@@ -10,11 +10,11 @@
         "primevue",
         "admin-panel"
     ],
-    "license": "MIT",
+    "license": "PolyForm-Noncommercial-1.0.0",
     "authors": [
         {
-            "name": "Levent",
-            "email": "levent@lvntr.com"
+            "name": "LVNTR",
+            "email": "info@lvntr.dev"
         }
     ],
     "require": {
