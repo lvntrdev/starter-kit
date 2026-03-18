@@ -46,21 +46,13 @@ class InstallCommand extends Command
     ];
 
     /**
-     * Paths that must always be overwritten, even without --force.
-     * These contain critical schema/config changes that differ from Laravel defaults.
+     * Paths that may be skipped if they already exist (user-customizable on re-install).
+     * Everything NOT in this list will always be overwritten, even without --force.
      *
      * @var list<string>
      */
-    private array $forceOverwritePaths = [
-        'database/migrations/',
-        'database/seeders/',
-        'package.json',
-        'vite.config.ts',
-        'tsconfig.json',
-        'resources/js/app.ts',
-        'resources/js/ssr.ts',
-        'resources/css/app.css',
-        'bootstrap/',
+    private array $preservablePaths = [
+        'lang/',
     ];
 
     public function handle(): int
@@ -322,7 +314,7 @@ class InstallCommand extends Command
                 $this->files->makeDirectory($targetDir, 0755, true);
             }
 
-            if (! $force && ! $this->isForceOverwritePath($relativePath) && $this->files->exists($targetPath)) {
+            if (! $force && $this->isPreservable($relativePath) && $this->files->exists($targetPath)) {
                 $this->skipped[] = $relativePath;
 
                 continue;
@@ -334,13 +326,15 @@ class InstallCommand extends Command
     }
 
     /**
-     * Check if a path must always be overwritten (e.g. migrations with critical schema changes).
+     * Check if a path is user-customizable and should be preserved on re-install.
+     * Only these paths are skipped when the file already exists (without --force).
+     * Everything else is always overwritten to ensure a working installation.
      */
-    private function isForceOverwritePath(string $relativePath): bool
+    private function isPreservable(string $relativePath): bool
     {
         $normalized = str_replace('\\', '/', $relativePath);
 
-        foreach ($this->forceOverwritePaths as $path) {
+        foreach ($this->preservablePaths as $path) {
             if (str_starts_with($normalized, $path)) {
                 return true;
             }
