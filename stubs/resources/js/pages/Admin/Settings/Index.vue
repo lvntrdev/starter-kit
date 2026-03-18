@@ -1,5 +1,5 @@
 <script setup lang="ts">
-    import { TB } from '@/components/Lvntr-Starter-Kit/TabBuilder/core';
+    import { TB } from '@lvntr/components/TabBuilder/core';
     import AdminLayout from '@/layouts/AdminLayout.vue';
     import AuthTab from './AuthTab.vue';
     import GeneralTab from './GeneralTab.vue';

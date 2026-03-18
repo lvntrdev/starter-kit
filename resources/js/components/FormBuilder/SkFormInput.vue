@@ -12,8 +12,8 @@
         SelectOption,
         TextareaFieldConfig,
         ToggleButtonFieldConfig,
-    } from '@/components/Lvntr-Starter-Kit/FormBuilder/core';
-    import ColorSelector from '@/components/Lvntr-Starter-Kit/FormBuilder/SkColorSelector.vue';
+    } from '@lvntr/components/FormBuilder/core';
+    import ColorSelector from '@lvntr/components/FormBuilder/SkColorSelector.vue';
     import { useApi } from '@/composables/useApi';
     import { useConfirm } from '@/composables/useConfirm';
     import { trans } from 'laravel-vue-i18n';

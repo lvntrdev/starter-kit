@@ -1,5 +1,5 @@
 <script setup lang="ts">
-    import { DB } from '@/components/Lvntr-Starter-Kit/DatatableBuilder/core';
+    import { DB } from '@lvntr/components/DatatableBuilder/core';
     import { useDialog } from '@/composables/useDialog';
     import AdminLayout from '@/layouts/AdminLayout.vue';
     import ActivityLogDetail from '@/pages/Admin/ActivityLogs/components/ActivityLogDetail.vue';

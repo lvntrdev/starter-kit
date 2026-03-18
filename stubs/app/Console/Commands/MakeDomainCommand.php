@@ -1379,7 +1379,7 @@ VUE;
         // ── Index.vue ────────────────────────────────────────────────
         $this->putFile("{$baseDir}/Index.vue", <<<VUE
 <script setup lang="ts">
-    import { DB } from '@/components/Lvntr-Starter-Kit/DatatableBuilder/core';
+    import { DB } from '@lvntr/components/DatatableBuilder/core';
     import { useConfirm } from '@/composables/useConfirm';
     import { useDialog } from '@/composables/useDialog';
     import { useRefreshBus } from '@/composables/useRefreshBus';
@@ -1501,8 +1501,8 @@ VUE);
         // ── components/Form.vue ──────────────────────────────────────
         $this->putFile("{$baseDir}/components/{$formComponent}.vue", <<<VUE
 <script setup lang="ts">
-    import { FB } from '@/components/Lvntr-Starter-Kit/FormBuilder/core';
-    import SkForm from '@/components/Lvntr-Starter-Kit/FormBuilder/SkForm.vue';
+    import { FB } from '@lvntr/components/FormBuilder/core';
+    import SkForm from '@lvntr/components/FormBuilder/SkForm.vue';
     import {$routeImport} from '{$routeImportPath}';
 
     interface Props {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-    import { FB } from '@/components/Lvntr-Starter-Kit/FormBuilder/core';
-    import SkForm from '@/components/Lvntr-Starter-Kit/FormBuilder/SkForm.vue';
+    import { FB } from '@lvntr/components/FormBuilder/core';
+    import SkForm from '@lvntr/components/FormBuilder/SkForm.vue';
     import adminSettings from '@/routes/settings';
 
     interface Props {

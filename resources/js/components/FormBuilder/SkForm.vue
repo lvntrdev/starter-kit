@@ -9,12 +9,12 @@
         SelectOption,
         SlotFieldConfig,
         TitleFieldConfig,
-    } from '@/components/Lvntr-Starter-Kit/FormBuilder/core';
+    } from '@lvntr/components/FormBuilder/core';
     import { useApi } from '@/composables/useApi';
     import { useDefinition } from '@/composables/useDefinition';
     import { useEnum } from '@/composables/useEnum';
     import { trans } from 'laravel-vue-i18n';
-    import SkFormInput from '@/components/Lvntr-Starter-Kit/FormBuilder/SkFormInput.vue';
+    import SkFormInput from '@lvntr/components/FormBuilder/SkFormInput.vue';
 
     interface Props {
         config: FormBuilderConfig;

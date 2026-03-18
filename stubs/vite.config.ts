@@ -14,6 +14,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': path.resolve(__dirname, 'resources/js'),
+            '@lvntr': path.resolve(__dirname, 'vendor/lvntr/starter-kit/resources/js'),
         },
     },
 
@@ -36,7 +37,10 @@ export default defineConfig({
         }),
 
         Components({
-            dirs: ['resources/js/components'],
+            dirs: [
+                'resources/js/components',
+                'vendor/lvntr/starter-kit/resources/js/components',
+            ],
             dts: 'components.d.ts',
             resolvers: [PrimeVueResolver()],
         }),

@@ -45,6 +45,24 @@ class InstallCommand extends Command
         'package-lock.json',
     ];
 
+    /**
+     * Paths that must always be overwritten, even without --force.
+     * These contain critical schema/config changes that differ from Laravel defaults.
+     *
+     * @var list<string>
+     */
+    private array $forceOverwritePaths = [
+        'database/migrations/',
+        'database/seeders/',
+        'package.json',
+        'vite.config.ts',
+        'tsconfig.json',
+        'resources/js/app.ts',
+        'resources/js/ssr.ts',
+        'resources/css/app.css',
+        'bootstrap/',
+    ];
+
     public function handle(): int
     {
         $this->files = new Filesystem;
@@ -139,6 +157,9 @@ class InstallCommand extends Command
             $this->components->twoColumnDetail('<fg=yellow>Skipped</>', count($this->skipped).' files (already exist, use --force to overwrite)');
         }
 
+        $this->newLine();
+        $this->components->warn('Run the following commands to ensure all components work correctly:');
+        $this->line('  <fg=cyan>npm install && npm run build</>');
         $this->newLine();
 
         return self::SUCCESS;
@@ -301,7 +322,7 @@ class InstallCommand extends Command
                 $this->files->makeDirectory($targetDir, 0755, true);
             }
 
-            if (! $force && $this->files->exists($targetPath)) {
+            if (! $force && ! $this->isForceOverwritePath($relativePath) && $this->files->exists($targetPath)) {
                 $this->skipped[] = $relativePath;
 
                 continue;
@@ -310,6 +331,22 @@ class InstallCommand extends Command
             $this->files->copy($file->getPathname(), $targetPath);
             $this->published[] = $relativePath;
         }
+    }
+
+    /**
+     * Check if a path must always be overwritten (e.g. migrations with critical schema changes).
+     */
+    private function isForceOverwritePath(string $relativePath): bool
+    {
+        $normalized = str_replace('\\', '/', $relativePath);
+
+        foreach ($this->forceOverwritePaths as $path) {
+            if (str_starts_with($normalized, $path)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -382,6 +419,10 @@ class InstallCommand extends Command
      */
     private function runSeeders(): void
     {
+        // Reload config files that were published during install
+        // (Laravel booted before these files existed, so they're not in the config repository)
+        $this->reloadPublishedConfigs();
+
         $seederPath = database_path('seeders');
         $files = glob($seederPath.'/_*.php');
         sort($files);
@@ -390,6 +431,10 @@ class InstallCommand extends Command
             $className = pathinfo($file, PATHINFO_FILENAME);
             $displayName = preg_replace('/^_\d+_/', '', $className);
             $fqcn = 'Database\\Seeders\\'.$className;
+
+            if (! class_exists($fqcn)) {
+                require_once $file;
+            }
 
             if (! class_exists($fqcn)) {
                 $this->components->warn("Class [{$fqcn}] not found — skipping.");
@@ -403,6 +448,23 @@ class InstallCommand extends Command
                     '--force' => true,
                 ]);
             });
+        }
+    }
+
+    /**
+     * Reload config files that were published during install.
+     * Laravel was already booted before these files existed, so they need to be loaded manually.
+     */
+    private function reloadPublishedConfigs(): void
+    {
+        $configPath = config_path();
+
+        foreach ($this->files->files($configPath) as $file) {
+            $key = pathinfo($file, PATHINFO_FILENAME);
+
+            if (config($key) === null) {
+                config([$key => require $file]);
+            }
         }
     }
 
@@ -467,38 +529,59 @@ class InstallCommand extends Command
      */
     private function installFrontend(): void
     {
-        // Remove old node_modules to ensure clean install with new package.json
+        // Remove old node_modules and lock file to ensure clean install with new package.json
         $nodeModules = base_path('node_modules');
+        $lockFile = base_path('package-lock.json');
+
         if ($this->files->isDirectory($nodeModules)) {
             $this->step('Removing old node_modules', function () use ($nodeModules) {
                 $this->files->deleteDirectory($nodeModules);
             });
         }
 
+        if ($this->files->exists($lockFile)) {
+            $this->files->delete($lockFile);
+        }
+
+        // 1. npm install
         $this->line('  <fg=gray>→</> Installing npm dependencies...');
 
         $npmInstall = new Process(['npm', 'install'], base_path(), null, null, 300);
         $npmInstall->run();
 
-        if ($npmInstall->isSuccessful()) {
-            $this->components->twoColumnDetail('Installing npm dependencies', '<fg=green>DONE</>');
-        } else {
+        if (! $npmInstall->isSuccessful()) {
             $this->components->twoColumnDetail('Installing npm dependencies', '<fg=red>FAILED</>');
             $this->line('  <fg=red>'.$npmInstall->getErrorOutput().'</>');
 
             return;
         }
 
-        // Generate Wayfinder route/action types before build
+        $this->components->twoColumnDetail('Installing npm dependencies', '<fg=green>DONE</>');
+
+        // 2. Clear config/route cache so wayfinder sees fresh routes
+        $this->runProcess(['php', 'artisan', 'config:clear'], 'Clearing config cache');
+        $this->runProcess(['php', 'artisan', 'route:clear'], 'Clearing route cache');
+
+        // 3. Generate Wayfinder route/action TypeScript files (required for build)
         $this->line('  <fg=gray>→</> Generating Wayfinder types...');
+
         $wayfinderProcess = new Process(['php', 'artisan', 'wayfinder:generate'], base_path(), null, null, 60);
         $wayfinderProcess->run();
-        if ($wayfinderProcess->isSuccessful()) {
-            $this->components->twoColumnDetail('Generating Wayfinder types', '<fg=green>DONE</>');
-        } else {
-            $this->components->twoColumnDetail('Generating Wayfinder types', '<fg=yellow>SKIPPED</>');
+
+        if (! $wayfinderProcess->isSuccessful()) {
+            $this->components->twoColumnDetail('Generating Wayfinder types', '<fg=red>FAILED</>');
+            $this->line('  <fg=red>'.$wayfinderProcess->getErrorOutput().'</>');
+            $this->newLine();
+            $this->components->warn('Wayfinder types could not be generated. Build will fail.');
+            $this->line('  Fix the issue, then run:');
+            $this->line('  <fg=cyan>php artisan wayfinder:generate && npm run build</>');
+
+            return;
         }
 
+        $this->components->twoColumnDetail('Generating Wayfinder types', '<fg=green>DONE</>');
+
+        // 4. Build frontend
         $this->line('  <fg=gray>→</> Building frontend assets...');
 
         $npmBuild = new Process(['npm', 'run', 'build'], base_path(), null, null, 300);
@@ -510,6 +593,15 @@ class InstallCommand extends Command
             $this->components->twoColumnDetail('Building frontend assets', '<fg=red>FAILED</>');
             $this->line('  <fg=red>'.$npmBuild->getErrorOutput().'</>');
         }
+    }
+
+    /**
+     * Run a process silently, only for cache/clear type operations.
+     */
+    private function runProcess(array $command, string $label): void
+    {
+        $process = new Process($command, base_path(), null, null, 30);
+        $process->run();
     }
 
     // ══════════════════════════════════════════════════════════════════════

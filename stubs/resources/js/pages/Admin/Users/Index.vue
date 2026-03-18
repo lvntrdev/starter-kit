@@ -1,5 +1,5 @@
 <script setup lang="ts">
-    import { DB } from '@/components/Lvntr-Starter-Kit/DatatableBuilder/core';
+    import { DB } from '@lvntr/components/DatatableBuilder/core';
     import { useCan } from '@/composables/useCan';
     import { useConfirm } from '@/composables/useConfirm';
     import { useDialog } from '@/composables/useDialog';

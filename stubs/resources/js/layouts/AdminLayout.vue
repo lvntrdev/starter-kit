@@ -10,7 +10,7 @@
     import AdminHeader from '@/layouts/components/AdminHeader.vue';
     import AdminFooter from '@/layouts/components/AdminFooter.vue';
     import AdminPageHeader from '@/layouts/components/AdminPageHeader.vue';
-    import AppDialog from '@/components/Lvntr-Starter-Kit/AppDialog.vue';
+    import AppDialog from '@lvntr/components/AppDialog.vue';
     import { Head } from '@inertiajs/vue3';
     import { trans } from 'laravel-vue-i18n';
 
