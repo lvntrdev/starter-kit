@@ -16,7 +16,7 @@ class _03_SettingSeeder extends Seeder
             'general' => [
                 'app_name' => config('app.name'),
                 'app_url' => config('app.url'),
-                'timezone' => config('app.display_timezone'),
+                'timezone' => config('app.display_timezone', 'UTC'),
                 'languages' => implode(',', array_keys(config('app.languages', ['en' => 'English']))),
                 'debug' => config('app.debug') ? '1' : '0',
             ],

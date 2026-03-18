@@ -13,10 +13,12 @@ export interface TabDefinition {
 export function useUrlTab(tabs: TabDefinition[], queryParam = 'tab') {
     const page = usePage();
 
-    const currentQuery = computed(() => {
-        const url = new URL(page.url, window.location.origin);
-        return url.searchParams;
-    });
+    function parseUrl(): URL {
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+        return new URL(page.url, origin);
+    }
+
+    const currentQuery = computed(() => parseUrl().searchParams);
 
     const activeTab = computed({
         get: () => {
@@ -25,7 +27,7 @@ export function useUrlTab(tabs: TabDefinition[], queryParam = 'tab') {
             return found ? found.key : (tabs[0]?.key ?? '');
         },
         set: (value: string) => {
-            const url = new URL(page.url, window.location.origin);
+            const url = parseUrl();
             if (value === tabs[0]?.key) {
                 url.searchParams.delete(queryParam);
             } else {
