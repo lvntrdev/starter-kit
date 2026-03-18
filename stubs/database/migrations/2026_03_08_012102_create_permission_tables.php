@@ -26,6 +26,7 @@ return new class extends Migration
         Schema::create($tableNames['permissions'], static function (Blueprint $table) {
             $table->id(); // permission id
             $table->string('name');
+            $table->json('display_name')->nullable();
             $table->string('guard_name');
             $table->timestamps();
 
@@ -42,7 +43,11 @@ return new class extends Migration
                 $table->index($columnNames['team_foreign_key'], 'roles_team_foreign_key_index');
             }
             $table->string('name');
+            $table->json('display_name')->nullable();
+            $table->string('group')->nullable();
             $table->string('guard_name');
+            $table->unsignedInteger('sort_order')->default(999);
+            $table->json('seeded_permissions')->nullable();
             $table->timestamps();
             if ($teams || config('permission.testing')) {
                 $table->unique([$columnNames['team_foreign_key'], 'name', 'guard_name']);

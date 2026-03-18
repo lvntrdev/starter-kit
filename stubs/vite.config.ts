@@ -1,5 +1,4 @@
-/// <reference types="vitest" />
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
@@ -10,15 +9,16 @@ import Components from 'unplugin-vue-components/vite';
 import { PrimeVueResolver } from '@primevue/auto-import-resolver';
 import path from 'path';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
     resolve: {
         alias: {
+            '@/components/Lvntr-Starter-Kit': path.resolve(__dirname, 'vendor/lvntr/starter-kit/resources/js/components'),
             '@': path.resolve(__dirname, 'resources/js'),
         },
     },
 
     plugins: [
-        wayfinder(),
+        command === 'serve' ? wayfinder() : null,
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.ts'],
             ssr: 'resources/js/ssr.ts',
@@ -36,7 +36,10 @@ export default defineConfig({
         }),
 
         Components({
-            dirs: ['resources/js/components'],
+            dirs: [
+                'resources/js/components',
+                'vendor/lvntr/starter-kit/resources/js/components',
+            ],
             dts: 'components.d.ts',
             resolvers: [PrimeVueResolver()],
         }),
@@ -70,4 +73,4 @@ export default defineConfig({
         environment: 'jsdom',
         globals: true,
     },
-});
+}));

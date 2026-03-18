@@ -23,6 +23,7 @@
         "inertiajs/inertia-laravel": "^2.0",
         "laravel/fortify": "^1.35",
         "laravel/passport": "^13.5",
+        "laravel/wayfinder": "^0.1",
         "spatie/laravel-activitylog": "^4.9",
         "spatie/laravel-medialibrary": "^11.12",
         "spatie/laravel-permission": "^7.2",

@@ -2,16 +2,18 @@
 
 namespace Lvntr\StarterKit\Console\Commands;
 
+use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Lvntr\StarterKit\StarterKitServiceProvider;
+use Symfony\Component\Process\Process;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
-use function Laravel\Prompts\spin;
 use function Laravel\Prompts\text;
 
 class InstallCommand extends Command
@@ -29,6 +31,20 @@ class InstallCommand extends Command
     /** @var list<string> */
     private array $skipped = [];
 
+    /**
+     * Default Laravel files that conflict with Starter Kit stubs.
+     *
+     * @var list<string>
+     */
+    private array $conflictingFiles = [
+        'vite.config.js',
+        'vite.config.mjs',
+        'resources/js/app.js',
+        'resources/js/bootstrap.js',
+        'resources/views/welcome.blade.php',
+        'package-lock.json',
+    ];
+
     public function handle(): int
     {
         $this->files = new Filesystem;
@@ -41,44 +57,69 @@ class InstallCommand extends Command
         $this->configureDatabaseStep();
 
         // 2. Publish stubs
-        $this->publishStubs();
+        $this->step('Publishing application scaffolding', function () {
+            $stubsPath = StarterKitServiceProvider::stubsPath();
+            $this->publishDirectory($stubsPath, base_path(), $this->option('force'));
+        });
 
-        // 3. Publish config
-        $this->publishConfig();
+        // 3. Remove conflicting default Laravel files
+        $this->step('Removing conflicting default files', function () {
+            foreach ($this->conflictingFiles as $file) {
+                $path = base_path($file);
+                if ($this->files->exists($path)) {
+                    $this->files->delete($path);
+                }
+            }
+        });
 
-        // 4. Create hash registry directory
-        $this->createHashRegistry();
+        // 4. Publish config
+        $this->step('Publishing configuration', function () {
+            $this->callSilently('vendor:publish', [
+                '--tag' => 'starter-kit-config',
+                '--force' => $this->option('force'),
+            ]);
+        });
 
-        // 5. Run migrations
+        // 5. Create hash registry directory
+        $dir = storage_path('starter-kit');
+        if (! $this->files->isDirectory($dir)) {
+            $this->files->makeDirectory($dir, 0755, true);
+        }
+
+        // 6. Regenerate autoload so published classes are available for migrations/seeders
+        $this->step('Regenerating autoload', function () {
+            $process = new Process(['composer', 'dump-autoload', '-q'], base_path(), null, null, 120);
+            $process->run();
+        });
+
+        // 7. Run migrations
         if ($this->confirmStep('Run database migrations?')) {
             $this->runMigrations();
         }
 
-        // 6. Run seeders
+        // 8. Run seeders
         if ($this->confirmStep('Run database seeders?')) {
             $this->runSeeders();
-            $this->components->info('Seeders completed.');
         }
 
-        // 7. Passport keys
+        // 9. Passport keys
         if ($this->confirmStep('Generate Passport encryption keys?')) {
-            spin(function () {
-                return $this->callSilently('passport:keys', ['--force' => true]) === 0;
-            }, 'Installing Passport keys...');
-            $this->components->info('Passport keys generated.');
+            $this->step('Generating Passport keys', function () {
+                $this->callSilently('passport:keys', ['--force' => true]);
+            });
         }
 
-        // 8. Create admin user
+        // 10. Create admin user
         if ($this->confirmStep('Create default admin user?')) {
             $this->createAdminUser();
         }
 
-        // 9. Install npm dependencies
+        // 11. Install npm dependencies
         if ($this->confirmStep('Install npm dependencies and build assets?')) {
             $this->installFrontend();
         }
 
-        // 10. Save stub hashes for update tracking
+        // 12. Save stub hashes for update tracking
         $this->saveStubHashes();
 
         // Summary
@@ -96,6 +137,20 @@ class InstallCommand extends Command
         $this->newLine();
 
         return self::SUCCESS;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // STEP RUNNER
+    // ══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Run a step with simple before/after output (no spinner).
+     */
+    private function step(string $label, callable $callback): void
+    {
+        $this->line("  <fg=gray>→</> {$label}...");
+        $callback();
+        $this->components->twoColumnDetail($label, '<fg=green>DONE</>');
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -220,19 +275,6 @@ class InstallCommand extends Command
     // ══════════════════════════════════════════════════════════════════════
 
     /**
-     * Publish all stub files to the application.
-     */
-    private function publishStubs(): void
-    {
-        $stubsPath = StarterKitServiceProvider::stubsPath();
-        $force = $this->option('force');
-
-        $this->components->task('Publishing application scaffolding', function () use ($stubsPath, $force) {
-            $this->publishDirectory($stubsPath, base_path(), $force);
-        });
-    }
-
-    /**
      * Recursively publish a directory.
      */
     private function publishDirectory(string $source, string $destination, bool $force): void
@@ -262,30 +304,6 @@ class InstallCommand extends Command
 
             $this->files->copy($file->getPathname(), $targetPath);
             $this->published[] = $relativePath;
-        }
-    }
-
-    /**
-     * Publish package config file.
-     */
-    private function publishConfig(): void
-    {
-        $this->components->task('Publishing configuration', function () {
-            $this->callSilently('vendor:publish', [
-                '--tag' => 'starter-kit-config',
-                '--force' => $this->option('force'),
-            ]);
-        });
-    }
-
-    /**
-     * Create the hash registry storage directory.
-     */
-    private function createHashRegistry(): void
-    {
-        $dir = storage_path('starter-kit');
-        if (! $this->files->isDirectory($dir)) {
-            $this->files->makeDirectory($dir, 0755, true);
         }
     }
 
@@ -337,21 +355,17 @@ class InstallCommand extends Command
                     return;
                 }
 
-                spin(function () {
-                    return $this->callSilently('migrate:fresh', ['--force' => true]) === 0;
-                }, 'Running migrate:fresh...');
-
-                $this->components->info('Fresh migrations completed.');
+                $this->step('Running migrate:fresh', function () {
+                    $this->callSilently('migrate:fresh', ['--force' => true]);
+                });
 
                 return;
             }
         }
 
-        spin(function () {
-            return $this->callSilently('migrate', ['--force' => true]) === 0;
-        }, 'Running migrations...');
-
-        $this->components->info('Migrations completed.');
+        $this->step('Running migrations', function () {
+            $this->callSilently('migrate', ['--force' => true]);
+        });
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -378,12 +392,12 @@ class InstallCommand extends Command
                 continue;
             }
 
-            spin(function () use ($fqcn) {
-                return $this->callSilently('db:seed', [
+            $this->step("Seeding: {$displayName}", function () use ($fqcn) {
+                $this->callSilently('db:seed', [
                     '--class' => $fqcn,
                     '--force' => true,
-                ]) === 0;
-            }, "Seeding: {$displayName}...");
+                ]);
+            });
         }
     }
 
@@ -404,29 +418,35 @@ class InstallCommand extends Command
             $password = text('Admin password:', default: $password, required: true);
         }
 
-        spin(function () use ($email, $password) {
-            $userModel = config('auth.providers.users.model', \App\Models\User::class);
+        // Use DB::table directly because the User model loaded in memory
+        // is the default Laravel model, not the published stub model.
+        $this->step("Creating admin user ({$email})", function () use ($email, $password) {
+            $id = (string) Str::uuid();
 
-            if (! class_exists($userModel)) {
-                return false;
-            }
-
-            $user = $userModel::create([
+            DB::table('users')->insert([
+                'id' => $id,
                 'first_name' => 'Admin',
                 'last_name' => 'User',
                 'email' => $email,
                 'password' => Hash::make($password),
                 'status' => 'active',
+                'email_verified_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
-            $user->forceFill(['email_verified_at' => now()])->save();
-
-            if (method_exists($user, 'assignRole')) {
-                $user->assignRole('system_admin');
+            // Assign system_admin role if roles table exists
+            if (Schema::hasTable('roles') && Schema::hasTable('model_has_roles')) {
+                $role = DB::table('roles')->where('name', 'system_admin')->first();
+                if ($role) {
+                    DB::table('model_has_roles')->insert([
+                        'role_id' => $role->id,
+                        'model_type' => 'App\\Models\\User',
+                        'model_id' => $id,
+                    ]);
+                }
             }
-
-            return true;
-        }, "Creating admin user ({$email})...");
+        });
 
         $this->newLine();
         $this->components->twoColumnDetail('<fg=green>Admin Email</>', $email);
@@ -442,13 +462,49 @@ class InstallCommand extends Command
      */
     private function installFrontend(): void
     {
-        $this->components->task('Installing npm dependencies', function () {
-            return exec('npm install 2>&1', $output, $code) !== false && $code === 0;
-        });
+        // Remove old node_modules to ensure clean install with new package.json
+        $nodeModules = base_path('node_modules');
+        if ($this->files->isDirectory($nodeModules)) {
+            $this->step('Removing old node_modules', function () use ($nodeModules) {
+                $this->files->deleteDirectory($nodeModules);
+            });
+        }
 
-        $this->components->task('Building frontend assets', function () {
-            return exec('npm run build 2>&1', $output, $code) !== false && $code === 0;
-        });
+        $this->line('  <fg=gray>→</> Installing npm dependencies...');
+
+        $npmInstall = new Process(['npm', 'install'], base_path(), null, null, 300);
+        $npmInstall->run();
+
+        if ($npmInstall->isSuccessful()) {
+            $this->components->twoColumnDetail('Installing npm dependencies', '<fg=green>DONE</>');
+        } else {
+            $this->components->twoColumnDetail('Installing npm dependencies', '<fg=red>FAILED</>');
+            $this->line('  <fg=red>'.$npmInstall->getErrorOutput().'</>');
+
+            return;
+        }
+
+        // Generate Wayfinder route/action types before build
+        $this->line('  <fg=gray>→</> Generating Wayfinder types...');
+        $wayfinderProcess = new Process(['php', 'artisan', 'wayfinder:generate'], base_path(), null, null, 60);
+        $wayfinderProcess->run();
+        if ($wayfinderProcess->isSuccessful()) {
+            $this->components->twoColumnDetail('Generating Wayfinder types', '<fg=green>DONE</>');
+        } else {
+            $this->components->twoColumnDetail('Generating Wayfinder types', '<fg=yellow>SKIPPED</>');
+        }
+
+        $this->line('  <fg=gray>→</> Building frontend assets...');
+
+        $npmBuild = new Process(['npm', 'run', 'build'], base_path(), null, null, 300);
+        $npmBuild->run();
+
+        if ($npmBuild->isSuccessful()) {
+            $this->components->twoColumnDetail('Building frontend assets', '<fg=green>DONE</>');
+        } else {
+            $this->components->twoColumnDetail('Building frontend assets', '<fg=red>FAILED</>');
+            $this->line('  <fg=red>'.$npmBuild->getErrorOutput().'</>');
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════
