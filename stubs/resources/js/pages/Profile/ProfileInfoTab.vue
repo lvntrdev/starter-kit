@@ -1,8 +1,8 @@
 <script setup lang="ts">
-    import { FB } from '@lvntr/components/FormBuilder/core';
-    import SkForm from '@lvntr/components/FormBuilder/SkForm.vue';
     import userProfileInformation from '@/routes/user-profile-information';
     import { usePage } from '@inertiajs/vue3';
+    import { FB } from '@lvntr/components/FormBuilder/core';
+    import SkForm from '@lvntr/components/FormBuilder/SkForm.vue';
     import { trans } from 'laravel-vue-i18n';
 
     const page = usePage();
@@ -46,6 +46,7 @@
         delete-url="/user/avatar"
         :title="$t('admin.avatar.title')"
         :subtitle="$t('admin.avatar.subtitle')"
+        class="mb-8"
     />
 
     <!-- Profile form -->
