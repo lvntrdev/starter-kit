@@ -5,8 +5,9 @@
         subtitle?: string;
     }
 
+    import { computed } from 'vue';
     import { useDarkMode } from '@/composables/useDarkMode';
-    import { Head } from '@inertiajs/vue3';
+    import { Head, usePage } from '@inertiajs/vue3';
 
     withDefaults(defineProps<Props>(), {
         title: '',
@@ -14,6 +15,7 @@
     });
 
     const { isDark, toggleDark } = useDarkMode();
+    const appName = computed(() => (usePage().props.appName as string) || 'Laravel');
 </script>
 
 <template>
@@ -26,7 +28,7 @@
             <div class="auth-left-icon">
                 <i class="pi pi-shield text-5xl" />
             </div>
-            <h1>STARTER KIT 12</h1>
+            <h1>{{ appName }}</h1>
             <h2>Management Console Access</h2>
             <div class="dots">
                 <div class="__icon" />
