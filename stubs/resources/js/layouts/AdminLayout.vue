@@ -1,18 +1,17 @@
 <!-- resources/js/layouts/AdminLayout.vue -->
 <script setup lang="ts">
-    import { useSidebar } from '@/composables/useSidebar';
     import { useDarkMode } from '@/composables/useDarkMode';
     import { useFlash } from '@/composables/useFlash';
     import { usePageLoading } from '@/composables/usePageLoading';
-    import { useToast } from 'primevue/usetoast';
-    import { router } from '@inertiajs/vue3';
-    import AdminSidebar from '@/layouts/components/AdminSidebar.vue';
-    import AdminHeader from '@/layouts/components/AdminHeader.vue';
+    import { useSidebar } from '@/composables/useSidebar';
     import AdminFooter from '@/layouts/components/AdminFooter.vue';
+    import AdminHeader from '@/layouts/components/AdminHeader.vue';
     import AdminPageHeader from '@/layouts/components/AdminPageHeader.vue';
-    import AppDialog from '@lvntr/components/AppDialog.vue';
-    import { Head } from '@inertiajs/vue3';
+    import AdminSidebar from '@/layouts/components/AdminSidebar.vue';
+    import { Head, router } from '@inertiajs/vue3';
+    import AppDialog from '@lvntr/components/ui/AppDialog.vue';
     import { trans } from 'laravel-vue-i18n';
+    import { useToast } from 'primevue/usetoast';
 
     interface Props {
         title?: string;
