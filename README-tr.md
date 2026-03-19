@@ -66,48 +66,6 @@
 
 ### 1. Paketi ekleyin
 
-**Packagist'ten (yayinlandiginda):**
-
-```bash
-composer require lvntr/starter-kit
-```
-
-**Yerel yoldan (gelistirme icin):**
-
-Projenizin `composer.json` dosyasina ekleyin:
-
-```json
-{
-    "repositories": [
-        {
-            "type": "path",
-            "url": "./packages/lvntr/starter-kit"
-        }
-    ]
-}
-```
-
-Ardindan:
-
-```bash
-composer require lvntr/starter-kit:@dev
-```
-
-**Ozel Git deposundan:**
-
-```json
-{
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "git@github.com:lvntrdev/starter-kit.git"
-        }
-    ]
-}
-```
-
-Ardindan:
-
 ```bash
 composer require lvntr/starter-kit
 ```

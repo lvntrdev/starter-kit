@@ -98,7 +98,8 @@ return [
     'permission_groups' => [
         'users' => ['users'],
         // 'users' => ['users', 'users:student', 'users:guardian', 'users:personal'],
-        'system' => ['roles', 'activity-logs', 'settings', 'api-routes', 'pulse', 'api-docs'],
+        'system' => ['roles', 'settings'],
+        'developer' => ['activity-logs', 'api-routes', 'pulse', 'api-docs'],
     ],
 
     /*
@@ -134,15 +135,11 @@ return [
         'admin' => [
             'users.create', 'users.read', 'users.update', 'users.delete',
             'roles.read',
-            'activity-logs.read',
-            'settings.read',
-            'api-routes.read',
             'dashboard.read',
             // 'users:student.create', 'users:student.read', 'users:student.update', 'users:student.delete',
             // 'users:guardian.create', 'users:guardian.read', 'users:guardian.update', 'users:guardian.delete',
         ],
         'user' => [
-            'users.read',
             'dashboard.read',
         ],
     ],

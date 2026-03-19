@@ -1,5 +1,7 @@
 <?php
 
+use Spatie\Activitylog\Models\Activity;
+
 return [
 
     /*
@@ -67,7 +69,7 @@ return [
      | and extend Illuminate\Database\Eloquent\Model.
      |
      */
-    'activity_model' => \Spatie\Activitylog\Models\Activity::class,
+    'activity_model' => Activity::class,
 
     /*
      |--------------------------------------------------------------------------

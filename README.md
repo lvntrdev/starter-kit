@@ -66,48 +66,6 @@ A full-featured Laravel admin panel package built with **Laravel 12**, **Inertia
 
 ### 1. Require the package
 
-**From Packagist (when published):**
-
-```bash
-composer require lvntr/starter-kit
-```
-
-**From a local path (for development):**
-
-Add to your project's `composer.json`:
-
-```json
-{
-    "repositories": [
-        {
-            "type": "path",
-            "url": "./packages/lvntr/starter-kit"
-        }
-    ]
-}
-```
-
-Then:
-
-```bash
-composer require lvntr/starter-kit:@dev
-```
-
-**From a private Git repository:**
-
-```json
-{
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "git@github.com:lvntrdev/starter-kit.git"
-        }
-    ]
-}
-```
-
-Then:
-
 ```bash
 composer require lvntr/starter-kit
 ```

@@ -3,6 +3,7 @@
 namespace App\Domain\Shared\Actions;
 
 use App\Domain\Shared\Contracts\PipeableAction;
+use App\Domain\Shared\Pipelines\ActionPipeline;
 
 /**
  * Base Action class.
@@ -21,7 +22,7 @@ use App\Domain\Shared\Contracts\PipeableAction;
  *       Action dispatches Events → Listeners handle side effects
  *
  * @see PipeableAction
- * @see \App\Domain\Shared\Pipelines\ActionPipeline
+ * @see ActionPipeline
  */
 abstract class BaseAction
 {
