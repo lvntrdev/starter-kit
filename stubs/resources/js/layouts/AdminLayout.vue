@@ -10,7 +10,7 @@
     import AdminSidebar from '@/layouts/components/AdminSidebar.vue';
     import { Head, router } from '@inertiajs/vue3';
     import AppDialog from '@lvntr/components/ui/AppDialog.vue';
-    import ConfirmDialogComponent from '@/components/Lvntr-Starter-Kit/UI/ConfirmDialogComponent.vue';
+    import ConfirmDialogComponent from '@lvntr/components/ui/ConfirmDialogComponent.vue';
     import { trans } from 'laravel-vue-i18n';
     import { useToast } from 'primevue/usetoast';
 
