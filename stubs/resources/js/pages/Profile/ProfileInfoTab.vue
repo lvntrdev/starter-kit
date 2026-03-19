@@ -12,7 +12,8 @@
         FB.form()
             .layout('vertical')
             .cols(2)
-            .isCard(false)
+            .cardTitle('admin.profile.info_title')
+            .cardSubtitle('admin.profile.info_subtitle')
             .initialData({
                 first_name: user.value?.first_name ?? '',
                 last_name: user.value?.last_name ?? '',
@@ -38,27 +39,15 @@
 </script>
 
 <template>
-    <Card>
-        <template #title>
-            {{ $t('admin.profile.info_title') }}
-        </template>
-        <template #subtitle>
-            {{ $t('admin.profile.info_subtitle') }}
-        </template>
-        <template #content>
-            <div class="space-y-6">
-                <!-- Avatar (independent upload) -->
-                <div class="border-b border-surface-200 pb-6 dark:border-surface-700">
-                    <AvatarUpload
-                        :avatar-url="(user as any)?.avatar_url"
-                        upload-url="/user/avatar"
-                        delete-url="/user/avatar"
-                    />
-                </div>
+    <!-- Avatar -->
+    <AvatarUpload
+        :avatar-url="(user as any)?.avatar_url"
+        upload-url="/user/avatar"
+        delete-url="/user/avatar"
+        :title="$t('admin.avatar.title')"
+        :subtitle="$t('admin.avatar.subtitle')"
+    />
 
-                <!-- Profile form -->
-                <SkForm :config="formConfig" />
-            </div>
-        </template>
-    </Card>
+    <!-- Profile form -->
+    <SkForm :config="formConfig" />
 </template>

@@ -155,6 +155,11 @@ return [
             'title' => 'General Settings',
             'subtitle' => 'Configure basic application settings.',
             'languages_hint' => 'Select the languages your application supports.',
+            'logo' => 'Application Logo',
+            'logo_hint' => 'Upload a logo to display in the sidebar and login page.',
+            'logo_upload' => 'Upload Logo',
+            'logo_remove' => 'Remove',
+            'logo_remove_confirm' => 'Are you sure you want to remove the application logo?',
         ],
 
         'auth' => [
@@ -245,6 +250,8 @@ return [
     */
 
     'avatar' => [
+        'title' => 'Profile Photo',
+        'subtitle' => 'Upload a profile photo to personalize your account.',
         'change' => 'Change',
         'remove' => 'Remove',
         'hint' => 'JPG, PNG or GIF. Max 2MB.',

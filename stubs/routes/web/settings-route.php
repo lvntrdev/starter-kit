@@ -13,4 +13,6 @@ Route::prefix('settings')
         Route::put('mail', 'updateMail')->name('update.mail')->middleware('check.permission:settings.update');
         Route::put('storage', 'updateStorage')->name('update.storage')->middleware('check.permission:settings.update');
         Route::post('test-mail', 'testMail')->name('testMail')->middleware('check.permission:settings.update');
+        Route::post('logo', 'uploadLogo')->name('upload.logo')->middleware('check.permission:settings.update');
+        Route::delete('logo', 'deleteLogo')->name('delete.logo')->middleware('check.permission:settings.update');
     });

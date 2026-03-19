@@ -55,7 +55,10 @@ class _03_SettingSeeder extends Seeder
 
         foreach ($defaults as $group => $settings) {
             foreach ($settings as $key => $value) {
-                Setting::setValue("{$group}.{$key}", $value);
+                Setting::firstOrCreate(
+                    ['group' => $group, 'key' => $key],
+                    ['value' => $value],
+                );
             }
         }
     }

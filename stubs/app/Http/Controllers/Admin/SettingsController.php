@@ -15,7 +15,11 @@ use App\Http\Requests\Admin\Settings\UpdateAuthSettingsRequest;
 use App\Http\Requests\Admin\Settings\UpdateGeneralSettingsRequest;
 use App\Http\Requests\Admin\Settings\UpdateMailSettingsRequest;
 use App\Http\Requests\Admin\Settings\UpdateStorageSettingsRequest;
+use App\Models\Setting;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -80,6 +84,44 @@ class SettingsController extends Controller
         $action->execute('storage', StorageSettingsDTO::fromArray($request->validated()));
 
         return back()->with('success', 'Storage settings updated.');
+    }
+
+    /**
+     * Upload application logo.
+     */
+    public function uploadLogo(Request $request): JsonResponse
+    {
+        $request->validate([
+            'logo' => ['required', 'image', 'mimes:png,jpg,jpeg,svg,webp', 'max:2048'],
+        ]);
+
+        // Delete old logo if exists
+        $oldLogo = Setting::getValue('general.logo');
+        if ($oldLogo && Storage::disk('public')->exists($oldLogo)) {
+            Storage::disk('public')->delete($oldLogo);
+        }
+
+        $path = $request->file('logo')->store('logo', 'public');
+        Setting::setValue('general.logo', $path);
+
+        return response()->json([
+            'data' => ['logo_url' => Storage::disk('public')->url($path)],
+        ]);
+    }
+
+    /**
+     * Delete application logo.
+     */
+    public function deleteLogo(): JsonResponse
+    {
+        $path = Setting::getValue('general.logo');
+        if ($path && Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
+
+        Setting::setValue('general.logo', null);
+
+        return response()->json(status: 204);
     }
 
     /**

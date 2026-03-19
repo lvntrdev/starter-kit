@@ -3,6 +3,7 @@
 namespace App\Domain\Setting\Queries;
 
 use App\Models\Setting;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Query: Resolve settings with config fallbacks for each group.
@@ -32,12 +33,15 @@ class SettingsDefaultsQuery
         $stored = Setting::getGroup('general');
         $defaultLanguages = implode(',', array_keys(config('app.languages', ['en' => 'English'])));
 
+        $logoPath = $stored['logo'] ?? null;
+
         return [
             'app_name' => $stored['app_name'] ?? config('app.name'),
             'app_url' => $stored['app_url'] ?? config('app.url'),
             'timezone' => $stored['timezone'] ?? config('app.display_timezone'),
             'languages' => explode(',', $stored['languages'] ?? $defaultLanguages),
             'debug' => ($stored['debug'] ?? (config('app.debug') ? '1' : '0')) === '1',
+            'logo_url' => $logoPath ? Storage::disk('public')->url($logoPath) : null,
         ];
     }
 

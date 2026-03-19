@@ -15,6 +15,10 @@
             }
         }
 
+        .auth-left-logo {
+            @apply mb-8 h-20 w-auto max-w-[280px] object-contain;
+        }
+
         h1 {
             @apply text-5xl font-bold text-slate-900 dark:text-white;
         }

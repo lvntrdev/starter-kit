@@ -7,10 +7,16 @@
         avatarUrl?: string | null;
         uploadUrl: string;
         deleteUrl: string;
+        title?: string;
+        subtitle?: string;
+        isCard?: boolean;
     }
 
     const props = withDefaults(defineProps<Props>(), {
         avatarUrl: null,
+        title: '',
+        subtitle: '',
+        isCard: true,
     });
 
     const { confirmDelete } = useConfirm();
@@ -82,6 +88,18 @@
         }
     }
 
+    const transparentCard = { style: 'background: transparent; box-shadow: none; border: 0; padding: 0' };
+    const cardPt = computed(() => {
+        if (!props.isCard) {
+            return {
+                root: transparentCard,
+                body: { style: 'padding: 0' },
+                content: { style: 'padding: 0' },
+            };
+        }
+        return {};
+    });
+
     function removeAvatar() {
         confirmDelete(async () => {
             uploading.value = true;
@@ -113,45 +131,55 @@
 </script>
 
 <template>
-    <div class="flex flex-col items-center gap-3 sm:flex-row">
-        <div
-            class="relative flex size-24 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-surface-100 dark:bg-surface-800"
-            @click="selectFile"
-        >
-            <img v-if="currentUrl" :src="currentUrl" alt="Avatar" class="size-full object-cover">
-            <i v-else class="pi pi-user text-3xl text-surface-400" />
-            <div
-                class="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity hover:opacity-100"
-            >
-                <i v-if="uploading" class="pi pi-spin pi-spinner text-lg text-white" />
-                <i v-else class="pi pi-camera text-lg text-white" />
-            </div>
-        </div>
-        <div class="flex flex-col gap-1">
-            <div class="flex gap-2">
-                <Button
-                    type="button"
-                    :label="$t('admin.avatar.change')"
-                    icon="pi pi-upload"
-                    size="small"
-                    outlined
-                    :loading="uploading"
+    <Card :pt="cardPt">
+        <template v-if="isCard && title" #title>
+            {{ title }}
+        </template>
+        <template v-if="isCard && subtitle" #subtitle>
+            {{ subtitle }}
+        </template>
+        <template #content>
+            <div class="flex flex-col items-center gap-3 sm:flex-row">
+                <div
+                    class="relative flex size-24 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-surface-100 dark:bg-surface-800"
                     @click="selectFile"
-                />
-                <Button
-                    v-if="currentUrl"
-                    type="button"
-                    :label="$t('admin.avatar.remove')"
-                    icon="pi pi-trash"
-                    size="small"
-                    severity="danger"
-                    outlined
-                    :disabled="uploading"
-                    @click="removeAvatar"
-                />
+                >
+                    <img v-if="currentUrl" :src="currentUrl" alt="Avatar" class="size-full object-cover">
+                    <i v-else class="pi pi-user text-3xl text-surface-400" />
+                    <div
+                        class="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity hover:opacity-100"
+                    >
+                        <i v-if="uploading" class="pi pi-spin pi-spinner text-lg text-white" />
+                        <i v-else class="pi pi-camera text-lg text-white" />
+                    </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <div class="flex gap-2">
+                        <Button
+                            type="button"
+                            :label="$t('admin.avatar.change')"
+                            icon="pi pi-upload"
+                            size="small"
+                            outlined
+                            :loading="uploading"
+                            @click="selectFile"
+                        />
+                        <Button
+                            v-if="currentUrl"
+                            type="button"
+                            :label="$t('admin.avatar.remove')"
+                            icon="pi pi-trash"
+                            size="small"
+                            severity="danger"
+                            outlined
+                            :disabled="uploading"
+                            @click="removeAvatar"
+                        />
+                    </div>
+                    <small class="text-surface-400">{{ $t('admin.avatar.hint') }}</small>
+                </div>
+                <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onFileSelected">
             </div>
-            <small class="text-surface-400">{{ $t('admin.avatar.hint') }}</small>
-        </div>
-        <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onFileSelected">
-    </div>
+        </template>
+    </Card>
 </template>

@@ -16,6 +16,7 @@
 
     const { isDark, toggleDark } = useDarkMode();
     const appName = computed(() => (usePage().props.appName as string) || 'Laravel');
+    const appLogo = computed(() => usePage().props.appLogo as string | null);
 </script>
 
 <template>
@@ -25,10 +26,15 @@
             <i :class="isDark ? 'pi pi-sun' : 'pi pi-moon'" />
         </button>
         <div class="auth-left">
-            <div class="auth-left-icon">
-                <i class="pi pi-shield text-5xl" />
-            </div>
-            <h1>{{ appName }}</h1>
+            <template v-if="appLogo">
+                <img :src="appLogo" alt="Logo" class="auth-left-logo">
+            </template>
+            <template v-else>
+                <div class="auth-left-icon">
+                    <i class="pi pi-shield text-5xl" />
+                </div>
+                <h1>{{ appName }}</h1>
+            </template>
             <h2>Management Console Access</h2>
             <div class="dots">
                 <div class="__icon" />

@@ -3,8 +3,10 @@
 namespace App\Http\Middleware;
 
 use App\Enums\EnumRegistry;
+use App\Models\Setting;
 use Composer\InstalledVersions;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Middleware;
 use Laravel\Fortify\Features;
 
@@ -53,6 +55,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'appName' => config('app.name'),
+            'appLogo' => fn () => ($logo = Setting::getValue('general.logo')) ? Storage::disk('public')->url($logo) : null,
             'appVersion' => InstalledVersions::getPrettyVersion('lvntr/starter-kit'),
             'appEnv' => config('app.env'),
             'appDebug' => config('app.debug'),

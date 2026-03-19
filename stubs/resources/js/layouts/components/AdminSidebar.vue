@@ -21,6 +21,7 @@
     provide('adminMenu', { isItemActive, isGroupOpen });
 
     const appName = computed(() => usePage().props.appName as string);
+    const appLogo = computed(() => usePage().props.appLogo as string | null);
 
     // Whether the sidebar is visually collapsed via CSS (icon-only mode)
     const isCollapsed = computed(() => props.collapsed && !props.isMobile);
@@ -49,12 +50,17 @@
     >
         <!-- Logo -->
         <div class="admin-sidebar__logo">
-            <div class="admin-sidebar__logo-icon">
-                <i class="pi pi-box" />
-            </div>
-            <span class="admin-sidebar__logo-text" :class="effectiveCollapsed ? 'opacity-0' : 'opacity-100'">
-                {{ appName }}
-            </span>
+            <template v-if="appLogo">
+                <img :src="appLogo" alt="Logo" class="admin-sidebar__logo-img">
+            </template>
+            <template v-else>
+                <div class="admin-sidebar__logo-icon">
+                    <i class="pi pi-box" />
+                </div>
+                <span class="admin-sidebar__logo-text" :class="effectiveCollapsed ? 'opacity-0' : 'opacity-100'">
+                    {{ appName }}
+                </span>
+            </template>
         </div>
 
         <!-- Navigation -->
