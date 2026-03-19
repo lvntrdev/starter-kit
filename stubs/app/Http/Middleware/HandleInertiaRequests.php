@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Enums\EnumRegistry;
+use Composer\InstalledVersions;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Laravel\Fortify\Features;
@@ -52,7 +53,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'appName' => config('app.name'),
-            'appVersion' => config('app.version'),
+            'appVersion' => InstalledVersions::getPrettyVersion('lvntr/starter-kit'),
             'appEnv' => config('app.env'),
             'appDebug' => config('app.debug'),
             'auth' => [
