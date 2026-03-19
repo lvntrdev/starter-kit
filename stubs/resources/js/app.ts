@@ -1,7 +1,7 @@
 import '../css/app.css';
 import 'primeicons/primeicons.css';
 import { createSSRApp, h, type DefineComponent } from 'vue';
-import { createInertiaApp } from '@inertiajs/vue3';
+import { createInertiaApp, usePage } from '@inertiajs/vue3';
 import { i18nVue } from 'laravel-vue-i18n';
 import PrimeVue from 'primevue/config';
 import ConfirmationService from 'primevue/confirmationservice';
@@ -18,10 +18,10 @@ createInertiaApp({
         includeCSS: true,
         showSpinner: false,
     },
-    title: (title) =>
-        title
-            ? `${title} - ${import.meta.env.VITE_APP_NAME || 'Starter Kit 12'}`
-            : import.meta.env.VITE_APP_NAME || 'Starter Kit 12',
+    title: (title) => {
+        const appName = (usePage().props.appName as string) || 'Laravel';
+        return title ? `${title} - ${appName}` : appName;
+    },
     resolve: (name) => {
         const pages = import.meta.glob<PageModule>('./pages/**/*.vue', {
             eager: true,

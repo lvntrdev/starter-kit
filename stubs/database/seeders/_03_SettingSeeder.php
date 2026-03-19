@@ -14,7 +14,7 @@ class _03_SettingSeeder extends Seeder
     {
         $defaults = [
             'general' => [
-                'app_name' => config('app.name'),
+                'app_name' => 'LVNTR Laravel Starter Kit',
                 'app_url' => config('app.url'),
                 'timezone' => config('app.display_timezone', 'UTC'),
                 'languages' => implode(',', array_keys(config('app.languages', ['en' => 'English']))),

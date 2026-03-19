@@ -15,10 +15,10 @@ createServer((page) =>
     createInertiaApp({
         page,
         render: renderToString,
-        title: (title) =>
-            title
-                ? `${title} - ${import.meta.env.VITE_APP_NAME || 'Starter Kit 12'}`
-                : import.meta.env.VITE_APP_NAME || 'Starter Kit 12',
+        title: (title) => {
+            const appName = (page.props.appName as string) || 'Laravel';
+            return title ? `${title} - ${appName}` : appName;
+        },
 
         resolve: (name) => {
             const pages = import.meta.glob<PageModule>('./pages/**/*.vue', {
