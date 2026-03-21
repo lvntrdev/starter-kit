@@ -80,6 +80,14 @@ export interface InputOtpFieldConfig extends BaseFieldConfig {
     integerOnly?: boolean;
 }
 
+/** Filter to include or exclude specific values from enum/definition options. */
+export interface OptionFilter {
+    /** Only include these values. */
+    only?: (string | number)[];
+    /** Exclude these values. */
+    except?: (string | number)[];
+}
+
 export interface SelectFieldConfig extends BaseFieldConfig {
     type: 'select' | 'multiselect' | 'select-button' | 'radio' | 'checkbox-group';
     /** Static option list. */
@@ -96,8 +104,12 @@ export interface SelectFieldConfig extends BaseFieldConfig {
      * Options are resolved from `page.props.enums[enumKey]` at render time.
      */
     enumKey?: string;
+    /** Filter for enum options (only/except specific values). */
+    enumFilter?: OptionFilter;
     /** DB-based definition key (e.g. 'gender'). Options are fetched from /api/v1/definitions. */
     definitionKey?: string;
+    /** Filter for definition options (only/except specific values). */
+    definitionFilter?: OptionFilter;
     optionLabel?: string;
     optionValue?: string;
     placeholder?: string;

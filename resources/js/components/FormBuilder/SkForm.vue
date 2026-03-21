@@ -5,6 +5,7 @@
         FieldConfig,
         FileUploadFieldConfig,
         FormBuilderConfig,
+        OptionFilter,
         SelectFieldConfig,
         SelectOption,
         SlotFieldConfig,
@@ -303,16 +304,29 @@
 
     // ── Field Helpers ─────────────────────────────────────────────────────────────
 
+    function applyFilter(items: SelectOption[], filter?: OptionFilter): SelectOption[] {
+        if (!filter) return items;
+        if (filter.only) {
+            const allowed = new Set(filter.only.map(String));
+            return items.filter((item) => allowed.has(String(item.value)));
+        }
+        if (filter.except) {
+            const excluded = new Set(filter.except.map(String));
+            return items.filter((item) => !excluded.has(String(item.value)));
+        }
+        return items;
+    }
+
     function getOptions(field: FieldConfig): SelectOption[] {
         if (!SELECT_TYPES.has(field.type)) {
             return [];
         }
         const sf = field as SelectFieldConfig;
         if (sf.enumKey) {
-            return enumOptions(sf.enumKey);
+            return applyFilter(enumOptions(sf.enumKey), sf.enumFilter);
         }
         if (sf.definitionKey) {
-            return definitionOptions(sf.definitionKey);
+            return applyFilter(definitionOptions(sf.definitionKey), sf.definitionFilter);
         }
         return sf.optionsUrl ? (dynamicOptions.value[field.key] ?? []) : (sf.options ?? []);
     }

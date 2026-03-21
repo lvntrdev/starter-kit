@@ -1,4 +1,4 @@
-import type { EnumItem } from './useEnum';
+import type { EnumFilter, EnumItem } from './useEnum';
 
 type DefinitionKey = 'system' | 'gender' | (string & {});
 
@@ -29,18 +29,31 @@ let fetchPromise: Promise<void> | null = null;
 export function useDefinition() {
     const loaded = ref(false);
 
+    function applyFilter(items: EnumItem[], filter?: EnumFilter): EnumItem[] {
+        if (!filter) return items;
+        if (filter.only) {
+            const allowed = new Set(filter.only.map(String));
+            return items.filter((item) => allowed.has(String(item.value)));
+        }
+        if (filter.except) {
+            const excluded = new Set(filter.except.map(String));
+            return items.filter((item) => !excluded.has(String(item.value)));
+        }
+        return items;
+    }
+
     /**
      * Get definition items from the reactive cache.
      */
-    function list(key: DefinitionKey): EnumItem[] {
-        return cache[key] ?? [];
+    function list(key: DefinitionKey, filter?: EnumFilter): EnumItem[] {
+        return applyFilter(cache[key] ?? [], filter);
     }
 
     /**
      * Get definition items formatted as select/filter options.
      */
-    function options(key: DefinitionKey): { label: string; value: string | number }[] {
-        return list(key).map((item) => ({
+    function options(key: DefinitionKey, filter?: EnumFilter): { label: string; value: string | number }[] {
+        return list(key, filter).map((item) => ({
             label: item.label,
             value: item.value,
         }));

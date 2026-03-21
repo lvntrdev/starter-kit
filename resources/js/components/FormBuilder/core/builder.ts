@@ -13,6 +13,7 @@ import type {
     InputNumberFieldConfig,
     InputOtpFieldConfig,
     InputTextFieldConfig,
+    OptionFilter,
     PasswordFieldConfig,
     SelectFieldConfig,
     SelectOption,
@@ -255,14 +256,20 @@ export class SelectFieldBuilder extends BaseFieldBuilder<SelectFieldConfig> {
     }
 
     /** Resolve options from an Inertia shared enum (e.g. 'userStatus'). */
-    enumOptions(key: string): this {
+    enumOptions(key: string, filter?: OptionFilter): this {
         this.config.enumKey = key;
+        if (filter) {
+            this.config.enumFilter = filter;
+        }
         return this;
     }
 
     /** Resolve options from a DB-based definition (e.g. 'gender'). */
-    definitionOptions(key: string): this {
+    definitionOptions(key: string, filter?: OptionFilter): this {
         this.config.definitionKey = key;
+        if (filter) {
+            this.config.definitionFilter = filter;
+        }
         return this;
     }
 }

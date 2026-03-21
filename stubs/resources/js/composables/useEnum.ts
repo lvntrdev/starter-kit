@@ -9,6 +9,11 @@ export interface EnumItem {
 
 export type EnumKey = 'userStatus' | 'identityType' | 'yesNo' | (string & {});
 
+export interface EnumFilter {
+    only?: (string | number)[];
+    except?: (string | number)[];
+}
+
 type EnumStore = Record<string, EnumItem[]>;
 
 /**
@@ -27,18 +32,31 @@ type EnumStore = Record<string, EnumItem[]>;
 export function useEnum() {
     const page = usePage<{ enums?: EnumStore }>();
 
+    function applyFilter(items: EnumItem[], filter?: EnumFilter): EnumItem[] {
+        if (!filter) return items;
+        if (filter.only) {
+            const allowed = new Set(filter.only.map(String));
+            return items.filter((item) => allowed.has(String(item.value)));
+        }
+        if (filter.except) {
+            const excluded = new Set(filter.except.map(String));
+            return items.filter((item) => !excluded.has(String(item.value)));
+        }
+        return items;
+    }
+
     /**
      * Get enum items from Inertia shared props.
      */
-    function list(key: EnumKey): EnumItem[] {
-        return page.props.enums?.[key] ?? [];
+    function list(key: EnumKey, filter?: EnumFilter): EnumItem[] {
+        return applyFilter(page.props.enums?.[key] ?? [], filter);
     }
 
     /**
      * Get enum items formatted as select/filter options.
      */
-    function options(key: EnumKey): { label: string; value: string | number }[] {
-        return list(key).map((item) => ({
+    function options(key: EnumKey, filter?: EnumFilter): { label: string; value: string | number }[] {
+        return list(key, filter).map((item) => ({
             label: item.label,
             value: item.value,
         }));

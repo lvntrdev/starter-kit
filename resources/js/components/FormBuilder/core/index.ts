@@ -19,6 +19,7 @@ export type {
     FileUploadFieldConfig,
     ColorSelectorFieldConfig,
     ExistingMedia,
+    OptionFilter,
 } from './types';
 
 export {
