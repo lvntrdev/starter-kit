@@ -28,6 +28,7 @@
         "spatie/laravel-medialibrary": "^11.12",
         "spatie/laravel-permission": "^7.2",
         "spatie/laravel-query-builder": "^6.3",
+        "league/flysystem-aws-s3-v3": "^3.0",
         "spatie/laravel-translatable": "^6.11"
     },
     "require-dev": {

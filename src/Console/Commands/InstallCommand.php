@@ -95,6 +95,11 @@ class InstallCommand extends Command
             $this->injectAppConfig();
         });
 
+        // 4c. Inject DigitalOcean Spaces disk into config/filesystems.php
+        $this->step('Configuring filesystem disks', function () {
+            $this->injectFilesystemsConfig();
+        });
+
         // 5. Create hash registry directory
         $dir = storage_path('starter-kit');
         if (! $this->files->isDirectory($dir)) {
@@ -675,6 +680,70 @@ PHP;
             'app.display_timezone' => 'UTC',
             'app.available_languages' => ['en' => 'English', 'tr' => 'Türkçe'],
             'app.languages' => ['en' => 'English'],
+        ]);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // FILESYSTEMS CONFIG INJECTION
+    // ══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Inject DigitalOcean Spaces disk into config/filesystems.php if not already present.
+     */
+    private function injectFilesystemsConfig(): void
+    {
+        $configPath = config_path('filesystems.php');
+
+        if (! $this->files->exists($configPath)) {
+            return;
+        }
+
+        $content = $this->files->get($configPath);
+
+        // Check if already injected
+        if (str_contains($content, "'do'")) {
+            return;
+        }
+
+        $diskConfig = <<<'PHP'
+
+        'do' => [
+            'driver' => 's3',
+            'key' => env('DO_SPACES_KEY'),
+            'secret' => env('DO_SPACES_SECRET'),
+            'region' => env('DO_SPACES_REGION'),
+            'bucket' => env('DO_SPACES_BUCKET'),
+            'endpoint' => env('DO_SPACES_ENDPOINT'),
+            'url' => env('DO_SPACES_URL'),
+            'visibility' => 'private',
+            'throw' => false,
+            'report' => false,
+        ],
+PHP;
+
+        // Find the 'disks' array closing and insert before it
+        // Look for the pattern: newline + 4 spaces + ], (closing of 'disks' array)
+        $pos = strrpos($content, "    ],");
+        if ($pos !== false) {
+            $content = substr_replace($content, $diskConfig."\n\n    ],", $pos, strlen("    ],"));
+        }
+
+        $this->files->put($configPath, $content);
+
+        // Also set in runtime config so it's available immediately
+        config([
+            'filesystems.disks.do' => [
+                'driver' => 's3',
+                'key' => env('DO_SPACES_KEY'),
+                'secret' => env('DO_SPACES_SECRET'),
+                'region' => env('DO_SPACES_REGION'),
+                'bucket' => env('DO_SPACES_BUCKET'),
+                'endpoint' => env('DO_SPACES_ENDPOINT'),
+                'url' => env('DO_SPACES_URL'),
+                'visibility' => 'private',
+                'throw' => false,
+                'report' => false,
+            ],
         ]);
     }
 
