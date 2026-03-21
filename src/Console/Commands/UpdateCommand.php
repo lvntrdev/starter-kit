@@ -265,9 +265,8 @@ class UpdateCommand extends Command
         }
 
         $toUpdate = multiselect(
-            label: 'Which files should be updated? (deselect files you modified manually)',
+            label: 'Which files should be updated? (select only files you did NOT modify)',
             options: $options,
-            default: array_keys($options),
         );
 
         $stubsPath = StarterKitServiceProvider::stubsPath();

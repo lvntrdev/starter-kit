@@ -6,6 +6,8 @@ export interface TabItemConfig {
     key: string;
     label: string;
     icon?: string;
+    permission?: string | string[];
+    role?: string | string[];
     visible?: boolean | (() => boolean);
     disabled?: boolean | (() => boolean);
 }

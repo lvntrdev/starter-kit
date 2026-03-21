@@ -12,7 +12,7 @@ import { usePage } from '@inertiajs/vue3';
 export function useAdminMenu() {
     const page = usePage();
     const currentUrl = computed(() => page.url);
-    const { can } = useCan();
+    const { can, hasRole } = useCan();
 
     const allItems: MenuItem[] = [
         {
@@ -99,6 +99,10 @@ export function useAdminMenu() {
         const filtered = allItems.filter((item) => {
             if (item.permission && !can(item.permission)) {
                 return false;
+            }
+            if (item.role) {
+                const roles = Array.isArray(item.role) ? item.role : [item.role];
+                if (!roles.some((r) => hasRole(r))) return false;
             }
             return true;
         });

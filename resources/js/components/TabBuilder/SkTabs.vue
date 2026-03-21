@@ -1,5 +1,5 @@
 <script setup lang="ts">
-    import { useUrlTab } from '@/composables';
+    import { useCan, useUrlTab } from '@/composables';
     import type { TabBuilderConfig, TabItemConfig } from './core';
 
     interface Props {
@@ -7,9 +7,18 @@
     }
 
     const props = defineProps<Props>();
+    const { can, canAny, hasRole } = useCan();
 
     const visibleTabs = computed(() =>
         props.config.tabs.filter((tab) => {
+            if (tab.permission) {
+                const hasPermission = Array.isArray(tab.permission) ? canAny(tab.permission) : can(tab.permission);
+                if (!hasPermission) return false;
+            }
+            if (tab.role) {
+                const roles = Array.isArray(tab.role) ? tab.role : [tab.role];
+                if (!roles.some((r) => hasRole(r))) return false;
+            }
             if (tab.visible === undefined) return true;
             return typeof tab.visible === 'function' ? tab.visible() : tab.visible;
         }),

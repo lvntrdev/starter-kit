@@ -20,6 +20,16 @@ export class TabItemBuilder {
         return this;
     }
 
+    permission(...permissions: string[]): this {
+        this.config.permission = permissions.length === 1 ? permissions[0] : permissions;
+        return this;
+    }
+
+    role(...roles: string[]): this {
+        this.config.role = roles.length === 1 ? roles[0] : roles;
+        return this;
+    }
+
     visible(condition: boolean | (() => boolean)): this {
         this.config.visible = condition;
         return this;

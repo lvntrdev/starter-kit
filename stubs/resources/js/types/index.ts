@@ -41,6 +41,7 @@ export interface MenuItem {
     section?: boolean;
     children?: MenuItem[];
     permission?: string;
+    role?: string | string[];
 }
 
 export interface MenuContext {
