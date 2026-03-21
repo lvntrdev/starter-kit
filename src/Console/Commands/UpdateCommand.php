@@ -392,8 +392,14 @@ PHP;
     {
         $configPath = config_path('media-library.php');
 
+        // Publish the config if it doesn't exist yet
         if (! $this->files->exists($configPath)) {
-            return;
+            $vendorConfig = base_path('vendor/spatie/laravel-medialibrary/config/media-library.php');
+            if ($this->files->exists($vendorConfig)) {
+                $this->files->copy($vendorConfig, $configPath);
+            } else {
+                return;
+            }
         }
 
         $content = $this->files->get($configPath);
