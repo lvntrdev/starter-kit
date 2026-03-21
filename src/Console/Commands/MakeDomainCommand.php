@@ -35,7 +35,8 @@ class MakeDomainCommand extends Command
         {--no-soft-deletes : Disable soft deletes on the model and migration}
         {--vue= : Vue page generation: none, empty, or full}
         {--vue-fields : Include model fields in DataTable columns and FormBuilder}
-        {--no-vue-fields : Skip model fields in Vue components (only id)}';
+        {--no-vue-fields : Skip model fields in Vue components (only id)}
+        {--from-migration= : Parse fields from existing migration file (e.g. 2026_03_21_create_products_table.php)}';
 
     protected $description = 'Scaffold a complete domain interactively (Model, DTO, Actions, Events, Controllers, Routes)';
 
@@ -78,6 +79,9 @@ class MakeDomainCommand extends Command
     /** Whether to include model fields in Vue components */
     private bool $withVueFields = false;
 
+    /** Whether domain is being created from an existing migration */
+    private bool $fromMigration = false;
+
     /** Available field types for the interactive prompt */
     private const FIELD_TYPES = [
         'string',
@@ -101,8 +105,20 @@ class MakeDomainCommand extends Command
             return self::FAILURE;
         }
 
-        $this->askFields();
-        $this->askIdType();
+        // --from-migration: parse fields, id-type, soft-deletes from existing migration
+        $migrationOption = $this->option('from-migration');
+
+        if ($migrationOption) {
+            if (! $this->parseFieldsFromMigration($migrationOption)) {
+                return self::FAILURE;
+            }
+
+            $this->fromMigration = true;
+        } else {
+            $this->askFields();
+            $this->askIdType();
+        }
+
         $this->askLayers();
 
         if (! $this->showSummaryAndConfirm()) {
@@ -114,7 +130,10 @@ class MakeDomainCommand extends Command
         $this->newLine();
 
         $this->createModel();
-        $this->populateMigration();
+
+        if (! $this->fromMigration) {
+            $this->populateMigration();
+        }
         $this->createDTO();
         $this->createActions();
 
@@ -159,12 +178,20 @@ class MakeDomainCommand extends Command
         $this->table(['Layer', 'Files'], $this->getFileSummaryTable());
         $this->newLine();
         $this->warn('📌 TODO:');
-        $this->line('   1. Check migration content: database/migrations/');
-        $this->line('   2. Check FormRequest validation rules');
-        $this->line('   3. Run: php artisan migrate');
+        $step = 1;
+
+        if (! $this->fromMigration) {
+            $this->line("   {$step}. Check migration content: database/migrations/");
+            $step++;
+        }
+
+        $this->line("   {$step}. Check FormRequest validation rules");
+        $step++;
+        $this->line("   {$step}. Run: php artisan migrate");
+        $step++;
 
         if ($this->withAdmin && $this->vueMode === 'none') {
-            $this->line("   4. Create Inertia pages: resources/js/pages/{$this->inertiaPagePath('')}");
+            $this->line("   {$step}. Create Inertia pages: resources/js/pages/{$this->inertiaPagePath('')}");
         }
 
         return self::SUCCESS;
@@ -272,6 +299,139 @@ class MakeDomainCommand extends Command
     }
 
     /**
+     * Parse fields, ID type, and soft deletes from an existing migration file.
+     */
+    private function parseFieldsFromMigration(string $filename): bool
+    {
+        $path = database_path('migrations/'.$filename);
+
+        if (! file_exists($path)) {
+            // Try glob match (partial filename)
+            $matches = glob(database_path('migrations/*'.$filename.'*'));
+
+            if (empty($matches)) {
+                $this->error("Migration file not found: {$filename}");
+
+                return false;
+            }
+
+            $path = end($matches);
+        }
+
+        $content = file_get_contents($path);
+
+        $this->info('📄 Parsing migration: '.basename($path));
+
+        // Detect ID type
+        if (preg_match('/\$table->uuid\s*\(\s*[\'"]id[\'"]\s*\)/', $content)) {
+            $this->idType = 'uuid';
+        } elseif (preg_match('/\$table->ulid\s*\(\s*[\'"]id[\'"]\s*\)/', $content)) {
+            $this->idType = 'ulid';
+        } else {
+            $this->idType = 'id';
+        }
+
+        // Detect soft deletes
+        if (preg_match('/\$table->softDeletes\s*\(/', $content)) {
+            $this->withSoftDeletes = true;
+        }
+
+        // Extract columns — skip system columns
+        $skipColumns = ['id', 'created_at', 'updated_at', 'deleted_at'];
+
+        // Match patterns like: $table->string('name'), $table->integer('age')->nullable(), etc.
+        preg_match_all(
+            '/\$table->(\w+)\s*\(\s*[\'"](\w+)[\'"]/',
+            $content,
+            $matches,
+            PREG_SET_ORDER,
+        );
+
+        // Also skip non-column methods
+        $skipMethods = [
+            'id', 'uuid', 'ulid', 'timestamps', 'softDeletes',
+            'primary', 'unique', 'index', 'foreign', 'dropColumn',
+            'dropForeign', 'dropIndex', 'dropUnique', 'dropPrimary',
+            'rememberToken', 'morphs', 'nullableMorphs',
+        ];
+
+        foreach ($matches as $match) {
+            $method = $match[1];
+            $column = $match[2];
+
+            if (in_array($column, $skipColumns) || in_array($method, $skipMethods)) {
+                continue;
+            }
+
+            // Map Blueprint method to field type
+            $type = $this->blueprintMethodToFieldType($method);
+
+            if ($type !== null) {
+                $this->fields[] = ['name' => $column, 'type' => $type];
+            }
+        }
+
+        // Handle foreignId separately — detect $table->foreignId('xxx')
+        preg_match_all(
+            '/\$table->foreignId\s*\(\s*[\'"](\w+)[\'"]/',
+            $content,
+            $foreignMatches,
+        );
+
+        foreach ($foreignMatches[1] ?? [] as $foreignColumn) {
+            if (! collect($this->fields)->contains('name', $foreignColumn)) {
+                $this->fields[] = ['name' => $foreignColumn, 'type' => 'unsignedBigInteger'];
+            }
+        }
+
+        if (empty($this->fields)) {
+            $this->warn('  No fields found in migration.');
+            $this->fields = [['name' => 'name', 'type' => 'string']];
+        }
+
+        $this->newLine();
+        $this->components->twoColumnDetail('ID Type', $this->idType);
+        $this->components->twoColumnDetail('Soft Deletes', $this->withSoftDeletes ? 'Yes' : 'No');
+        $this->newLine();
+        $this->table(
+            ['#', 'Field Name', 'Type'],
+            collect($this->fields)->map(fn ($f, $i) => [$i + 1, $f['name'], $f['type']])->all()
+        );
+
+        return true;
+    }
+
+    /**
+     * Map a Blueprint column method to a field type string.
+     *
+     * @return string|null null if the method is not a recognized column type
+     */
+    private function blueprintMethodToFieldType(string $method): ?string
+    {
+        return match ($method) {
+            'string', 'char' => 'string',
+            'integer', 'tinyInteger', 'smallInteger', 'mediumInteger' => 'integer',
+            'bigInteger' => 'bigInteger',
+            'unsignedInteger', 'unsignedTinyInteger', 'unsignedSmallInteger', 'unsignedMediumInteger' => 'integer',
+            'unsignedBigInteger' => 'unsignedBigInteger',
+            'float' => 'float',
+            'double' => 'float',
+            'decimal', 'unsignedDecimal' => 'decimal',
+            'boolean' => 'boolean',
+            'text', 'mediumText' => 'text',
+            'longText' => 'longText',
+            'json', 'jsonb' => 'json',
+            'date' => 'date',
+            'dateTime', 'dateTimeTz' => 'dateTime',
+            'timestamp', 'timestampTz' => 'timestamp',
+            'enum' => 'string',
+            'year' => 'integer',
+            'binary' => 'text',
+            default => null,
+        };
+    }
+
+    /**
      * Step 3: Ask the ID type for the model and migration.
      */
     private function askIdType(): void
@@ -313,7 +473,12 @@ class MakeDomainCommand extends Command
         $this->withAdmin = $this->resolveFlag('admin', '   Create Admin layer (Controller + Routes)?');
         $this->withApi = $this->resolveFlag('api', '   Create API layer (Controller + Routes)?');
         $this->withEvents = $this->resolveFlag('events', '   Create Event and Listener layer?');
-        $this->withSoftDeletes = $this->resolveFlag('soft-deletes', '   Add soft delete support?');
+
+        // Skip soft-deletes prompt when parsed from migration
+        if (! $this->fromMigration) {
+            $this->withSoftDeletes = $this->resolveFlag('soft-deletes', '   Add soft delete support?');
+        }
+
         $this->askVueMode();
     }
 
@@ -444,7 +609,10 @@ class MakeDomainCommand extends Command
         }
 
         $this->callSilently('make:model', ['name' => $this->domainPath, '-f' => true]);
-        $this->callSilently('make:migration', ['name' => "create_{$this->dnPSnake}_table", '--create' => $this->dnPSnake]);
+
+        if (! $this->fromMigration) {
+            $this->callSilently('make:migration', ['name' => "create_{$this->dnPSnake}_table", '--create' => $this->dnPSnake]);
+        }
 
         $fillable = collect($this->fields)->map(fn ($f) => "        '{$f['name']}',")->implode("\n");
         $tableProperty = $this->dnPSnake === Str::snake($this->dnPlural)
@@ -484,7 +652,7 @@ class MakeDomainCommand extends Command
 
         file_put_contents($path, $stub);
         $this->line("  ✓ Model: <info>app/Models/{$this->domainPath}.php</info>");
-        $this->line('  ✓ Migration + Factory created');
+        $this->line($this->fromMigration ? '  ✓ Factory created (migration already exists)' : '  ✓ Migration + Factory created');
     }
 
     // ══════════════════════════════════════════════════════════════════════
