@@ -1,5 +1,5 @@
 // resources/js/composables/useAdminMenu.ts
-import { useCan } from '@/composables/useCan';
+import { useMenuBuilder } from '@/composables/useMenuBuilder';
 import activityLogs from '@/routes/activity-logs';
 import apiRoutes from '@/routes/api-routes';
 import dashboard from '@/routes/dashboard';
@@ -7,13 +7,8 @@ import roles from '@/routes/roles';
 import settings from '@/routes/settings';
 import users from '@/routes/users';
 import type { MenuItem } from '@/types';
-import { usePage } from '@inertiajs/vue3';
 
 export function useAdminMenu() {
-    const page = usePage();
-    const currentUrl = computed(() => page.url);
-    const { can, hasRole } = useCan();
-
     const allItems: MenuItem[] = [
         {
             title: 'admin.menu.dashboard',
@@ -95,41 +90,5 @@ export function useAdminMenu() {
         },
     ];
 
-    const items = computed(() => {
-        const filtered = allItems.filter((item) => {
-            if (item.permission && !can(item.permission)) {
-                return false;
-            }
-            if (item.role) {
-                const roles = Array.isArray(item.role) ? item.role : [item.role];
-                if (!roles.some((r) => hasRole(r))) return false;
-            }
-            return true;
-        });
-
-        // Remove section headers that have no visible items after them
-        return filtered.filter((item, index) => {
-            if (!item.section) return true;
-            const nextItems = filtered.slice(index + 1);
-            return nextItems.length > 0 && !nextItems[0].section;
-        });
-    });
-
-    function isItemActive(item: MenuItem): boolean {
-        if (!item.href || item.external) {
-            return false;
-        }
-
-        return currentUrl.value.startsWith(item.href);
-    }
-
-    function isGroupOpen(item: MenuItem): boolean {
-        if (!item.children) {
-            return false;
-        }
-
-        return item.children.some((child) => isItemActive(child) || isGroupOpen(child));
-    }
-
-    return { items, isItemActive, isGroupOpen, currentUrl };
+    return useMenuBuilder(allItems);
 }

@@ -2,6 +2,7 @@
 // Re-export composables from a single entry point.
 export { useSidebar } from './useSidebar';
 export { useAdminMenu } from './useAdminMenu';
+export { useMenuBuilder } from './useMenuBuilder';
 export { useDarkMode } from './useDarkMode';
 export { useFlash } from './useFlash';
 export { useConfirm } from './useConfirm';
