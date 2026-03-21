@@ -237,6 +237,7 @@ class UpdateCommand extends Command
     private function addNewFiles(bool $dryRun): void
     {
         $stubsPath = StarterKitServiceProvider::stubsPath();
+        $hashes = $this->loadHashRegistry();
 
         foreach ($this->files->allFiles($stubsPath, true) as $file) {
             $relativePath = $file->getRelativePathname();
@@ -248,6 +249,12 @@ class UpdateCommand extends Command
 
             // Skip if already handled
             if (in_array($relativePath, $this->updated)) {
+                continue;
+            }
+
+            // If hash registry has an entry, the file was previously installed
+            // but the user deleted it — respect that decision, don't re-add.
+            if (isset($hashes[$relativePath])) {
                 continue;
             }
 
@@ -341,18 +348,23 @@ class UpdateCommand extends Command
     }
 
     /**
-     * Update the hash registry with current file hashes.
+     * Update the hash registry only for files that were actually updated or added.
+     * Skipped (user-modified) files keep their original hash so they stay protected.
      */
     private function updateHashRegistry(): void
     {
         $hashFile = config('starter-kit.published_hashes', storage_path('starter-kit/hashes.json'));
         $hashes = $this->loadHashRegistry();
-        $stubsPath = StarterKitServiceProvider::stubsPath();
 
-        foreach ($this->files->allFiles($stubsPath, true) as $file) {
-            $relativePath = $file->getRelativePathname();
+        $changedFiles = array_merge($this->updated, $this->added);
+
+        foreach ($changedFiles as $relativePath) {
+            // Skip descriptive entries like "config/filesystems.php (injected DO Spaces disk)"
+            if (str_contains($relativePath, ' ')) {
+                continue;
+            }
+
             $targetPath = base_path($relativePath);
-
             if ($this->files->exists($targetPath)) {
                 $hashes[$relativePath] = md5_file($targetPath);
             }
