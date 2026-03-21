@@ -7,6 +7,7 @@ use Illuminate\Filesystem\Filesystem;
 use Lvntr\StarterKit\StarterKitServiceProvider;
 
 use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\spin;
 
 class UpdateCommand extends Command
@@ -68,6 +69,9 @@ class UpdateCommand extends Command
     /** @var list<string> */
     private array $added = [];
 
+    /** @var list<string> Files with no hash record (untracked) */
+    private array $untracked = [];
+
     public function handle(): int
     {
         $this->files = new Filesystem;
@@ -85,16 +89,21 @@ class UpdateCommand extends Command
         // 2. Update user-modifiable files only if not modified
         $this->updateModifiableFiles($force, $dryRun);
 
-        // 3. Add new files that don't exist yet
+        // 3. Handle untracked files (no hash record — ask user)
+        if (! $force && ! empty($this->untracked)) {
+            $this->resolveUntrackedFiles($dryRun);
+        }
+
+        // 4. Add new files that don't exist yet
         $this->addNewFiles($dryRun);
 
-        // 3b. Inject filesystem config if missing (added in later versions)
+        // 4b. Inject filesystem config if missing (added in later versions)
         if (! $dryRun) {
             $this->injectFilesystemsConfig();
             $this->injectMediaLibraryConfig();
         }
 
-        // 4. Run new migrations
+        // 5. Run new migrations
         if (! $dryRun && ! empty($this->added) && $this->hasNewMigrations()) {
             if (confirm('New migrations found. Run them now?', default: true)) {
                 spin(function () {
@@ -104,7 +113,7 @@ class UpdateCommand extends Command
             }
         }
 
-        // 5. Update hash registry
+        // 6. Update hash registry
         if (! $dryRun) {
             $this->updateHashRegistry();
         }
@@ -207,9 +216,8 @@ class UpdateCommand extends Command
 
             if (! $force) {
                 if ($originalHash === null) {
-                    // No hash record — file predates hash registry or was never tracked.
-                    // Assume user may have modified it; skip to be safe.
-                    $this->skipped[] = $relativePath;
+                    // No hash record — collect for interactive prompt
+                    $this->untracked[] = $relativePath;
 
                     continue;
                 }
@@ -228,6 +236,53 @@ class UpdateCommand extends Command
             }
 
             $this->updated[] = $relativePath;
+        }
+    }
+
+    /**
+     * Handle untracked files — no hash record exists.
+     * Ask the user which ones to update via multiselect.
+     */
+    private function resolveUntrackedFiles(bool $dryRun): void
+    {
+        if (empty($this->untracked)) {
+            return;
+        }
+
+        if ($dryRun) {
+            // In dry-run mode, just report them — no interactive prompt
+            return;
+        }
+
+        $this->newLine();
+        $this->components->warn('The following files have no tracking history and differ from the package version.');
+        $this->line('  <fg=gray>This usually happens after a package update that changed these files.</>');
+        $this->newLine();
+
+        $options = [];
+        foreach ($this->untracked as $path) {
+            $options[$path] = $path;
+        }
+
+        $toUpdate = multiselect(
+            label: 'Which files should be updated? (deselect files you modified manually)',
+            options: $options,
+            default: array_keys($options),
+        );
+
+        $stubsPath = StarterKitServiceProvider::stubsPath();
+
+        foreach ($this->untracked as $path) {
+            if (in_array($path, $toUpdate)) {
+                $stubPath = $stubsPath.DIRECTORY_SEPARATOR.$path;
+                $targetPath = base_path($path);
+                $this->ensureDirectoryExists(dirname($targetPath));
+                $this->files->copy($stubPath, $targetPath);
+
+                $this->updated[] = $path;
+            } else {
+                $this->skipped[] = $path;
+            }
         }
     }
 
@@ -574,7 +629,9 @@ PHP;
     {
         $prefix = $dryRun ? '[DRY RUN] ' : '';
 
-        if (empty($this->updated) && empty($this->added) && empty($this->skipped)) {
+        $hasChanges = ! empty($this->updated) || ! empty($this->added) || ! empty($this->skipped) || ! empty($this->untracked);
+
+        if (! $hasChanges) {
             $this->components->info($prefix.'Everything is up to date!');
 
             return;
@@ -593,6 +650,17 @@ PHP;
             foreach ($this->added as $path) {
                 $this->line("  <fg=blue>+</> {$path}");
             }
+        }
+
+        // Show untracked files (dry-run: not yet resolved; normal: already resolved into updated/skipped)
+        if ($dryRun && ! empty($this->untracked)) {
+            $this->newLine();
+            $this->components->twoColumnDetail('<fg=magenta>Untracked</>', count($this->untracked).' files need review');
+            foreach ($this->untracked as $path) {
+                $this->line("  <fg=magenta>?</> {$path}");
+            }
+            $this->newLine();
+            $this->line('  <fg=gray>Run without --dry-run to choose which files to update.</>');
         }
 
         if (! empty($this->skipped)) {
