@@ -12,6 +12,12 @@ use Spatie\Permission\PermissionRegistrar;
 class _01_RolePermissionSeeder extends Seeder
 {
     /**
+     * When true, existing roles are synced to match config exactly
+     * (removing permissions not in config). Default is additive-only.
+     */
+    public bool $fresh = false;
+
+    /**
      * Seed the default roles and permissions from config.
      *
      * Reads config/permission-resources.php to generate
@@ -214,8 +220,8 @@ class _01_RolePermissionSeeder extends Seeder
 
             $seededPermissions = $role->seeded_permissions ?? [];
 
-            if ($isNew) {
-                // Brand new role: assign all configured permissions
+            if ($isNew || $this->fresh) {
+                // Brand new role or fresh mode: sync to match config exactly
                 if ($configuredPermissions === '*') {
                     $role->syncPermissions($allPermissions);
                 } elseif (is_array($configuredPermissions)) {
