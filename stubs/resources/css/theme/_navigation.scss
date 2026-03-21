@@ -140,6 +140,6 @@
 
 /* Submenu container */
 .nav-submenu {
-    @apply mt-0.5 overflow-hidden py-1.5 pl-2;
+    @apply mt-0.5 flex flex-col gap-1 overflow-hidden py-1.5 pl-2;
 }
 
