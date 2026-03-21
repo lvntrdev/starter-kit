@@ -78,6 +78,11 @@ class UpdateCommand extends Command
         // 3. Add new files that don't exist yet
         $this->addNewFiles($dryRun);
 
+        // 3b. Inject filesystem config if missing (added in later versions)
+        if (! $dryRun) {
+            $this->injectFilesystemsConfig();
+        }
+
         // 4. Run new migrations
         if (! $dryRun && ! empty($this->added) && $this->hasNewMigrations()) {
             if (confirm('New migrations found. Run them now?', default: true)) {
@@ -184,11 +189,21 @@ class UpdateCommand extends Command
             $currentHash = md5_file($targetPath);
             $originalHash = $hashes[$relativePath] ?? null;
 
-            if (! $force && $originalHash !== null && $currentHash !== $originalHash) {
-                // User has modified this file — skip it
-                $this->skipped[] = $relativePath;
+            if (! $force) {
+                if ($originalHash === null) {
+                    // No hash record — file predates hash registry or was never tracked.
+                    // Assume user may have modified it; skip to be safe.
+                    $this->skipped[] = $relativePath;
 
-                continue;
+                    continue;
+                }
+
+                if ($currentHash !== $originalHash) {
+                    // User has modified this file — skip it
+                    $this->skipped[] = $relativePath;
+
+                    continue;
+                }
             }
 
             if (! $dryRun) {
@@ -315,6 +330,49 @@ class UpdateCommand extends Command
         }
 
         $this->files->put($hashFile, json_encode($hashes, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    }
+
+    /**
+     * Inject DigitalOcean Spaces disk into config/filesystems.php if not already present.
+     */
+    private function injectFilesystemsConfig(): void
+    {
+        $configPath = config_path('filesystems.php');
+
+        if (! $this->files->exists($configPath)) {
+            return;
+        }
+
+        $content = $this->files->get($configPath);
+
+        if (str_contains($content, "'do'")) {
+            return;
+        }
+
+        $diskConfig = <<<'PHP'
+
+        'do' => [
+            'driver' => 's3',
+            'key' => env('DO_SPACES_KEY'),
+            'secret' => env('DO_SPACES_SECRET'),
+            'region' => env('DO_SPACES_REGION'),
+            'bucket' => env('DO_SPACES_BUCKET'),
+            'endpoint' => env('DO_SPACES_ENDPOINT'),
+            'url' => env('DO_SPACES_URL'),
+            'visibility' => 'private',
+            'throw' => false,
+            'report' => false,
+        ],
+PHP;
+
+        $pos = strrpos($content, '    ],');
+        if ($pos !== false) {
+            $content = substr_replace($content, $diskConfig."\n\n    ],", $pos, strlen('    ],'));
+        }
+
+        $this->files->put($configPath, $content);
+
+        $this->updated[] = 'config/filesystems.php (injected DO Spaces disk)';
     }
 
     /**
