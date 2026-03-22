@@ -62,8 +62,9 @@ export function useDefinition() {
     /**
      * Find a single definition item by value.
      */
-    function find(key: DefinitionKey, value: string | number): EnumItem | undefined {
-        return list(key).find((item) => String(item.value) === String(value));
+    function find(key: DefinitionKey, value: string | number | boolean): EnumItem | undefined {
+        const normalized = typeof value === 'boolean' ? (value ? 1 : 0) : value;
+        return list(key).find((item) => String(item.value) === String(normalized));
     }
 
     /**

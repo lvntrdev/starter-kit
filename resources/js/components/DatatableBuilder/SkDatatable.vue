@@ -936,13 +936,13 @@
                                             :value="
                                                 definition.find(
                                                     column.tagKey!,
-                                                    getNestedValue(row, column.key) as string | number,
+                                                    getNestedValue(row, column.key) as string | number | boolean,
                                                 )?.label
                                             "
                                             :severity="
                                                 definition.find(
                                                     column.tagKey!,
-                                                    getNestedValue(row, column.key) as string | number,
+                                                    getNestedValue(row, column.key) as string | number | boolean,
                                                 )?.severity ?? undefined
                                             "
                                         />
