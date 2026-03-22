@@ -43,8 +43,11 @@ export class ColumnBuilder<_T = unknown> {
     }
 
     /** Render cell as a PrimeVue Tag. Use 'definition' for enum/DB definitions, 'custom' for manual severity mapping. */
-    tag(type: 'definition' | 'custom'): this {
+    tag(type: 'definition' | 'custom', tagKey?: string): this {
         this.config.tag = type;
+        if (tagKey) {
+            this.config.tagKey = tagKey;
+        }
         return this;
     }
 
