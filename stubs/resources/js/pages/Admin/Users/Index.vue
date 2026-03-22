@@ -2,7 +2,7 @@
     import { useCan } from '@/composables/useCan';
     import { useConfirm } from '@/composables/useConfirm';
     import { useDialog } from '@/composables/useDialog';
-    import { useEnum } from '@/composables/useEnum';
+    import { useDefinition } from '@/composables/useDefinition';
     import { useRefreshBus } from '@/composables/useRefreshBus';
     import AdminLayout from '@/layouts/AdminLayout.vue';
     import type { User } from '@/types';
@@ -23,7 +23,9 @@
     const { confirmDelete } = useConfirm();
     const dialog = useDialog();
     const bus = useRefreshBus();
-    const { options } = useEnum();
+    const { options, load: loadDefinitions } = useDefinition();
+
+    onMounted(() => loadDefinitions(['userStatus']));
     const { can } = useCan();
 
     const REFRESH_KEY = 'users-table';

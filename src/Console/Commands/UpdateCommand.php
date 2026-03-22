@@ -60,6 +60,22 @@ class UpdateCommand extends Command
         'config/permission-resources.php',
     ];
 
+    /**
+     * Files/directories removed from the package that should be cleaned up.
+     * These are deleted during update if they exist in the application.
+     *
+     * @var list<string>
+     */
+    private const DEPRECATED_PATHS = [
+        'app/Enums/EnumRegistry.php',
+        'app/Enums/Contracts/HasDefinition.php',
+        'app/Enums/Attributes/InertiaShared.php',
+        'app/Enums/Contracts/',
+        'app/Enums/Attributes/',
+        'app/Traits/HasEnumAccessors.php',
+        'resources/js/composables/useEnum.ts',
+    ];
+
     /** @var list<string> */
     private array $updated = [];
 
@@ -71,6 +87,9 @@ class UpdateCommand extends Command
 
     /** @var list<string> Files with no hash record (untracked) */
     private array $untracked = [];
+
+    /** @var list<string> */
+    private array $removed = [];
 
     public function handle(): int
     {
@@ -85,6 +104,9 @@ class UpdateCommand extends Command
 
         // 1. Always update safe paths (core files)
         $this->updateSafePaths($dryRun);
+
+        // 1b. Remove deprecated files
+        $this->removeDeprecatedPaths($dryRun);
 
         // 2. Update user-modifiable files only if not modified
         $this->updateModifiableFiles($force, $dryRun);
@@ -173,6 +195,34 @@ class UpdateCommand extends Command
                 }
 
                 $this->updated[] = $safePath;
+            }
+        }
+    }
+
+    /**
+     * Remove deprecated files/directories that are no longer part of the package.
+     */
+    private function removeDeprecatedPaths(bool $dryRun): void
+    {
+        foreach (self::DEPRECATED_PATHS as $path) {
+            $target = base_path($path);
+
+            if (str_ends_with($path, '/')) {
+                // Directory — remove only if empty
+                if ($this->files->isDirectory($target) && empty($this->files->files($target))) {
+                    if (! $dryRun) {
+                        $this->files->deleteDirectory($target);
+                    }
+                    $this->removed[] = $path;
+                }
+            } else {
+                // File
+                if ($this->files->exists($target)) {
+                    if (! $dryRun) {
+                        $this->files->delete($target);
+                    }
+                    $this->removed[] = $path;
+                }
             }
         }
     }
@@ -628,7 +678,7 @@ PHP;
     {
         $prefix = $dryRun ? '[DRY RUN] ' : '';
 
-        $hasChanges = ! empty($this->updated) || ! empty($this->added) || ! empty($this->skipped) || ! empty($this->untracked);
+        $hasChanges = ! empty($this->updated) || ! empty($this->added) || ! empty($this->removed) || ! empty($this->skipped) || ! empty($this->untracked);
 
         if (! $hasChanges) {
             $this->components->info($prefix.'Everything is up to date!');
@@ -648,6 +698,14 @@ PHP;
             $this->components->twoColumnDetail("<fg=blue>{$prefix}Added</>", count($this->added).' new files');
             foreach ($this->added as $path) {
                 $this->line("  <fg=blue>+</> {$path}");
+            }
+        }
+
+        if (! empty($this->removed)) {
+            $this->newLine();
+            $this->components->twoColumnDetail("<fg=red>{$prefix}Removed</>", count($this->removed).' deprecated files');
+            foreach ($this->removed as $path) {
+                $this->line("  <fg=red>-</> {$path}");
             }
         }
 

@@ -2,13 +2,12 @@
 
 namespace App\Domain\Shared\Services;
 
-use App\Enums\EnumRegistry;
 use App\Models\Definition;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Unified service that merges enum-based and DB-based definitions.
- * Enum definitions are type-safe and fixed; DB definitions are dynamic and admin-managed.
+ * Service that provides DB-based definitions for the frontend.
+ * All definition data (labels, severities) is stored in the definitions table.
  */
 class DefinitionService
 {
@@ -17,29 +16,26 @@ class DefinitionService
     private const CACHE_TTL = 60 * 60 * 24; // 24 hours
 
     /**
-     * Get all definitions (enum + DB), optionally filtered by keys.
+     * Get all definitions, optionally filtered by keys.
      *
      * @param  string[]|null  $keys  Filter by specific keys, or null for all
-     * @return array<string, array<int, array{value: string|int, label: string, severity: string|null}>>
+     * @return array<string, array<int, array{value: string|int, label: string, severity: string|null, icon: string|null}>>
      */
     public function all(?array $keys = null): array
     {
-        $enums = EnumRegistry::all();
-        $dbDefs = $this->getFromDatabase();
-
-        $merged = array_merge($enums, $dbDefs);
+        $definitions = $this->getFromDatabase();
 
         if ($keys) {
-            $merged = array_intersect_key($merged, array_flip($keys));
+            $definitions = array_intersect_key($definitions, array_flip($keys));
         }
 
-        return $merged;
+        return $definitions;
     }
 
     /**
      * Get a single definition group by key.
      *
-     * @return array<int, array{value: string|int, label: string, severity: string|null}>
+     * @return array<int, array{value: string|int, label: string, severity: string|null, icon: string|null}>
      */
     public function get(string $key): array
     {
@@ -49,7 +45,7 @@ class DefinitionService
     /**
      * Get DB definitions grouped by key, with caching and locale awareness.
      *
-     * @return array<string, array<int, array{value: string, label: string, severity: string|null, icon: string|null}>>
+     * @return array<string, array<int, array{value: string|int, label: string, severity: string|null, icon: string|null}>>
      */
     private function getFromDatabase(): array
     {

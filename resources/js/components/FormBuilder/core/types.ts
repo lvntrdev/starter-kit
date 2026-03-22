@@ -100,13 +100,14 @@ export interface SelectFieldConfig extends BaseFieldConfig {
      */
     optionsUrl?: string | ((values: Record<string, unknown>) => string | null);
     /**
-     * Inertia shared enum key (e.g. 'userStatus').
-     * Options are resolved from `page.props.enums[enumKey]` at render time.
+     * Definition key (e.g. 'userStatus', 'gender').
+     * Options are fetched from the /definitions endpoint.
+     * @deprecated Use `definitionKey` instead.
      */
     enumKey?: string;
-    /** Filter for enum options (only/except specific values). */
+    /** @deprecated Use `definitionFilter` instead. */
     enumFilter?: OptionFilter;
-    /** DB-based definition key (e.g. 'gender'). Options are fetched from /api/v1/definitions. */
+    /** Definition key (e.g. 'userStatus', 'gender'). Options are fetched from /definitions. */
     definitionKey?: string;
     /** Filter for definition options (only/except specific values). */
     definitionFilter?: OptionFilter;

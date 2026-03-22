@@ -46,7 +46,7 @@
                 FB.inputText().key('first_name'),
                 FB.inputText().key('last_name'),
                 FB.inputText().key('email').inputType('email'),
-                FB.select().key('status').default('active').enumOptions('userStatus'),
+                FB.select().key('status').default('active').definitionOptions('userStatus'),
                 FB.select().key('gender').definitionOptions('gender').placeholder('common.placeholder.select_gender'),
                 FB.select()
                     .key('role')

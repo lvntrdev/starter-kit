@@ -1,6 +1,16 @@
-import type { EnumFilter, EnumItem } from './useEnum';
+export interface EnumItem {
+    value: string | number;
+    label: string;
+    severity: string | null;
+    icon?: string | null;
+}
 
-type DefinitionKey = 'system' | 'gender' | (string & {});
+export type DefinitionKey = string;
+
+export interface DefinitionFilter {
+    only?: (string | number)[];
+    except?: (string | number)[];
+}
 
 type DefinitionStore = Record<string, EnumItem[]>;
 
@@ -9,27 +19,26 @@ const cache = reactive<DefinitionStore>({});
 let fetchPromise: Promise<void> | null = null;
 
 /**
- * Access DB-based definitions via API.
+ * Access definitions via API.
  *
- * For PHP enums (Inertia shared), use `useEnum()` instead.
+ * All definition data (labels, severities) is stored in the definitions DB table
+ * and served via the /definitions endpoint.
  *
  * Usage:
  *   const { list, find, options, load, loaded } = useDefinition();
  *
- *   // Load specific keys on mount
  *   onMounted(async () => {
- *       await load(['system', 'gender']);
+ *       await load(['userStatus', 'gender']);
  *   });
  *
- *   // Then use synchronously in template
- *   const systems = list('system');
+ *   const statuses = list('userStatus');
  *   const opts = options('gender');
- *   const item = find('system', 1);
+ *   const item = find('userStatus', 'active');
  */
 export function useDefinition() {
     const loaded = ref(false);
 
-    function applyFilter(items: EnumItem[], filter?: EnumFilter): EnumItem[] {
+    function applyFilter(items: EnumItem[], filter?: DefinitionFilter): EnumItem[] {
         if (!filter) return items;
         if (filter.only) {
             const allowed = new Set(filter.only.map(String));
@@ -45,14 +54,14 @@ export function useDefinition() {
     /**
      * Get definition items from the reactive cache.
      */
-    function list(key: DefinitionKey, filter?: EnumFilter): EnumItem[] {
+    function list(key: DefinitionKey, filter?: DefinitionFilter): EnumItem[] {
         return applyFilter(cache[key] ?? [], filter);
     }
 
     /**
      * Get definition items formatted as select/filter options.
      */
-    function options(key: DefinitionKey, filter?: EnumFilter): { label: string; value: string | number }[] {
+    function options(key: DefinitionKey, filter?: DefinitionFilter): { label: string; value: string | number }[] {
         return list(key, filter).map((item) => ({
             label: item.label,
             value: item.value,

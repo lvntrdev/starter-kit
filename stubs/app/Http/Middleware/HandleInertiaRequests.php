@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Enums\EnumRegistry;
 use App\Models\Setting;
 use Composer\InstalledVersions;
 use Illuminate\Http\Request;
@@ -78,7 +77,6 @@ class HandleInertiaRequests extends Middleware
                 'two_factor' => Features::enabled(Features::twoFactorAuthentication()),
                 'password_reset' => Features::enabled(Features::resetPasswords()),
             ],
-            'enums' => fn () => EnumRegistry::shared(),
         ];
     }
 }

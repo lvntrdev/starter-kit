@@ -95,19 +95,38 @@ class _02_DefinitionSeeder extends Seeder
     {
         return [
 
-            // ── Example definitions ───────────────────────────────────────
+            // ── User Status ───────────────────────────────────────────────
+            'userStatus' => [
+                ['active', 'Active', 0, 'en', 'success'],
+                ['active', 'Aktif', 0, 'tr', 'success'],
+                ['inactive', 'Inactive', 1, 'en', 'danger'],
+                ['inactive', 'Pasif', 1, 'tr', 'danger'],
+                ['banned', 'Banned', 2, 'en', 'contrast'],
+                ['banned', 'Yasaklı', 2, 'tr', 'contrast'],
+            ],
 
-            // 'identityType' => [
-            //     // [value, label, order, lang, severity]
-            //     [1, 'Türkiye', 0, 'tr', 'contrast'],
-            //     [2, 'Yabancı Uyruklu', 1, 'tr', 'green,soft'],
-            // ],
+            // ── Yes / No ─────────────────────────────────────────────────
+            'yesNo' => [
+                [1, 'Yes', 0, 'en', 'success'],
+                [1, 'Evet', 0, 'tr', 'success'],
+                [0, 'No', 1, 'en', 'danger'],
+                [0, 'Hayır', 1, 'tr', 'danger'],
+            ],
 
+            // ── Identity Type ────────────────────────────────────────────
+            'identityType' => [
+                [1, 'Turkey', 0, 'en', 'contrast'],
+                [1, 'Türkiye', 0, 'tr', 'contrast'],
+                [2, 'Foreign', 1, 'en', 'green,soft'],
+                [2, 'Yabancı Uyruklu', 1, 'tr', 'green,soft'],
+            ],
+
+            // ── Gender ───────────────────────────────────────────────────
             'gender' => [
-                ['female', 'Kadın', 0, 'tr'],
                 ['female', 'Female', 0, 'en'],
-                ['male', 'Erkek', 1, 'tr'],
+                ['female', 'Kadın', 0, 'tr'],
                 ['male', 'Male', 1, 'en'],
+                ['male', 'Erkek', 1, 'tr'],
             ],
 
         ];

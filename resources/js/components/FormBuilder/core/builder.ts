@@ -255,22 +255,18 @@ export class SelectFieldBuilder extends BaseFieldBuilder<SelectFieldConfig> {
         return this;
     }
 
-    /** Resolve options from an Inertia shared enum (e.g. 'userStatus'). */
-    enumOptions(key: string, filter?: OptionFilter): this {
-        this.config.enumKey = key;
-        if (filter) {
-            this.config.enumFilter = filter;
-        }
-        return this;
-    }
-
-    /** Resolve options from a DB-based definition (e.g. 'gender'). */
+    /** Resolve options from a definition (e.g. 'userStatus', 'gender'). */
     definitionOptions(key: string, filter?: OptionFilter): this {
         this.config.definitionKey = key;
         if (filter) {
             this.config.definitionFilter = filter;
         }
         return this;
+    }
+
+    /** @deprecated Use `definitionOptions()` instead. */
+    enumOptions(key: string, filter?: OptionFilter): this {
+        return this.definitionOptions(key, filter);
     }
 }
 

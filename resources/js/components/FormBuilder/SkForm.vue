@@ -13,7 +13,6 @@
     } from '@lvntr/components/FormBuilder/core';
     import { useApi } from '@/composables/useApi';
     import { useDefinition } from '@/composables/useDefinition';
-    import { useEnum } from '@/composables/useEnum';
     import { trans } from 'laravel-vue-i18n';
     import SkFormInput from '@lvntr/components/FormBuilder/SkFormInput.vue';
 
@@ -73,7 +72,6 @@
     }
 
     const api = useApi();
-    const { options: enumOptions } = useEnum();
     const { options: definitionOptions, load: loadDefinitions } = useDefinition();
 
     // ── Remote data loading ─────────────────────────────────────────────────────
@@ -96,8 +94,12 @@
     /** Collect all definitionKey values from select fields to preload them. */
     const definitionKeys = computed(() =>
         props.config.fields
-            .filter((f): f is SelectFieldConfig => SELECT_TYPES.has(f.type) && !!(f as SelectFieldConfig).definitionKey)
-            .map((f) => f.definitionKey!),
+            .filter((f): f is SelectFieldConfig => {
+                if (!SELECT_TYPES.has(f.type)) return false;
+                const sf = f as SelectFieldConfig;
+                return !!(sf.definitionKey ?? sf.enumKey);
+            })
+            .map((f) => ((f as SelectFieldConfig).definitionKey ?? (f as SelectFieldConfig).enumKey)!),
     );
 
     onMounted(async () => {
@@ -322,11 +324,9 @@
             return [];
         }
         const sf = field as SelectFieldConfig;
-        if (sf.enumKey) {
-            return applyFilter(enumOptions(sf.enumKey), sf.enumFilter);
-        }
-        if (sf.definitionKey) {
-            return applyFilter(definitionOptions(sf.definitionKey), sf.definitionFilter);
+        const defKey = sf.definitionKey ?? sf.enumKey;
+        if (defKey) {
+            return applyFilter(definitionOptions(defKey), sf.definitionFilter ?? sf.enumFilter);
         }
         return sf.optionsUrl ? (dynamicOptions.value[field.key] ?? []) : (sf.options ?? []);
     }

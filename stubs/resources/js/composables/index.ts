@@ -13,7 +13,6 @@ export { useRefreshBus } from './useRefreshBus';
 export { useUrlTab } from './useUrlTab';
 export type { TabDefinition } from './useUrlTab';
 export { useCan } from './useCan';
-export { useEnum } from './useEnum';
-export type { EnumItem, EnumKey } from './useEnum';
 export { useDefinition } from './useDefinition';
+export type { EnumItem, DefinitionKey, DefinitionFilter } from './useDefinition';
 export { usePageLoading } from './usePageLoading';

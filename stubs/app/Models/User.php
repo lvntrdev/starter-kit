@@ -4,7 +4,6 @@ namespace App\Models;
 
 use App\Enums\UserStatus;
 use App\Traits\HasActivityLogging;
-use App\Traits\HasEnumAccessors;
 use App\Traits\HasMediaCollections;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -27,7 +26,7 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable implements HasMedia, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasActivityLogging, HasApiTokens, HasEnumAccessors, HasFactory, HasMediaCollections, HasRoles, HasUuids, Notifiable, SoftDeletes, TwoFactorAuthenticatable;
+    use HasActivityLogging, HasApiTokens, HasFactory, HasMediaCollections, HasRoles, HasUuids, Notifiable, SoftDeletes, TwoFactorAuthenticatable;
 
     /**
      * The attributes that are mass assignable.
