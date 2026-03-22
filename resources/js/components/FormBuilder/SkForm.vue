@@ -147,8 +147,11 @@
             resolvedFields.value
                 .filter((f) => !NON_INPUT_TYPES.has(f.type))
                 .map((f) => {
-                    const fromData = initial[f.key];
+                    let fromData = initial[f.key];
                     if (fromData !== undefined && fromData !== null) {
+                        if (f.type === 'date-picker' && typeof fromData === 'string') {
+                            fromData = new Date(fromData);
+                        }
                         return [f.key, fromData];
                     }
                     return [f.key, f.defaultValue ?? null];
