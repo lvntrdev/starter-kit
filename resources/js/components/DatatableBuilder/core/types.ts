@@ -33,10 +33,9 @@ export interface ColumnConfig {
     key: string;
     sortable: boolean;
     render?: (row: unknown, escape: (str: string) => string) => string;
-    tag?: TagSeverity | ((row: unknown) => TagSeverity | undefined);
+    tag?: 'definition' | 'custom';
     tagKey?: string;
-    /** When set, uses `{key}_label` for display and `{key}_severity` for tag severity. */
-    enumTag?: boolean;
+    severities?: Record<string, TagSeverity>;
     /** Pin this column so it stays visible while scrolling horizontally. */
     sticky?: boolean;
 }

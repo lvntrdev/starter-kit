@@ -1,6 +1,7 @@
 <script setup lang="ts">
     import type { DataTableConfig, DataTableResponse, ActionConfig } from '@lvntr/components/DatatableBuilder/core';
     import { useApi } from '@/composables/useApi';
+    import { useDefinition } from '@/composables/useDefinition';
     import { useRefreshBus } from '@/composables/useRefreshBus';
     import { Link } from '@inertiajs/vue3';
     import type { MenuItem } from 'primevue/menuitem';
@@ -20,6 +21,16 @@
     }>();
 
     const api = useApi();
+    const definition = useDefinition();
+
+    // ── Auto-load definitions for definition-tag columns ───────────────────────
+    const definitionKeys = props.config.columns
+        .filter((c) => c.tag === 'definition' && c.tagKey)
+        .map((c) => c.tagKey!);
+
+    if (definitionKeys.length) {
+        onMounted(() => definition.load(definitionKeys));
+    }
 
     // ── Scroll constraint ──────────────────────────────────────────────────────
 
@@ -921,16 +932,28 @@
                                         :class="{ 'sk-dt__td--sticky': column.sticky }"
                                     >
                                         <Tag
-                                            v-if="column.enumTag"
-                                            :value="String(getNestedValue(row, `${column.key}_label`) ?? '-')"
+                                            v-if="column.tag === 'definition'"
+                                            :value="
+                                                definition.find(
+                                                    column.tagKey!,
+                                                    getNestedValue(row, column.key) as string | number,
+                                                )?.label
+                                            "
                                             :severity="
-                                                (getNestedValue(row, `${column.key}_severity`) as string) ?? undefined
+                                                definition.find(
+                                                    column.tagKey!,
+                                                    getNestedValue(row, column.key) as string | number,
+                                                )?.severity ?? undefined
                                             "
                                         />
                                         <Tag
-                                            v-else-if="column.tag"
-                                            :value="String(getNestedValue(row, column.tagKey ?? column.key) ?? '-')"
-                                            :severity="typeof column.tag === 'function' ? column.tag(row) : column.tag"
+                                            v-else-if="column.tag === 'custom'"
+                                            :value="String(getNestedValue(row, column.key) ?? '-')"
+                                            :severity="
+                                                column.severities?.[
+                                                    getNestedValue(row, column.tagKey!) as string
+                                                ]
+                                            "
                                         />
                                         <span v-else-if="column.render" v-html="column.render(row, escapeHtml)" />
                                         <template v-else>

@@ -69,7 +69,7 @@
             DB.column<User>().label('common.full_name').key('full_name'),
             DB.column<User>().key('email'),
             DB.column<User>().label('common.role').key('role'),
-            DB.column<User>().key('status').enumTag(),
+            DB.column<User>().key('status').tag('definition').tagKey('userStatus'),
             DB.column<User>().label('common.created_at').key('created_at'),
         )
         .addFilters(

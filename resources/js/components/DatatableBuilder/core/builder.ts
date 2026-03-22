@@ -42,24 +42,21 @@ export class ColumnBuilder<_T = unknown> {
         return this;
     }
 
-    /** Render cell as a PrimeVue Tag with the given severity (static or per-row). */
-    tag(severity: TagSeverity | ((row: _T) => TagSeverity | undefined)): this {
-        this.config.tag = severity as TagSeverity | ((row: unknown) => TagSeverity | undefined);
+    /** Render cell as a PrimeVue Tag. Use 'definition' for enum/DB definitions, 'custom' for manual severity mapping. */
+    tag(type: 'definition' | 'custom'): this {
+        this.config.tag = type;
         return this;
     }
 
-    /** Property key to use as the Tag label (defaults to column key). */
+    /** Definition key or row property key used to resolve the tag severity. */
     tagKey(key: string): this {
         this.config.tagKey = key;
         return this;
     }
 
-    /**
-     * Shortcut for enum-backed columns.
-     * Expects `{key}_label` and `{key}_severity` fields from backend.
-     */
-    enumTag(): this {
-        this.config.enumTag = true;
+    /** Severity map for custom tags – keys are matched against the tagKey value. */
+    severities(map: Record<string, TagSeverity>): this {
+        this.config.severities = map;
         return this;
     }
 

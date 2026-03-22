@@ -55,7 +55,11 @@
 
     <!-- GROUP -->
     <div v-else-if="item.children?.length" class="nav-group-wrapper">
-        <button class="nav-group" :class="{ 'nav-group--active': isOpen || isGroupOpen(item), 'nav-group--url-active': isGroupOpen(item) }" @click="toggle">
+        <button
+            class="nav-group"
+            :class="{ 'nav-group--active': isOpen || isGroupOpen(item), 'nav-group--url-active': isGroupOpen(item) }"
+            @click="toggle"
+        >
             <div class="nav-icon">
                 <i v-if="item.icon" :class="item.icon" />
             </div>

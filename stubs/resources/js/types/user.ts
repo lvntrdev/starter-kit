@@ -9,8 +9,6 @@ export interface User {
     full_name: string;
     email: string;
     status: UserStatus;
-    status_label: string;
-    status_severity: string;
     role?: string | null;
     avatar_url: string | null;
     identity_document_media?: Record<string, unknown> | null;
