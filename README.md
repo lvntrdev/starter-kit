@@ -1,5 +1,14 @@
 # Lvntr Starter Kit
 
+![Tests](https://img.shields.io/badge/tests-passing-22c55e?style=flat-square)
+![License](https://img.shields.io/badge/license-PolyForm--Noncommercial%201.0.0-f59e0b?style=flat-square)
+![Packagist Version](https://img.shields.io/packagist/v/lvntr/starter-kit?style=flat-square&label=packagist)
+![Downloads](https://img.shields.io/packagist/dt/lvntr/starter-kit?style=flat-square&label=downloads)
+
+Lvntr Starter Kit is under active development, and each release is shaping it into a more complete admin-first Laravel platform.
+
+Detailed usage docs: [kit-docs.lvntr.dev](https://kit-docs.lvntr.dev/)
+
 A full-featured Laravel admin panel package built with **Laravel 12**, **Inertia.js v2**, **Vue 3**, **PrimeVue 4**, and **Tailwind CSS 4**. Follows DDD (Domain-Driven Design) architecture with built-in role-based permissions, activity logging, settings management, and more.
 
 ## Features
@@ -20,40 +29,40 @@ A full-featured Laravel admin panel package built with **Laravel 12**, **Inertia
 
 ### Backend (PHP / Composer)
 
-| Package | Purpose |
-|---|---|
-| **Laravel 12** | Core framework |
-| **Inertia.js v2** | Server-driven SPA — no API layer needed between backend and frontend |
-| **Laravel Fortify** | Authentication backend (login, register, 2FA, password reset) |
-| **Laravel Passport** | OAuth2 API authentication (personal access tokens, device authorization) |
-| **Laravel Wayfinder** | Type-safe route generation for TypeScript |
-| **Spatie Permission** | Role & permission management with dynamic resource-scoped permissions |
-| **Spatie Activity Log** | Model activity logging with browsable admin interface |
-| **Spatie Media Library** | File uploads & media collections (avatars, attachments) |
-| **Spatie Query Builder** | Filter, sort, and include relationships via query string |
-| **Spatie Translatable** | Multi-language model attributes (JSON-based) |
+| Package                  | Purpose                                                                  |
+| ------------------------ | ------------------------------------------------------------------------ |
+| **Laravel 12**           | Core framework                                                           |
+| **Inertia.js v2**        | Server-driven SPA — no API layer needed between backend and frontend     |
+| **Laravel Fortify**      | Authentication backend (login, register, 2FA, password reset)            |
+| **Laravel Passport**     | OAuth2 API authentication (personal access tokens, device authorization) |
+| **Laravel Wayfinder**    | Type-safe route generation for TypeScript                                |
+| **Spatie Permission**    | Role & permission management with dynamic resource-scoped permissions    |
+| **Spatie Activity Log**  | Model activity logging with browsable admin interface                    |
+| **Spatie Media Library** | File uploads & media collections (avatars, attachments)                  |
+| **Spatie Query Builder** | Filter, sort, and include relationships via query string                 |
+| **Spatie Translatable**  | Multi-language model attributes (JSON-based)                             |
 
 ### Frontend (Node / npm)
 
-| Package | Purpose |
-|---|---|
-| **Vue 3** | Reactive UI framework |
-| **PrimeVue 4** | UI component library (DataTable, Dialog, Toast, Menu, etc.) |
-| **Tailwind CSS 4** | Utility-first CSS framework |
-| **Inertia.js Vue 3** | Client-side adapter for Inertia SPA |
-| **VueUse** | Collection of Vue composition utilities |
-| **laravel-vue-i18n** | Use Laravel translation files directly in Vue |
+| Package              | Purpose                                                     |
+| -------------------- | ----------------------------------------------------------- |
+| **Vue 3**            | Reactive UI framework                                       |
+| **PrimeVue 4**       | UI component library (DataTable, Dialog, Toast, Menu, etc.) |
+| **Tailwind CSS 4**   | Utility-first CSS framework                                 |
+| **Inertia.js Vue 3** | Client-side adapter for Inertia SPA                         |
+| **VueUse**           | Collection of Vue composition utilities                     |
+| **laravel-vue-i18n** | Use Laravel translation files directly in Vue               |
 
 ### Dev Tools
 
-| Tool | Purpose |
-|---|---|
-| **Vite** | Frontend build tool with HMR |
-| **TypeScript** | Type safety for frontend code |
-| **ESLint + Prettier** | Code linting and formatting |
-| **Vitest** | Unit testing for Vue components |
+| Tool                    | Purpose                           |
+| ----------------------- | --------------------------------- |
+| **Vite**                | Frontend build tool with HMR      |
+| **TypeScript**          | Type safety for frontend code     |
+| **ESLint + Prettier**   | Code linting and formatting       |
+| **Vitest**              | Unit testing for Vue components   |
 | **Husky + lint-staged** | Pre-commit hooks for code quality |
-| **Commitizen** | Conventional commit messages |
+| **Commitizen**          | Conventional commit messages      |
 
 ## Requirements
 
@@ -162,14 +171,14 @@ php artisan sk:publish --tag=config
 
 ## Available Commands
 
-| Command | Description |
-|---|---|
-| `sk:install` | Full installation wizard |
-| `sk:update` | Update package files preserving user changes |
-| `sk:publish` | Publish optional assets for customization |
-| `make:sk-domain` | Scaffold a complete DDD domain interactively |
-| `remove:sk-domain` | Remove a domain and all its files |
-| `env:sync` | Sync .env keys to .env.example |
+| Command            | Description                                  |
+| ------------------ | -------------------------------------------- |
+| `sk:install`       | Full installation wizard                     |
+| `sk:update`        | Update package files preserving user changes |
+| `sk:publish`       | Publish optional assets for customization    |
+| `make:sk-domain`   | Scaffold a complete DDD domain interactively |
+| `remove:sk-domain` | Remove a domain and all its files            |
+| `env:sync`         | Sync .env keys to .env.example               |
 
 ### Domain Scaffolding
 
@@ -201,10 +210,11 @@ lvntr/starter-kit/
 │   ├── StarterKitServiceProvider.php
 │   ├── Console/Commands/         # sk:install, sk:update, make:sk-domain, etc.
 │   ├── Domain/Shared/            # BaseAction, BaseDTO, ActionPipeline
-│   ├── Enums/                    # PermissionEnum, HasDefinition, EnumRegistry
+│   ├── Enums/                    # PermissionEnum
 │   ├── Http/Middleware/          # CheckResourcePermission, SecurityHeaders
 │   ├── Http/Responses/           # ApiResponse builder
-│   ├── Traits/                   # HasActivityLogging, HasEnumAccessors, HasMediaCollections
+│   ├── Support/                  # Package support classes
+│   ├── Traits/                   # HasActivityLogging, HasMediaCollections
 │   └── helpers.php               # to_api(), format_date()
 ├── resources/
 │   ├── js/components/            # Vue components (optionally publishable)
@@ -242,12 +252,12 @@ app/
 
 ### Update Strategy
 
-| File Category | Behavior on `sk:update` |
-|---|---|
-| `Domain/Shared/`, Traits, Middleware, helpers | Always updated |
-| Controllers, Models, Pages, Routes | Updated only if user hasn't modified them |
-| User's custom domains | Never touched |
-| New files from package | Automatically added |
+| File Category                                 | Behavior on `sk:update`                   |
+| --------------------------------------------- | ----------------------------------------- |
+| `Domain/Shared/`, Traits, Middleware, helpers | Always updated                            |
+| Controllers, Models, Pages, Routes            | Updated only if user hasn't modified them |
+| User's custom domains                         | Never touched                             |
+| New files from package                        | Automatically added                       |
 
 ## Using Package Components
 
@@ -257,9 +267,9 @@ Components are auto-resolved from the package. Use them in your Vue files:
 
 ```vue
 <template>
-    <SkForm :form="form" :builder="formBuilder" />
-    <SkDatatable :builder="tableBuilder" />
-    <SkTabs :builder="tabBuilder" />
+    <SkForm :config="formConfig" />
+    <SkDatatable :config="tableConfig" />
+    <SkTabs :config="tabConfig" />
 </template>
 ```
 
@@ -282,4 +292,4 @@ use Lvntr\StarterKit\Traits\HasActivityLogging;
 
 ## License
 
-MIT
+[PolyForm Noncommercial 1.0.0](./LICENSE)

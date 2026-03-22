@@ -11,6 +11,7 @@ import type {
     FormLayout,
     FormSubmitConfig,
     InputNumberFieldConfig,
+    InputMaskFieldConfig,
     InputOtpFieldConfig,
     InputTextFieldConfig,
     OptionFilter,
@@ -206,6 +207,37 @@ export class InputOtpBuilder extends BaseFieldBuilder<InputOtpFieldConfig> {
 
     integerOnly(integerOnly = true): this {
         this.config.integerOnly = integerOnly;
+        return this;
+    }
+}
+
+export class InputMaskBuilder extends BaseFieldBuilder<InputMaskFieldConfig> {
+    constructor() {
+        super('input-mask');
+    }
+
+    mask(mask: string): this {
+        this.config.mask = mask;
+        return this;
+    }
+
+    placeholder(placeholder: string | boolean): this {
+        this.config.placeholder = placeholder as string;
+        return this;
+    }
+
+    slotChar(char: string): this {
+        this.config.slotChar = char;
+        return this;
+    }
+
+    autoClear(enabled = true): this {
+        this.config.autoClear = enabled;
+        return this;
+    }
+
+    unmask(enabled = true): this {
+        this.config.unmask = enabled;
         return this;
     }
 }

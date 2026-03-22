@@ -27,7 +27,7 @@
         "starter-kit",
         "laravel"
     ],
-    "license": "MIT",
+    "license": "PolyForm-Noncommercial-1.0.0",
     "peerDependencies": {
         "vue": "^3.5.0",
         "primevue": "^4.0.0",

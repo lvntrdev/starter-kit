@@ -6,6 +6,7 @@
         FileUploadFieldConfig,
         InputNumberFieldConfig,
         InputOtpFieldConfig,
+        InputMaskFieldConfig,
         InputTextFieldConfig,
         PasswordFieldConfig,
         SelectFieldConfig,
@@ -43,6 +44,7 @@
     const asInputText = computed(() => props.field as InputTextFieldConfig);
     const asInputNumber = computed(() => props.field as InputNumberFieldConfig);
     const asInputOtp = computed(() => props.field as InputOtpFieldConfig);
+    const asInputMask = computed(() => props.field as InputMaskFieldConfig);
     const asSelect = computed(() => props.field as SelectFieldConfig);
     const asPassword = computed(() => props.field as PasswordFieldConfig);
     const asTextarea = computed(() => props.field as TextareaFieldConfig);
@@ -216,6 +218,22 @@
         :integer-only="asInputOtp.integerOnly"
         :disabled="disabled"
         :invalid="invalid"
+        v-bind="extraProps"
+    />
+
+    <!-- InputMask -->
+    <InputMask
+        v-else-if="field.type === 'input-mask'"
+        :id="field.key"
+        v-model="stringVal"
+        :mask="asInputMask.mask"
+        :placeholder="asInputMask.placeholder ? $t(asInputMask.placeholder) : undefined"
+        :slot-char="asInputMask.slotChar ?? '_'"
+        :auto-clear="asInputMask.autoClear ?? false"
+        :unmask="asInputMask.unmask ?? false"
+        :disabled="disabled"
+        :invalid="invalid"
+        class="w-full"
         v-bind="extraProps"
     />
 

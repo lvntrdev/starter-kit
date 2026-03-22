@@ -1,5 +1,14 @@
 # Lvntr Starter Kit
 
+![Tests](https://img.shields.io/badge/tests-passing-22c55e?style=flat-square)
+![License](https://img.shields.io/badge/license-PolyForm--Noncommercial%201.0.0-f59e0b?style=flat-square)
+![Packagist Surum](https://img.shields.io/packagist/v/lvntr/starter-kit?style=flat-square&label=packagist)
+![Downloads](https://img.shields.io/packagist/dt/lvntr/starter-kit?style=flat-square&label=downloads)
+
+Lvntr Starter Kit aktif olarak gelistiriliyor; her yeni surum onu daha olgun, daha kapsamli ve admin odakli bir Laravel platformuna donusturuyor.
+
+Detayli kullanim dokumanlari: [kit-docs.lvntr.dev](https://kit-docs.lvntr.dev/)
+
 **Laravel 12**, **Inertia.js v2**, **Vue 3**, **PrimeVue 4** ve **Tailwind CSS 4** ile olusturulmus, tam donanimli bir Laravel admin panel paketi. DDD (Domain-Driven Design) mimarisi ile rol tabanli yetkilendirme, aktivite kaydi, ayarlar yonetimi ve daha fazlasini icerir.
 
 ## Ozellikler
@@ -20,40 +29,40 @@
 
 ### Backend (PHP / Composer)
 
-| Paket | Amac |
-|---|---|
-| **Laravel 12** | Cekirdek framework |
-| **Inertia.js v2** | Sunucu tabanli SPA — backend ile frontend arasinda API katmanina gerek yok |
-| **Laravel Fortify** | Kimlik dogrulama altyapisi (giris, kayit, 2FA, sifre sifirlama) |
-| **Laravel Passport** | OAuth2 API kimlik dogrulamasi (kisisel erisim tokenlari, cihaz yetkilendirme) |
-| **Laravel Wayfinder** | TypeScript icin tip-guvenli rota olusturma |
-| **Spatie Permission** | Dinamik kaynak bazli yetkilerle rol ve yetki yonetimi |
-| **Spatie Activity Log** | Gozatilabilir admin arayuzu ile model aktivite kaydi |
-| **Spatie Media Library** | Dosya yuklemeleri ve medya koleksiyonlari (avatarlar, ekler) |
-| **Spatie Query Builder** | Sorgu dizisi uzerinden filtreleme, siralama ve iliski dahil etme |
-| **Spatie Translatable** | Coklu dil model ozellikleri (JSON tabanli) |
+| Paket                    | Amac                                                                          |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| **Laravel 12**           | Cekirdek framework                                                            |
+| **Inertia.js v2**        | Sunucu tabanli SPA — backend ile frontend arasinda API katmanina gerek yok    |
+| **Laravel Fortify**      | Kimlik dogrulama altyapisi (giris, kayit, 2FA, sifre sifirlama)               |
+| **Laravel Passport**     | OAuth2 API kimlik dogrulamasi (kisisel erisim tokenlari, cihaz yetkilendirme) |
+| **Laravel Wayfinder**    | TypeScript icin tip-guvenli rota olusturma                                    |
+| **Spatie Permission**    | Dinamik kaynak bazli yetkilerle rol ve yetki yonetimi                         |
+| **Spatie Activity Log**  | Gozatilabilir admin arayuzu ile model aktivite kaydi                          |
+| **Spatie Media Library** | Dosya yuklemeleri ve medya koleksiyonlari (avatarlar, ekler)                  |
+| **Spatie Query Builder** | Sorgu dizisi uzerinden filtreleme, siralama ve iliski dahil etme              |
+| **Spatie Translatable**  | Coklu dil model ozellikleri (JSON tabanli)                                    |
 
 ### Frontend (Node / npm)
 
-| Paket | Amac |
-|---|---|
-| **Vue 3** | Reaktif UI framework |
-| **PrimeVue 4** | UI bilesen kutuphanesi (DataTable, Dialog, Toast, Menu, vb.) |
-| **Tailwind CSS 4** | Utility-first CSS framework |
-| **Inertia.js Vue 3** | Inertia SPA icin istemci tarafi adaptoru |
-| **VueUse** | Vue composition yardimci araclari koleksiyonu |
-| **laravel-vue-i18n** | Laravel ceviri dosyalarini dogrudan Vue'da kullanma |
+| Paket                | Amac                                                         |
+| -------------------- | ------------------------------------------------------------ |
+| **Vue 3**            | Reaktif UI framework                                         |
+| **PrimeVue 4**       | UI bilesen kutuphanesi (DataTable, Dialog, Toast, Menu, vb.) |
+| **Tailwind CSS 4**   | Utility-first CSS framework                                  |
+| **Inertia.js Vue 3** | Inertia SPA icin istemci tarafi adaptoru                     |
+| **VueUse**           | Vue composition yardimci araclari koleksiyonu                |
+| **laravel-vue-i18n** | Laravel ceviri dosyalarini dogrudan Vue'da kullanma          |
 
 ### Gelistirme Araclari
 
-| Arac | Amac |
-|---|---|
-| **Vite** | HMR ile frontend derleme araci |
-| **TypeScript** | Frontend kodu icin tip guvenligi |
-| **ESLint + Prettier** | Kod linting ve formatlama |
-| **Vitest** | Vue bilesenleri icin birim testi |
+| Arac                    | Amac                                   |
+| ----------------------- | -------------------------------------- |
+| **Vite**                | HMR ile frontend derleme araci         |
+| **TypeScript**          | Frontend kodu icin tip guvenligi       |
+| **ESLint + Prettier**   | Kod linting ve formatlama              |
+| **Vitest**              | Vue bilesenleri icin birim testi       |
 | **Husky + lint-staged** | Kod kalitesi icin pre-commit hook'lari |
-| **Commitizen** | Konvansiyonel commit mesajlari |
+| **Commitizen**          | Konvansiyonel commit mesajlari         |
 
 ## Gereksinimler
 
@@ -162,14 +171,14 @@ php artisan sk:publish --tag=config
 
 ## Mevcut Komutlar
 
-| Komut | Aciklama |
-|---|---|
-| `sk:install` | Tam kurulum sihirbazi |
-| `sk:update` | Kullanici degisikliklerini koruyarak paket dosyalarini guncelle |
-| `sk:publish` | Ozellestirme icin istege bagli varliklari yayinla |
-| `make:sk-domain` | Interaktif olarak eksiksiz bir DDD domain'i olustur |
-| `remove:sk-domain` | Bir domain'i ve tum dosyalarini kaldir |
-| `env:sync` | .env anahtarlarini .env.example ile senkronize et |
+| Komut              | Aciklama                                                        |
+| ------------------ | --------------------------------------------------------------- |
+| `sk:install`       | Tam kurulum sihirbazi                                           |
+| `sk:update`        | Kullanici degisikliklerini koruyarak paket dosyalarini guncelle |
+| `sk:publish`       | Ozellestirme icin istege bagli varliklari yayinla               |
+| `make:sk-domain`   | Interaktif olarak eksiksiz bir DDD domain'i olustur             |
+| `remove:sk-domain` | Bir domain'i ve tum dosyalarini kaldir                          |
+| `env:sync`         | .env anahtarlarini .env.example ile senkronize et               |
 
 ### Domain Iskelet Olusturma
 
@@ -201,10 +210,11 @@ lvntr/starter-kit/
 │   ├── StarterKitServiceProvider.php
 │   ├── Console/Commands/         # sk:install, sk:update, make:sk-domain, vb.
 │   ├── Domain/Shared/            # BaseAction, BaseDTO, ActionPipeline
-│   ├── Enums/                    # PermissionEnum, HasDefinition, EnumRegistry
+│   ├── Enums/                    # PermissionEnum
 │   ├── Http/Middleware/          # CheckResourcePermission, SecurityHeaders
 │   ├── Http/Responses/           # ApiResponse olusturucu
-│   ├── Traits/                   # HasActivityLogging, HasEnumAccessors, HasMediaCollections
+│   ├── Support/                  # Paket destek siniflari
+│   ├── Traits/                   # HasActivityLogging, HasMediaCollections
 │   └── helpers.php               # to_api(), format_date()
 ├── resources/
 │   ├── js/components/            # Vue bilesenleri (istege bagli yayinlanabilir)
@@ -242,12 +252,12 @@ app/
 
 ### Guncelleme Stratejisi
 
-| Dosya Kategorisi | `sk:update` ile Davranis |
-|---|---|
-| `Domain/Shared/`, Trait'ler, Middleware, helper'lar | Her zaman guncellenir |
-| Controller'lar, Model'ler, Sayfalar, Route'lar | Sadece kullanici degistirmemisse guncellenir |
-| Kullanicinin kendi domain'leri | Asla dokunulmaz |
-| Paketten gelen yeni dosyalar | Otomatik olarak eklenir |
+| Dosya Kategorisi                                    | `sk:update` ile Davranis                     |
+| --------------------------------------------------- | -------------------------------------------- |
+| `Domain/Shared/`, Trait'ler, Middleware, helper'lar | Her zaman guncellenir                        |
+| Controller'lar, Model'ler, Sayfalar, Route'lar      | Sadece kullanici degistirmemisse guncellenir |
+| Kullanicinin kendi domain'leri                      | Asla dokunulmaz                              |
+| Paketten gelen yeni dosyalar                        | Otomatik olarak eklenir                      |
 
 ## Paket Bilesenlerini Kullanma
 
@@ -257,9 +267,9 @@ Bilesenler paketten otomatik olarak cozumlenir. Vue dosyalarinizda kullanin:
 
 ```vue
 <template>
-    <SkForm :form="form" :builder="formBuilder" />
-    <SkDatatable :builder="tableBuilder" />
-    <SkTabs :builder="tabBuilder" />
+    <SkForm :config="formConfig" />
+    <SkDatatable :config="tableConfig" />
+    <SkTabs :config="tabConfig" />
 </template>
 ```
 
@@ -282,4 +292,4 @@ use Lvntr\StarterKit\Traits\HasActivityLogging;
 
 ## Lisans
 
-MIT
+[PolyForm Noncommercial 1.0.0](./LICENSE)

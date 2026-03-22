@@ -6,6 +6,7 @@ export type FieldType =
     | 'input-text'
     | 'input-number'
     | 'input-otp'
+    | 'input-mask'
     | 'select'
     | 'multiselect'
     | 'radio'
@@ -78,6 +79,19 @@ export interface InputOtpFieldConfig extends BaseFieldConfig {
     length?: number;
     mask?: boolean;
     integerOnly?: boolean;
+}
+
+export interface InputMaskFieldConfig extends BaseFieldConfig {
+    type: 'input-mask';
+    /** Mask pattern (e.g. '(999) 999-9999', '99999999999', '99/99/9999'). */
+    mask?: string;
+    placeholder?: string;
+    /** Character used for unfilled positions (default: '_'). */
+    slotChar?: string;
+    /** Whether to include the literal characters in the value (default: false). */
+    autoClear?: boolean;
+    /** When true, mask is removed from the model value (default: false). */
+    unmask?: boolean;
 }
 
 /** Filter to include or exclude specific values from enum/definition options. */
@@ -200,6 +214,7 @@ export type FieldConfig =
     | InputTextFieldConfig
     | InputNumberFieldConfig
     | InputOtpFieldConfig
+    | InputMaskFieldConfig
     | SelectFieldConfig
     | CheckboxFieldConfig
     | PasswordFieldConfig
