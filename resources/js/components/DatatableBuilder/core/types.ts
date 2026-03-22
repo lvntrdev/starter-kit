@@ -53,6 +53,10 @@ export interface FilterConfig {
     type: FilterType;
     placement: FilterPlacement;
     options?: FilterOption[];
+    /** Load options from the definition system (useDefinition). */
+    definitionKey?: string;
+    /** Load options from a remote URL (GET → { data: FilterOption[] }). */
+    optionsUrl?: string;
     placeholder?: string;
 }
 

@@ -100,6 +100,18 @@ export class FilterBuilder {
         return this;
     }
 
+    /** Load filter options from the definition system. */
+    definitionOptions(key: string): this {
+        this.config.definitionKey = key;
+        return this;
+    }
+
+    /** Load filter options from a remote URL (GET → { data: FilterOption[] }). */
+    optionsUrl(url: string): this {
+        this.config.optionsUrl = url;
+        return this;
+    }
+
     placeholder(placeholder: string): this {
         this.config.placeholder = placeholder;
         return this;

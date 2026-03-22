@@ -2,7 +2,6 @@
     import { useCan } from '@/composables/useCan';
     import { useConfirm } from '@/composables/useConfirm';
     import { useDialog } from '@/composables/useDialog';
-    import { useDefinition } from '@/composables/useDefinition';
     import { useRefreshBus } from '@/composables/useRefreshBus';
     import AdminLayout from '@/layouts/AdminLayout.vue';
     import type { User } from '@/types';
@@ -23,9 +22,6 @@
     const { confirmDelete } = useConfirm();
     const dialog = useDialog();
     const bus = useRefreshBus();
-    const { options, load: loadDefinitions } = useDefinition();
-
-    onMounted(() => loadDefinitions(['userStatus']));
     const { can } = useCan();
 
     const REFRESH_KEY = 'users-table';
@@ -75,7 +71,7 @@
             DB.column<User>().label('common.created_at').key('created_at'),
         )
         .addFilters(
-            DB.filter().key('status').type('select').options(options('userStatus')),
+            DB.filter().key('status').definitionOptions('userStatus'),
             DB.filter().key('role').label('common.role').type('select').options(props.roleOptions),
         )
         .addActions(

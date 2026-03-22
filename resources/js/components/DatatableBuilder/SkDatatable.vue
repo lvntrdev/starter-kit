@@ -1,5 +1,5 @@
 <script setup lang="ts">
-    import type { DataTableConfig, DataTableResponse, ActionConfig } from '@lvntr/components/DatatableBuilder/core';
+    import type { DataTableConfig, DataTableResponse, ActionConfig, FilterConfig, FilterOption } from '@lvntr/components/DatatableBuilder/core';
     import { useApi } from '@/composables/useApi';
     import { useDefinition } from '@/composables/useDefinition';
     import { useRefreshBus } from '@/composables/useRefreshBus';
@@ -23,13 +23,41 @@
     const api = useApi();
     const definition = useDefinition();
 
-    // ── Auto-load definitions for definition-tag columns ───────────────────────
-    const definitionKeys = props.config.columns
-        .filter((c) => c.tag === 'definition' && c.tagKey)
-        .map((c) => c.tagKey!);
+    // ── Auto-load definitions for columns and filters ──────────────────────────
+    const definitionKeys = [
+        ...props.config.columns.filter((c) => c.tag === 'definition' && c.tagKey).map((c) => c.tagKey!),
+        ...props.config.filters.filter((f) => f.definitionKey).map((f) => f.definitionKey!),
+    ];
 
     if (definitionKeys.length) {
-        onMounted(() => definition.load(definitionKeys));
+        onMounted(() => definition.load([...new Set(definitionKeys)]));
+    }
+
+    // ── URL-based filter options ───────────────────────────────────────────────
+    const urlOptions = reactive<Record<string, FilterOption[]>>({});
+
+    const urlFilters = props.config.filters.filter((f) => f.optionsUrl);
+    if (urlFilters.length) {
+        onMounted(async () => {
+            await Promise.all(
+                urlFilters.map(async (f) => {
+                    const res = await fetch(f.optionsUrl!, {
+                        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                    });
+                    const json = await res.json();
+                    urlOptions[f.key] = json.data ?? json;
+                }),
+            );
+        });
+    }
+
+    /** Resolve filter options: static > definition > URL. */
+    function getFilterOptions(filter: FilterConfig): FilterOption[] {
+        if (filter.options) return filter.options;
+        if (filter.definitionKey) return definition.options(filter.definitionKey);
+        if (filter.optionsUrl) return urlOptions[filter.key] ?? [];
+        return [];
     }
 
     // ── Scroll constraint ──────────────────────────────────────────────────────
@@ -534,8 +562,9 @@
         const val = activeFilters.value[filter.key] as unknown;
         if (val === null || val === undefined || val === '') return null;
 
-        if ((filter.type === 'select' || filter.type === 'select-button') && filter.options) {
-            const opt = filter.options.find((o) => o.value === val);
+        if (filter.type === 'select' || filter.type === 'select-button') {
+            const opts = getFilterOptions(filter);
+            const opt = opts.find((o) => o.value === val);
             return opt ? opt.label : String(val);
         }
 
@@ -692,7 +721,7 @@
                         <Select
                             v-if="filter.type === 'select'"
                             v-model="activeFilters[filter.key]"
-                            :options="filter.options ?? []"
+                            :options="getFilterOptions(filter)"
                             option-label="label"
                             option-value="value"
                             :placeholder="filter.placeholder ?? resolveFilterLabel(filter)"
@@ -702,7 +731,7 @@
                         <SelectButton
                             v-else-if="filter.type === 'select-button'"
                             v-model="activeFilters[filter.key]"
-                            :options="filter.options ?? []"
+                            :options="getFilterOptions(filter)"
                             option-label="label"
                             option-value="value"
                             :allow-empty="true"
@@ -790,7 +819,7 @@
                         <Select
                             v-if="filter.type === 'select'"
                             v-model="activeFilters[filter.key]"
-                            :options="filter.options ?? []"
+                            :options="getFilterOptions(filter)"
                             option-label="label"
                             option-value="value"
                             :placeholder="filter.placeholder ?? resolveFilterLabel(filter)"
@@ -800,7 +829,7 @@
                         <SelectButton
                             v-else-if="filter.type === 'select-button'"
                             v-model="activeFilters[filter.key]"
-                            :options="filter.options ?? []"
+                            :options="getFilterOptions(filter)"
                             option-label="label"
                             option-value="value"
                             :allow-empty="true"

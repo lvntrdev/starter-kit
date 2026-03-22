@@ -59,6 +59,9 @@ class _02_DefinitionSeeder extends Seeder
         // Soft-delete rows that are no longer in the definitions array
         $this->cleanRemovedRows($definitions);
 
+        // Clear definition cache so new data is picked up immediately
+        app(\App\Domain\Shared\Services\DefinitionService::class)->clearCache();
+
         $this->command?->info('Definitions seeded: '.count($rows).' rows.');
     }
 
