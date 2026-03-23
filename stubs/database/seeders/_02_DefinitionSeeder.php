@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Shared\Services\DefinitionService;
 use App\Models\Definition;
 use Illuminate\Database\Seeder;
 
@@ -60,7 +61,7 @@ class _02_DefinitionSeeder extends Seeder
         $this->cleanRemovedRows($definitions);
 
         // Clear definition cache so new data is picked up immediately
-        app(\App\Domain\Shared\Services\DefinitionService::class)->clearCache();
+        app(DefinitionService::class)->clearCache();
 
         $this->command?->info('Definitions seeded: '.count($rows).' rows.');
     }

@@ -1,5 +1,11 @@
 <script setup lang="ts">
-    import type { DataTableConfig, DataTableResponse, ActionConfig, FilterConfig, FilterOption } from '@lvntr/components/DatatableBuilder/core';
+    import type {
+        DataTableConfig,
+        DataTableResponse,
+        ActionConfig,
+        FilterConfig,
+        FilterOption,
+    } from '@lvntr/components/DatatableBuilder/core';
     import { useApi } from '@/composables/useApi';
     import { useDefinition } from '@/composables/useDefinition';
     import { useRefreshBus } from '@/composables/useRefreshBus';
@@ -980,9 +986,7 @@
                                             v-else-if="column.tag === 'custom'"
                                             :value="String(getNestedValue(row, column.key) ?? '-')"
                                             :severity="
-                                                column.severities?.[
-                                                    getNestedValue(row, column.tagKey!) as string
-                                                ]
+                                                column.severities?.[getNestedValue(row, column.tagKey!) as string]
                                             "
                                         />
                                         <span v-else-if="column.render" v-html="column.render(row, escapeHtml)" />

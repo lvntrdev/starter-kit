@@ -1917,7 +1917,7 @@ PHP);
             $col = "            DB.column<{$dn}>().key('{$key}')";
 
             if ($type === 'boolean') {
-                $col .= '.enumTag()';
+                $col .= ".tag('definition')";
             }
 
             $lines[] = $col.',';
