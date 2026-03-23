@@ -66,6 +66,7 @@ export interface ActionConfig<T = unknown> extends ButtonStyleOptions {
     tooltip?: string;
     handle: (row: T) => void;
     visible?: (row: T) => boolean;
+    disabled?: (row: T) => boolean;
 }
 
 export interface MenuActionConfig<T = unknown> {
@@ -74,6 +75,7 @@ export interface MenuActionConfig<T = unknown> {
     separator?: boolean;
     handle: (row: T) => void;
     visible?: (row: T) => boolean;
+    disabled?: (row: T) => boolean;
 }
 
 export interface CreateButtonConfig extends ButtonStyleOptions {

@@ -630,6 +630,7 @@
             items.push({
                 label: ma.label,
                 icon: ma.icon,
+                disabled: ma.disabled ? ma.disabled(row) : false,
                 command: () => ma.handle(row),
             });
         }
@@ -1008,6 +1009,7 @@
                                                     :text="action.text"
                                                     :outlined="action.outlined"
                                                     :label="action.label ? $t(action.label) : ''"
+                                                    :disabled="action.disabled ? action.disabled(row) : false"
                                                     @click="action.handle(row)"
                                                 />
                                             </template>

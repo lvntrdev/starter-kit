@@ -201,6 +201,12 @@ export class ActionBuilder<T = unknown> {
         return this;
     }
 
+    /** Conditionally disable this action per row. */
+    disabled(fn: (row: T) => boolean): this {
+        this.config.disabled = fn;
+        return this;
+    }
+
     build(): ActionConfig<T> {
         if (!this.config.icon || !this.config.handle) {
             throw new Error('Action must have an icon and a handle callback');
@@ -235,6 +241,12 @@ export class MenuActionBuilder<T = unknown> {
     /** Conditionally show this menu action per row. */
     visible(fn: (row: T) => boolean): this {
         this.config.visible = fn;
+        return this;
+    }
+
+    /** Conditionally disable this menu action per row. */
+    disabled(fn: (row: T) => boolean): this {
+        this.config.disabled = fn;
         return this;
     }
 
