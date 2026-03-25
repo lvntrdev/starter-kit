@@ -22,6 +22,7 @@ export type {
     ColorSelectorFieldConfig,
     ExistingMedia,
     OptionFilter,
+    FormResourceConfig,
 } from './types';
 
 export {

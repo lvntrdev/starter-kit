@@ -273,6 +273,19 @@ export interface FormSubmitConfig {
     preserveScroll?: boolean;
 }
 
+export interface FormResourceConfig {
+    /** URL for creating a new record (POST). */
+    store: string;
+    /** URL for updating an existing record (PUT). */
+    update: string;
+    /** URL to fetch existing data from (GET). */
+    data: string;
+    /** Key to extract from the data response (e.g. 'contact'). */
+    key: string;
+    /** Record ID — when truthy the form operates in edit mode (PUT + dataUrl). */
+    id?: string | number | null;
+}
+
 export interface FormActionLabels {
     /** Submit button label (default: 'Save'). */
     submit?: string;

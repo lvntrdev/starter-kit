@@ -10,6 +10,7 @@ import type {
     FormActionLabels,
     FormBuilderConfig,
     FormLayout,
+    FormResourceConfig,
     FormSubmitConfig,
     InputNumberFieldConfig,
     InputMaskFieldConfig,
@@ -640,6 +641,26 @@ export class FormBuilder {
      */
     submit(config: FormSubmitConfig): this {
         this.config.submit = config;
+        return this;
+    }
+
+    /**
+     * Resource shorthand — automatically configures submit, dataUrl, and dataKey
+     * based on whether an id is provided.
+     *
+     * When `id` is truthy → edit mode (PUT to `update`, GET from `data`).
+     * When `id` is falsy  → create mode (POST to `store`).
+     */
+    resource(config: FormResourceConfig): this {
+        const isEdit = !!config.id;
+        this.config.submit = {
+            url: isEdit ? config.update : config.store,
+            method: isEdit ? 'put' : 'post',
+        };
+        if (isEdit) {
+            this.config.dataUrl = config.data;
+        }
+        this.config.dataKey = config.key;
         return this;
     }
 
