@@ -655,7 +655,12 @@
 
     // ── Public API ────────────────────────────────────────────────────────────────
 
-    defineSlots<{ toolbar?(): unknown }>();
+    defineSlots<{
+        toolbar?(): unknown;
+        [key: `cell-${string}`]: (props: { row: unknown; value: unknown }) => unknown;
+    }>();
+
+    const slots = useSlots();
 
     defineExpose({ refresh: fetchData });
 
@@ -967,8 +972,15 @@
                                         class="sk-dt__td"
                                         :class="{ 'sk-dt__td--sticky': column.sticky }"
                                     >
+                                        <!-- Custom slot -->
+                                        <slot
+                                            v-if="slots[`cell-${column.key}`]"
+                                            :name="`cell-${column.key}`"
+                                            :row="row"
+                                            :value="getNestedValue(row, column.key)"
+                                        />
                                         <Tag
-                                            v-if="column.tag === 'definition'"
+                                            v-else-if="column.tag === 'definition'"
                                             :value="
                                                 definition.find(
                                                     column.tagKey!,

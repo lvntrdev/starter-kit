@@ -27,14 +27,16 @@ class UpdateCommand extends Command
      * @var list<string>
      */
     private const SAFE_UPDATE_PATHS = [
-        // Shared domain base classes
-        'app/Domain/Shared/',
+        // Shared domain base classes (excluding Services — user may customize those)
+        'app/Domain/Shared/Actions/',
+        'app/Domain/Shared/Contracts/',
+        'app/Domain/Shared/DTOs/',
+        'app/Domain/Shared/Pipelines/',
 
         // Base enums and contracts from package
         'app/Enums/PermissionEnum.php',
 
-        // Middleware from package
-        'app/Http/Middleware/CheckResourcePermission.php',
+        // Middleware from package (excluding CheckResourcePermission — user may customize)
         'app/Http/Middleware/SecurityHeaders.php',
 
         // API Response builder
