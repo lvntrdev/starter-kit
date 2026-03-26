@@ -2,6 +2,7 @@
     import { FB } from '@lvntr/components/FormBuilder/core';
     import SkForm from '@lvntr/components/FormBuilder/SkForm.vue';
     import adminSettings from '@/routes/settings';
+    import { useConfirm } from '@/composables/useConfirm';
     import { trans } from 'laravel-vue-i18n';
 
     interface Props {
@@ -14,6 +15,8 @@
     }
 
     const props = defineProps<Props>();
+    const { confirmAction } = useConfirm();
+    const formRef = ref<InstanceType<typeof SkForm>>();
 
     const formConfig = computed(() =>
         FB.form()
@@ -35,8 +38,33 @@
             )
             .build(),
     );
+
+    /**
+     * Watch two_factor toggle — if user turns it OFF while it was ON,
+     * show a warning that all users' 2FA will be revoked.
+     */
+    watch(
+        () => formRef.value?.currentValues?.two_factor,
+        (newVal, oldVal) => {
+            if (oldVal === true && newVal === false) {
+                confirmAction({
+                    message: trans('admin.settings.auth.two_factor_disable_warning'),
+                    header: trans('admin.settings.auth.two_factor_disable_title'),
+                    icon: 'pi pi-exclamation-triangle',
+                    acceptLabel: trans('button.confirm'),
+                    acceptClass: 'p-button-danger',
+                    onAccept: () => {
+                        // User confirmed — value stays false, they can submit normally
+                    },
+                    onReject: () => {
+                        formRef.value?.setValue('two_factor', true);
+                    },
+                });
+            }
+        },
+    );
 </script>
 
 <template>
-    <SkForm :config="formConfig" />
+    <SkForm ref="formRef" :config="formConfig" />
 </template>

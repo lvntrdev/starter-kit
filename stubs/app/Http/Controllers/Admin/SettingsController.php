@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Domain\Setting\Actions\SendTestMailAction;
+use App\Domain\Setting\Actions\UpdateAuthSettingsAction;
 use App\Domain\Setting\Actions\UpdateSettingsAction;
 use App\Domain\Setting\DTOs\AuthSettingsDTO;
 use App\Domain\Setting\DTOs\GeneralSettingsDTO;
@@ -59,9 +60,9 @@ class SettingsController extends Controller
     /**
      * Update authentication settings.
      */
-    public function updateAuth(UpdateAuthSettingsRequest $request, UpdateSettingsAction $action): RedirectResponse
+    public function updateAuth(UpdateAuthSettingsRequest $request, UpdateAuthSettingsAction $action): RedirectResponse
     {
-        $action->execute('auth', AuthSettingsDTO::fromArray($request->validated()));
+        $action->execute(AuthSettingsDTO::fromArray($request->validated()));
 
         return back()->with('success', 'Authentication settings updated.');
     }

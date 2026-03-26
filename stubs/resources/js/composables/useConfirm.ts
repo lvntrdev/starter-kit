@@ -42,6 +42,7 @@ export function useConfirm() {
         header?: string;
         icon?: string;
         onAccept: () => void;
+        onReject?: () => void;
         acceptLabel?: string;
         rejectLabel?: string;
         acceptClass?: string;
@@ -56,6 +57,7 @@ export function useConfirm() {
             rejectClass: 'p-button-secondary p-button-outlined',
             acceptClass: options.acceptClass ?? '',
             accept: options.onAccept,
+            reject: options.onReject,
         });
     }
 

@@ -242,7 +242,7 @@
         internalForm.clearErrors();
     }
 
-    defineExpose({ reset, dataLoading, remoteData });
+    defineExpose({ reset, dataLoading, remoteData, currentValues, setValue });
 
     // ── Dynamic Options ───────────────────────────────────────────────────────────
 
