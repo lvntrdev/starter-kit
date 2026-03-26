@@ -34,17 +34,15 @@
     }
 
     const transparentCard = { style: 'background: transparent; box-shadow: none; border: 0; padding: 0' };
+    const noPad = { style: 'padding: 0' };
 
-    const cardPt = computed(() => {
-        if (!props.config.isCard) {
-            return {
-                root: transparentCard,
-                body: { style: 'padding: 0' },
-                content: { style: 'padding: 0' },
-            };
+    function tabCardPt(tab: TabItemConfig) {
+        const showCard = tab.isCard ?? props.config.isCard ?? false;
+        if (!showCard) {
+            return { root: transparentCard, body: noPad, content: noPad };
         }
         return {};
-    });
+    }
 
     defineSlots<
         {
@@ -91,21 +89,19 @@
         </div>
 
         <div class="sk-tabs-vertical__content">
-            <Card :pt="cardPt">
-                <template v-if="config.cardTitle" #title>
-                    {{ $t(config.cardTitle) }}
-                </template>
-                <template v-if="config.cardSubtitle" #subtitle>
-                    {{ $t(config.cardSubtitle) }}
-                </template>
-                <template #content>
-                    <template v-for="tab in visibleTabs" :key="tab.key">
-                        <div v-if="isActive(tab.key)">
-                            <slot :name="tab.key" :tab="tab" :is-active="true" />
-                        </div>
+            <template v-for="tab in visibleTabs" :key="tab.key">
+                <Card v-if="isActive(tab.key)" :pt="tabCardPt(tab)">
+                    <template v-if="tab.cardTitle ?? config.cardTitle" #title>
+                        {{ $t(tab.cardTitle ?? config.cardTitle!) }}
                     </template>
-                </template>
-            </Card>
+                    <template v-if="tab.cardSubtitle ?? config.cardSubtitle" #subtitle>
+                        {{ $t(tab.cardSubtitle ?? config.cardSubtitle!) }}
+                    </template>
+                    <template #content>
+                        <slot :name="tab.key" :tab="tab" :is-active="true" />
+                    </template>
+                </Card>
+            </template>
         </div>
     </div>
 
@@ -120,12 +116,12 @@
 
         <TabPanels>
             <TabPanel v-for="tab in visibleTabs" :key="tab.key" :value="tab.key">
-                <Card :pt="cardPt">
-                    <template v-if="config.cardTitle" #title>
-                        {{ $t(config.cardTitle) }}
+                <Card :pt="tabCardPt(tab)">
+                    <template v-if="tab.cardTitle ?? config.cardTitle" #title>
+                        {{ $t(tab.cardTitle ?? config.cardTitle!) }}
                     </template>
-                    <template v-if="config.cardSubtitle" #subtitle>
-                        {{ $t(config.cardSubtitle) }}
+                    <template v-if="tab.cardSubtitle ?? config.cardSubtitle" #subtitle>
+                        {{ $t(tab.cardSubtitle ?? config.cardSubtitle!) }}
                     </template>
                     <template #content>
                         <div class="sk-tabs__panel">

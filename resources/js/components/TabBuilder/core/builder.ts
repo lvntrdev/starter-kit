@@ -40,6 +40,21 @@ export class TabItemBuilder {
         return this;
     }
 
+    isCard(value: boolean = true): this {
+        this.config.isCard = value;
+        return this;
+    }
+
+    cardTitle(title: string): this {
+        this.config.cardTitle = title;
+        return this;
+    }
+
+    cardSubtitle(subtitle: string): this {
+        this.config.cardSubtitle = subtitle;
+        return this;
+    }
+
     build(): TabItemConfig {
         if (!this.config.key) {
             throw new Error('Tab item must have a key');
