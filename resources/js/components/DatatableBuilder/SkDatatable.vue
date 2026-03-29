@@ -1,17 +1,17 @@
 <script setup lang="ts">
-    import type {
-        DataTableConfig,
-        DataTableResponse,
-        ActionConfig,
-        FilterConfig,
-        FilterOption,
-    } from '@lvntr/components/DatatableBuilder/core';
     import { useApi } from '@/composables/useApi';
     import { useDefinition } from '@/composables/useDefinition';
     import { useRefreshBus } from '@/composables/useRefreshBus';
     import { Link } from '@inertiajs/vue3';
-    import type { MenuItem } from 'primevue/menuitem';
+    import type {
+        ActionConfig,
+        DataTableConfig,
+        DataTableResponse,
+        FilterConfig,
+        FilterOption,
+    } from '@lvntr/components/DatatableBuilder/core';
     import { trans } from 'laravel-vue-i18n';
+    import type { MenuItem } from 'primevue/menuitem';
 
     interface Props {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -698,7 +698,7 @@
             <div
                 v-if="config.searchable || config.filters.length > 0 || config.createButton || $slots.toolbar"
                 class="sk-dt-toolbar"
-                :class="{ 'sk-dt-toolbar--no-card': !config.isCard }"
+                :class="{ 'no-padding': !config.isCard }"
             >
                 <!-- Left: Search (hidden on mobile, shown on sm+) -->
                 <div v-if="config.searchable" class="sk-dt-toolbar__search">
