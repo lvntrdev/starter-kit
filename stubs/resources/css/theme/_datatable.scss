@@ -16,8 +16,8 @@
 .sk-dt-toolbar {
     @apply p-5 flex flex-col gap-3 sm:flex-row sm:items-center;
 
-    &--no-card {
-        padding: 0 0 1.25rem;
+    &.no-padding {
+        @apply pt-0 px-0;
     }
 }
 

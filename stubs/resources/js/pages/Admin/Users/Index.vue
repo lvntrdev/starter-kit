@@ -61,6 +61,7 @@
         .route(users.dtApi.url())
         // .searchable(true)
         .sortable(true)
+        // .isCard(false)
         // .pagination(true)
         // .create({ onClick: openCreateDialog })
         .addColumns(
