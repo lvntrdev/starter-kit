@@ -48,6 +48,11 @@ export function useMenuBuilder(allItems: MenuItem[]) {
         });
     });
 
+    function matchesPath(current: string, target: string): boolean {
+        if (current === target) return true;
+        return current.startsWith(target + '/') || current.startsWith(target + '?');
+    }
+
     function isItemActive(item: MenuItem): boolean {
         if (!item.href || item.external) {
             return false;
@@ -60,7 +65,7 @@ export function useMenuBuilder(allItems: MenuItem[]) {
             const [itemPath, itemQuery] = item.href.split('?');
             const [currentPath] = current.split('?');
 
-            if (!currentPath.startsWith(itemPath)) return false;
+            if (!matchesPath(currentPath, itemPath)) return false;
 
             const itemParams = new URLSearchParams(itemQuery);
             const currentParams = new URLSearchParams(current.split('?')[1] || '');
@@ -72,7 +77,7 @@ export function useMenuBuilder(allItems: MenuItem[]) {
             return true;
         }
 
-        return current.startsWith(item.href);
+        return matchesPath(current, item.href);
     }
 
     function isGroupOpen(item: MenuItem): boolean {
