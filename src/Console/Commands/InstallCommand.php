@@ -114,8 +114,13 @@ class InstallCommand extends Command
 
         // 6. Regenerate autoload so published classes are available for migrations/seeders
         $this->step('Regenerating autoload', function () {
-            $process = new Process(['composer', 'dump-autoload', '-q'], base_path(), null, null, 120);
+            $composer = $this->findComposerBinary();
+            $process = new Process([...$composer, 'dump-autoload', '-q'], base_path(), null, null, 120);
             $process->run();
+
+            // Reload the in-process autoloader so newly published classes (e.g. App\Enums\RoleEnum)
+            // are discoverable during the seeder step that runs in the same PHP process.
+            $this->refreshAutoloader();
         });
 
         // 7. Run migrations
@@ -333,6 +338,58 @@ class InstallCommand extends Command
 
             $this->files->copy($file->getPathname(), $targetPath);
             $this->published[] = $relativePath;
+        }
+    }
+
+    /**
+     * Locate the composer executable. Falls back to `php composer.phar` or `composer`
+     * when a direct binary cannot be resolved from PATH.
+     *
+     * @return list<string>
+     */
+    private function findComposerBinary(): array
+    {
+        if ($this->files->exists(base_path('composer.phar'))) {
+            return [PHP_BINARY, base_path('composer.phar')];
+        }
+
+        return ['composer'];
+    }
+
+    /**
+     * Re-register Composer's autoloader in the current process so that classes
+     * published during this install (e.g. app/Enums/RoleEnum.php) can be resolved
+     * by the seeders that run later in the same PHP request.
+     */
+    private function refreshAutoloader(): void
+    {
+        $autoloadPath = base_path('vendor/autoload.php');
+
+        if (! $this->files->exists($autoloadPath)) {
+            return;
+        }
+
+        // Clear any opcache entries for the regenerated composer autoload files.
+        if (function_exists('opcache_invalidate')) {
+            foreach (['autoload_classmap.php', 'autoload_psr4.php', 'autoload_static.php', 'autoload_real.php'] as $file) {
+                $path = base_path('vendor/composer/'.$file);
+                if ($this->files->exists($path)) {
+                    @opcache_invalidate($path, true);
+                }
+            }
+        }
+
+        // Re-include the freshly generated classmap/psr4 maps into the active ClassLoader
+        // instance so newly published files become discoverable immediately.
+        $loaders = \Composer\Autoload\ClassLoader::getRegisteredLoaders();
+        foreach ($loaders as $vendorDir => $loader) {
+            $classMap = $vendorDir.'/composer/autoload_classmap.php';
+            if (file_exists($classMap)) {
+                $map = require $classMap;
+                if (is_array($map)) {
+                    $loader->addClassMap($map);
+                }
+            }
         }
     }
 
