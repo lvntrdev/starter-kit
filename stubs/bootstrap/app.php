@@ -29,8 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'check.permission' => CheckResourcePermission::class,
         ]);
 
-        $middleware->redirectGuestsTo('/login');
-        $middleware->redirectUsersTo('/dashboard');
+        $middleware->redirectTo(guests: '/login', users: '/dashboard');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         ApiExceptionHandler::register($exceptions);
