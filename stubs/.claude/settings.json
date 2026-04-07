@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Volumes/WorkingDisk/Herd/Labor/remop/app/Domain/Setting/Actions/**)",
+      "Read(//Volumes/WorkingDisk/Herd/Labor/remop/app/Http/Controllers/Admin/**)",
+      "Read(//Volumes/WorkingDisk/Herd/Labor/remop/**)",
+      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
+      "Bash(grep -r \"from ''primevue''\" /Volumes/WorkingDisk/Herd/Levent/starter-kit-12/resources/js/components/Lvntr-Starter-Kit/FormBuilder/)"
+    ],
+    "additionalDirectories": [
+      "/Volumes/WorkingDisk/Herd/Labor/remop/app/Http/Controllers/Admin"
+    ]
+  }
+}
