@@ -93,10 +93,6 @@ class StarterKitServiceProvider extends ServiceProvider
      */
     private function configureScramble(): void
     {
-        if (! class_exists('Dedoc\Scramble\Scramble')) {
-            return;
-        }
-
         \Dedoc\Scramble\Scramble::configure()
             ->withDocumentTransformers(function (\Dedoc\Scramble\Support\Generator\OpenApi $openApi) {
                 $openApi->secure(
