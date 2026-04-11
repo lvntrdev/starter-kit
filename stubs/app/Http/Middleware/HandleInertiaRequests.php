@@ -44,6 +44,8 @@ class HandleInertiaRequests extends Middleware
             return [
                 ...parent::share($request),
                 'appName' => config('app.name'),
+                'locale' => app()->getLocale(),
+                'availableLocales' => config('app.languages', []),
                 'flash' => [
                     'success' => $request->session()->get('success'),
                     'error' => $request->session()->get('error'),
@@ -58,6 +60,8 @@ class HandleInertiaRequests extends Middleware
             'appVersion' => InstalledVersions::getPrettyVersion('lvntr/starter-kit'),
             'appEnv' => config('app.env'),
             'appDebug' => config('app.debug'),
+            'locale' => app()->getLocale(),
+            'availableLocales' => config('app.languages', []),
             'auth' => [
                 'user' => $request->user()?->loadMissing('media'),
                 'role' => $request->user()?->roles->first()?->display_name[app()->getLocale()] ?? $request->user()?->roles->first()?->name,

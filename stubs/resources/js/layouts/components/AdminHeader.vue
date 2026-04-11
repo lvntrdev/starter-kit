@@ -4,6 +4,7 @@
     import type { MenuItem } from 'primevue/menuitem';
     import type { User } from '@/types';
     import { trans } from 'laravel-vue-i18n';
+    import locale from '@/routes/locale';
 
     interface Props {
         collapsed: boolean;
@@ -23,6 +24,41 @@
     const role = computed(() => (page.props.auth?.role as string) ?? '');
     const isLocal = computed(() => page.props.appEnv === 'local');
     const isDebug = computed(() => page.props.appDebug === true);
+
+    const currentLocale = computed(() => (page.props.locale as string) ?? 'en');
+    const availableLocales = computed(
+        () => (page.props.availableLocales as Record<string, string>) ?? {},
+    );
+    const showLocaleSwitcher = computed(() => Object.keys(availableLocales.value).length > 1);
+
+    const localeMenuRef = ref();
+
+    const localeMenuItems = computed<MenuItem[]>(() =>
+        Object.entries(availableLocales.value).map(([code, label]) => ({
+            label,
+            icon: code === currentLocale.value ? 'pi pi-check' : 'pi pi-fw',
+            command: () => switchLocale(code),
+        })),
+    );
+
+    function toggleLocaleMenu(event: Event): void {
+        localeMenuRef.value?.toggle(event);
+    }
+
+    function switchLocale(code: string): void {
+        if (code === currentLocale.value) {
+            return;
+        }
+
+        router.post(
+            locale.update.url(),
+            { locale: code },
+            {
+                preserveScroll: true,
+                onSuccess: () => window.location.reload(),
+            },
+        );
+    }
 
     const initials = computed(() => {
         if (!user.value) return '';
@@ -74,6 +110,19 @@
         </div>
 
         <div class="admin-header__right">
+            <!-- Language Switcher (only when more than one language is active) -->
+            <template v-if="showLocaleSwitcher">
+                <button
+                    class="admin-header__btn admin-header__btn--locale"
+                    :title="availableLocales[currentLocale]"
+                    @click="toggleLocaleMenu"
+                >
+                    <i class="pi pi-globe" />
+                    <span class="admin-header__locale-code">{{ currentLocale.toUpperCase() }}</span>
+                </button>
+                <Menu ref="localeMenuRef" :model="localeMenuItems" :popup="true" />
+            </template>
+
             <button
                 class="admin-header__btn"
                 :title="isDark ? $t('admin.layout.light_mode') : $t('admin.layout.dark_mode')"

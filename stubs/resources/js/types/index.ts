@@ -31,6 +31,8 @@ export interface SharedPageProps {
     };
     flash: FlashMessages;
     enums: Record<string, Array<{ value: string | number; label: string; severity: string }>>;
+    locale: string;
+    availableLocales: Record<string, string>;
 }
 
 export interface MenuItem {

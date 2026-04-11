@@ -231,6 +231,14 @@
     background: var(--p-surface-800);
 }
 
+.admin-header__btn--locale {
+    @apply w-auto gap-1.5 px-2.5 text-sm;
+}
+
+.admin-header__locale-code {
+    @apply text-xs font-semibold tracking-wide;
+}
+
 .admin-header__user {
     @apply flex cursor-pointer items-center gap-2.5 rounded-lg border-none bg-transparent px-2 py-1.5 transition-colors duration-150;
 
