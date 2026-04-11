@@ -5,6 +5,8 @@
 ![Packagist Version](https://img.shields.io/packagist/v/lvntr/laravel-starter-kit?style=flat-square&label=packagist)
 ![Downloads](https://img.shields.io/packagist/dt/lvntr/laravel-starter-kit?style=flat-square&label=downloads)
 
+> ⚠️ **End-of-Life Notice:** This is the `1.x` branch targeting **Laravel 12**. As of `v12.0.63`, this branch is in **maintenance-only mode** — no new features or bug fixes will be released. Existing installations using `lvntr/laravel-starter-kit:^12.0` will continue to work, but for future updates please upgrade your project to **Laravel 13** and switch to `lvntr/laravel-starter-kit:^13.0` (see the [`main` branch](https://github.com/lvntrdev/laravel-starter-kit)).
+
 Lvntr Starter Kit is under active development, and each release is shaping it into a more complete admin-first Laravel platform.
 
 Detailed usage docs: [kit-docs.lvntr.dev](https://kit-docs.lvntr.dev/)

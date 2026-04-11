@@ -5,6 +5,8 @@
 ![Packagist Surum](https://img.shields.io/packagist/v/lvntr/laravel-starter-kit?style=flat-square&label=packagist)
 ![Downloads](https://img.shields.io/packagist/dt/lvntr/laravel-starter-kit?style=flat-square&label=downloads)
 
+> ⚠️ **End-of-Life Bildirimi:** Bu branch (`1.x`) **Laravel 12** icin gelistiriliyor. `v12.0.63` itibariyla **sadece bakim modundadir** — yeni ozellik veya hata duzeltmesi yayinlanmayacak. `lvntr/laravel-starter-kit:^12.0` ile kurulmus mevcut projeler calismaya devam eder; gelecek guncellemeler icin projenizi **Laravel 13**'e yukseltip `lvntr/laravel-starter-kit:^13.0` kullanmanizi oneririz (bkz. [`main` branch](https://github.com/lvntrdev/laravel-starter-kit)).
+
 Lvntr Starter Kit aktif olarak gelistiriliyor; her yeni surum onu daha olgun, daha kapsamli ve admin odakli bir Laravel platformuna donusturuyor.
 
 Detayli kullanim dokumanlari: [kit-docs.lvntr.dev](https://kit-docs.lvntr.dev/)
