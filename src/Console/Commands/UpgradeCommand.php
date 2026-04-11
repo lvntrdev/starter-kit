@@ -164,13 +164,13 @@ class UpgradeCommand extends Command
      */
     private function assertPackageVersion(): bool
     {
-        if (! class_exists(InstalledVersions::class) || ! InstalledVersions::isInstalled('lvntr/starter-kit')) {
-            $this->components->error('lvntr/starter-kit package is not installed via Composer.');
+        if (! class_exists(InstalledVersions::class) || ! InstalledVersions::isInstalled('lvntr/laravel-starter-kit')) {
+            $this->components->error('lvntr/laravel-starter-kit package is not installed via Composer.');
 
             return false;
         }
 
-        $installed = InstalledVersions::getPrettyVersion('lvntr/starter-kit') ?? 'unknown';
+        $installed = InstalledVersions::getPrettyVersion('lvntr/laravel-starter-kit') ?? 'unknown';
         $normalized = ltrim((string) $installed, 'v');
         $major = (int) (explode('.', $normalized)[0] ?? 0);
 
@@ -192,7 +192,7 @@ class UpgradeCommand extends Command
         $this->line("  Current version: <fg=yellow>{$installed}</>");
         $this->newLine();
         $this->line('  <fg=gray>Bump the constraint and update the package:</>');
-        $this->line('    <fg=cyan>composer require lvntr/starter-kit:^13.0</>');
+        $this->line('    <fg=cyan>composer require lvntr/laravel-starter-kit:^13.0</>');
         $this->newLine();
 
         return false;
