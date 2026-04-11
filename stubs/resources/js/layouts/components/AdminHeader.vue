@@ -26,9 +26,7 @@
     const isDebug = computed(() => page.props.appDebug === true);
 
     const currentLocale = computed(() => (page.props.locale as string) ?? 'en');
-    const availableLocales = computed(
-        () => (page.props.availableLocales as Record<string, string>) ?? {},
-    );
+    const availableLocales = computed(() => (page.props.availableLocales as Record<string, string>) ?? {});
     const showLocaleSwitcher = computed(() => Object.keys(availableLocales.value).length > 1);
 
     const localeMenuRef = ref();
