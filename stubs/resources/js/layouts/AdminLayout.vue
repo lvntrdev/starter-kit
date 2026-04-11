@@ -2,7 +2,6 @@
 <script setup lang="ts">
     import { useDarkMode } from '@/composables/useDarkMode';
     import { useFlash } from '@/composables/useFlash';
-    import { usePageLoading } from '@/composables/usePageLoading';
     import { useSidebar } from '@/composables/useSidebar';
     import AdminFooter from '@/layouts/components/AdminFooter.vue';
     import AdminHeader from '@/layouts/components/AdminHeader.vue';
@@ -27,7 +26,6 @@
     });
 
     const { isCollapsed, isMobileOpen, isMobile, toggle, closeMobile } = useSidebar();
-    const { isNavigating } = usePageLoading();
     const { isDark, toggleDark } = useDarkMode();
     const { flash } = useFlash();
     const toast = useToast();
@@ -106,10 +104,7 @@
             />
 
             <!-- Content -->
-            <main
-                class="admin-content"
-                :class="{ 'opacity-60 pointer-events-none transition-opacity duration-150': isNavigating }"
-            >
+            <main class="admin-content">
                 <AdminPageHeader :title="title" :subtitle="subtitle" :back-url="backUrl">
                     <template #actions>
                         <slot name="page-actions" />

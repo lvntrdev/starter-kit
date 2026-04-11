@@ -16,10 +16,6 @@ return [
     'failed' => 'These credentials do not match our records.',
     'password' => 'The provided password is incorrect.',
     'throttle' => 'Too many login attempts. Please try again in :seconds seconds.',
-    'forgot_password' => 'Forgot Password',
-    'reset_password' => 'Reset Password',
-    'send_password_reset_link' => 'Send Password Reset Link',
-    'back_to_login' => 'Back to Login',
 
     'login' => [
         'title' => 'Sign In',
@@ -50,6 +46,26 @@ return [
         'submit' => 'Register',
         'has_account' => 'Already have an account?',
         'sign_in' => 'Sign in',
+    ],
+
+    'forgot_password' => [
+        'title' => 'Forgot Password',
+        'heading' => 'Forgot Password',
+        'subtitle' => 'Enter your email address and we will send you a password reset link.',
+        'email_label' => 'Email',
+        'email_placeholder' => 'example@email.com',
+        'submit' => 'Send Password Reset Link',
+        'back_to_login' => 'Back to sign in',
+    ],
+
+    'reset_password' => [
+        'title' => 'Reset Password',
+        'heading' => 'Reset Password',
+        'subtitle' => 'Choose a new password for your account.',
+        'email_label' => 'Email',
+        'password_label' => 'New Password',
+        'password_confirmation_label' => 'Confirm New Password',
+        'submit' => 'Reset Password',
     ],
 
 ];
