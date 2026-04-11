@@ -23,13 +23,13 @@
 </script>
 
 <template>
-    <AuthLayout title="Sign In">
+    <AuthLayout :title="$t('auth.login.title')">
         <template #header>
             <h2 class="auth-title">
-                Welcome Back
+                {{ $t('auth.login.heading') }}
             </h2>
             <p class="auth-subtitle">
-                Please enter your credentials to continue
+                {{ $t('auth.login.subtitle') }}
             </p>
         </template>
 
@@ -41,14 +41,14 @@
         <form class="auth-form" @submit.prevent="submit">
             <!-- Email -->
             <div class="auth-form__field">
-                <label for="email" class="auth-form__label"> Email Address </label>
+                <label for="email" class="auth-form__label">{{ $t('auth.login.email_label') }}</label>
                 <IconField class="auth-input">
                     <InputIcon class="auth-input__icon pi pi-envelope" />
                     <InputText
                         id="email"
                         v-model="form.email"
                         type="email"
-                        placeholder="admin@company.com"
+                        :placeholder="$t('auth.login.email_placeholder')"
                         :invalid="!!form.errors.email"
                         :aria-describedby="form.errors.email ? 'email-error' : undefined"
                         autocomplete="email"
@@ -65,9 +65,9 @@
             <!-- Password -->
             <div class="auth-form__field">
                 <div class="auth-form__row">
-                    <label for="password" class="auth-form__label"> Password </label>
+                    <label for="password" class="auth-form__label">{{ $t('auth.login.password_label') }}</label>
                     <Link v-if="page.props.features.password_reset" href="/forgot-password" class="auth-link">
-                        Forgot password?
+                        {{ $t('auth.login.forgot_password_link') }}
                     </Link>
                 </div>
                 <IconField class="auth-input auth-input--password">
@@ -94,14 +94,14 @@
             <div class="auth-form__options">
                 <div class="auth-remember">
                     <Checkbox v-model="form.remember" input-id="remember" :binary="true" />
-                    <label for="remember" class="auth-remember__label"> Remember me for 30 days </label>
+                    <label for="remember" class="auth-remember__label">{{ $t('auth.login.remember') }}</label>
                 </div>
             </div>
 
             <!-- Submit -->
             <Button
                 type="submit"
-                label="Sign In"
+                :label="$t('auth.login.submit')"
                 icon="pi pi-arrow-right"
                 icon-pos="right"
                 :loading="form.processing"
@@ -110,10 +110,10 @@
         </form>
 
         <template v-if="page.props.features.registration" #footer>
-            <span>Don't have an account?</span>
+            <span>{{ $t('auth.login.no_account') }}</span>
             {{ ' ' }}
             <Link href="/register" class="auth-link">
-                Create an account
+                {{ $t('auth.login.create_account') }}
             </Link>
         </template>
     </AuthLayout>

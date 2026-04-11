@@ -18,27 +18,27 @@
 </script>
 
 <template>
-    <AuthLayout title="Register">
+    <AuthLayout :title="$t('auth.register.title')">
         <template #header>
             <h2 class="auth-title">
-                Register
+                {{ $t('auth.register.heading') }}
             </h2>
             <p class="auth-subtitle">
-                Create a new account
+                {{ $t('auth.register.subtitle') }}
             </p>
         </template>
 
         <form class="auth-form" @submit.prevent="submit">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div class="auth-form__field">
-                    <label for="first_name" class="auth-form__label"> First Name </label>
+                    <label for="first_name" class="auth-form__label">{{ $t('auth.register.first_name_label') }}</label>
                     <IconField>
                         <InputIcon class="pi pi-user" />
                         <InputText
                             id="first_name"
                             v-model="form.first_name"
                             type="text"
-                            placeholder="First Name"
+                            :placeholder="$t('auth.register.first_name_placeholder')"
                             :invalid="!!form.errors.first_name"
                             :aria-describedby="form.errors.first_name ? 'first_name-error' : undefined"
                             autocomplete="first_name"
@@ -51,14 +51,14 @@
                     </small>
                 </div>
                 <div class="auth-form__field">
-                    <label for="last_name" class="auth-form__label"> Last Name </label>
+                    <label for="last_name" class="auth-form__label">{{ $t('auth.register.last_name_label') }}</label>
                     <IconField>
                         <InputIcon class="pi pi-user" />
                         <InputText
                             id="last_name"
                             v-model="form.last_name"
                             type="text"
-                            placeholder="Last Name"
+                            :placeholder="$t('auth.register.last_name_placeholder')"
                             :invalid="!!form.errors.last_name"
                             :aria-describedby="form.errors.last_name ? 'last_name-error' : undefined"
                             autocomplete="last_name"
@@ -74,14 +74,14 @@
 
             <!-- Email -->
             <div class="auth-form__field">
-                <label for="email" class="auth-form__label"> Email </label>
+                <label for="email" class="auth-form__label">{{ $t('auth.register.email_label') }}</label>
                 <IconField>
                     <InputIcon class="pi pi-envelope" />
                     <InputText
                         id="email"
                         v-model="form.email"
                         type="email"
-                        placeholder="example@email.com"
+                        :placeholder="$t('auth.register.email_placeholder')"
                         :invalid="!!form.errors.email"
                         :aria-describedby="form.errors.email ? 'email-error' : undefined"
                         autocomplete="email"
@@ -95,7 +95,7 @@
 
             <!-- Password -->
             <div class="auth-form__field">
-                <label for="password" class="auth-form__label"> Password </label>
+                <label for="password" class="auth-form__label">{{ $t('auth.register.password_label') }}</label>
                 <IconField>
                     <InputIcon class="pi pi-lock" />
                     <Password
@@ -115,7 +115,9 @@
 
             <!-- Password Confirmation -->
             <div class="auth-form__field">
-                <label for="password_confirmation" class="auth-form__label"> Confirm Password </label>
+                <label for="password_confirmation" class="auth-form__label">
+                    {{ $t('auth.register.password_confirmation_label') }}
+                </label>
                 <IconField>
                     <InputIcon class="pi pi-lock" />
                     <Password
@@ -143,7 +145,7 @@
             <!-- Submit -->
             <Button
                 type="submit"
-                label="Register"
+                :label="$t('auth.register.submit')"
                 icon="pi pi-user-plus"
                 :loading="form.processing"
                 class="auth-form__submit"
@@ -151,9 +153,11 @@
         </form>
 
         <template #footer>
-            <span>Already have an account?</span>
+            <span>{{ $t('auth.register.has_account') }}</span>
             {{ ' ' }}
-            <a href="/login" class="auth-link" @click.prevent="$inertia.visit('/login')"> Sign in </a>
+            <a href="/login" class="auth-link" @click.prevent="$inertia.visit('/login')">
+                {{ $t('auth.register.sign_in') }}
+            </a>
         </template>
     </AuthLayout>
 </template>

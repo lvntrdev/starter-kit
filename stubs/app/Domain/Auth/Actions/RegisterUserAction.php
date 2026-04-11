@@ -4,7 +4,6 @@ namespace App\Domain\Auth\Actions;
 
 use App\Domain\Auth\DTOs\RegisterDTO;
 use App\Domain\Shared\Actions\BaseAction;
-use App\Enums\UserStatus;
 use App\Models\User;
 
 /**
@@ -21,7 +20,7 @@ class RegisterUserAction extends BaseAction
     {
         $user = User::create([
             ...$dto->toArray(),
-            'status' => UserStatus::Active,
+            'status' => 'active',
         ]);
 
         $token = $user->createToken('auth-token')->accessToken;

@@ -3,7 +3,6 @@
 namespace App\Domain\User\DTOs;
 
 use App\Domain\Shared\DTOs\BaseDTO;
-use App\Enums\UserStatus;
 
 /**
  * Data Transfer Object for creating or updating a user.
@@ -16,9 +15,7 @@ readonly class UserDTO extends BaseDTO
         public string $lastName,
         public string $email,
         public ?string $password = null,
-        public UserStatus $status = UserStatus::Active,
-        public ?string $role = null,
-        public ?string $gender = null,
+        public string $status = 'active',
     ) {}
 
     /**
@@ -33,9 +30,7 @@ readonly class UserDTO extends BaseDTO
             lastName: $data['last_name'],
             email: $data['email'],
             password: $data['password'] ?? null,
-            status: UserStatus::from($data['status'] ?? UserStatus::Active->value),
-            role: $data['role'] ?? null,
-            gender: $data['gender'] ?? null,
+            status: $data['status'] ?? 'active',
         );
     }
 
@@ -50,8 +45,7 @@ readonly class UserDTO extends BaseDTO
             'first_name' => $this->firstName,
             'last_name' => $this->lastName,
             'email' => $this->email,
-            'status' => $this->status->value,
-            'gender' => $this->gender,
+            'status' => $this->status,
         ];
 
         if ($this->password !== null) {

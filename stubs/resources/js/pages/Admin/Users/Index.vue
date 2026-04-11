@@ -76,22 +76,24 @@
             DB.filter().key('role').label('common.role').type('select').options(props.roleOptions),
         )
         .addActions(
-            /*   DB.action<User>()
-                .icon('pi pi-eye')
-                .tooltip('button.view')
-                .handle((user) => router.visit(users.show.url(user))), */
             DB.action<User>()
                 .icon('pi pi-pencil')
                 .severity('warn')
                 .label('button.edit')
                 .visible(() => can('users.update'))
                 .handle((user) => openEditDialog(user.id)),
+            DB.action<User>()
+                .icon('pi pi-trash')
+                .severity('danger')
+                .label('button.delete')
+                .visible(() => can('users.delete'))
+                .handle((user) => deleteUser(user)),
         )
-        .addMenuActions(
-            /*  DB.menuAction<User>()
+        /* .addMenuActions(
+            DB.menuAction<User>()
                 .label('button.view')
                 .icon('pi pi-eye')
-                .handle((user) => router.visit(users.show.url(user))), */
+                .handle((user) => router.visit(users.show.url(user))),
             DB.menuAction<User>()
                 .label('button.edit')
                 .icon('pi pi-pencil')
@@ -108,7 +110,7 @@
                 .separator()
                 .visible(() => can('users.delete'))
                 .handle((user) => deleteUser(user)),
-        )
+        ) */
         .build();
 </script>
 

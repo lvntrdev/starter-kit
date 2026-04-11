@@ -25,6 +25,15 @@ class LoginUserAction extends BaseAction
 
         /** @var User $user */
         $user = Auth::user();
+
+        // Block non-active accounts (inactive, banned) — the credential check
+        // must not be enough to obtain a token if the account is disabled.
+        if ($user->status !== 'active') {
+            Auth::logout();
+
+            return null;
+        }
+
         $token = $user->createToken('auth-token')->accessToken;
 
         return [

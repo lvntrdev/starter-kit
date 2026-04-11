@@ -1,10 +1,8 @@
 <!-- resources/js/components/Admin/UserForm.vue -->
 <script setup lang="ts">
-    import roles from '@/routes/roles';
     import adminUsers from '@/routes/users';
     import { FB } from '@lvntr/components/FormBuilder/core';
     import SkForm from '@lvntr/components/FormBuilder/SkForm.vue';
-    import { trans } from 'laravel-vue-i18n';
 
     interface Props {
         userId?: string | null;
@@ -45,38 +43,12 @@
             .addFields(
                 FB.inputText().key('first_name'),
                 FB.inputText().key('last_name'),
-                FB.inputText().key('email').inputType('email'),
-                FB.datePicker().key('birth_date'),
-                FB.inputMask()
-                    .key('phone')
-                    .label('Phone')
-                    .mask('0 (999) 999 99 99')
-                    .placeholder('0 (5__) ___ __ __')
-                    .slotChar('_')
-                    .unmask()
-                    .optional()
-                    .hint('Example InputMask field. Add backend validation to persist it.'),
-                FB.select().key('status').default('active').definitionOptions('userStatus'),
-                FB.select().key('gender').definitionOptions('gender').placeholder('common.placeholder.select_gender'),
-                FB.select()
-                    .key('role')
-                    .optionsUrl(roles.roleOptions.url())
-                    .placeholder('common.placeholder.select_role'),
-                FB.title(trans('admin.users.security')).class('col-span-full'),
-                FB.fileUpload()
-                    .key('identity_document')
-                    .accept(
-                        'image/*,application/pdf,.doc,.docx,.xls,.xlsx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    )
-                    .maxFileSize(5 * 1024 * 1024)
-                    .optional()
-                    .class('col-span-full')
-                    .existingMediaKey('identity_document_media'),
+                FB.inputText().key('email').inputType('email').class('col-span-full'),
+                FB.select().key('status').default('active').definitionOptions('userStatus').class('col-span-full'),
                 FB.password()
                     .key('password')
                     .required(!isEdit.value)
                     .toggleMask()
-                    .class('col-start-1')
                     .hint(isEdit.value ? 'admin.users.password_hint' : undefined)
                     .default(''),
                 FB.password().key('password_confirmation').required(!isEdit.value).toggleMask().default(''),

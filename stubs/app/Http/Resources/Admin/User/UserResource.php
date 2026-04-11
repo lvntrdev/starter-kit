@@ -26,7 +26,6 @@ class UserResource extends JsonResource
             'initials' => $this->initials,
             'email' => $this->email,
             'status' => $this->status,
-            'gender' => $this->gender,
             'avatar_url' => $this->avatar_url,
             'email_verified_at' => $this->email_verified_at,
             'created_at' => format_date($this->created_at),
@@ -34,20 +33,6 @@ class UserResource extends JsonResource
 
             // Conditional: only when loaded
             'role' => $this->whenLoaded('roles', fn () => $this->roles->first()?->name),
-            'identity_document_media' => $this->when(
-                $this->relationLoaded('media'),
-                function () {
-                    $media = $this->getFirstMedia('identity_document');
-
-                    return $media ? [
-                        'id' => $media->id,
-                        'name' => $media->file_name,
-                        'url' => $this->identity_document_url,
-                        'size' => $media->size,
-                        'mime_type' => $media->mime_type,
-                    ] : null;
-                },
-            ),
         ];
     }
 }

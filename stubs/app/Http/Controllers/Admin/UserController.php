@@ -66,13 +66,8 @@ class UserController extends Controller
     public function store(
         StoreUserRequest $request,
         CreateUserAction $action,
-        UploadMediaAction $uploadMedia,
     ): RedirectResponse {
-        $user = $action->execute(UserDTO::fromArray($request->validated()));
-
-        if ($request->hasFile('identity_document')) {
-            $uploadMedia->execute($user, $request, 'identity_document');
-        }
+        $action->execute(UserDTO::fromArray($request->validated()));
 
         return back()->with('success', __('message.created', ['entity' => __('admin.users.user')]));
     }
@@ -104,13 +99,8 @@ class UserController extends Controller
         UpdateUserRequest $request,
         User $user,
         UpdateUserAction $action,
-        UploadMediaAction $uploadMedia,
     ): RedirectResponse {
         $action->execute($user, UserDTO::fromArray($request->validated()));
-
-        if ($request->hasFile('identity_document')) {
-            $uploadMedia->execute($user, $request, 'identity_document');
-        }
 
         return back()->with('success', __('message.updated', ['entity' => __('admin.users.user')]));
     }
@@ -121,7 +111,7 @@ class UserController extends Controller
     public function destroy(User $user, DeleteUserAction $action): RedirectResponse
     {
         try {
-            $action->execute($user, Auth::id());
+            $action->execute($user, (string) Auth::id());
 
             return back()->with('success', __('message.deleted', ['entity' => __('admin.users.user')]));
         } catch (\LogicException $e) {

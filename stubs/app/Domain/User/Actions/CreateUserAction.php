@@ -22,10 +22,6 @@ class CreateUserAction extends BaseAction
     {
         $user = User::create($dto->toArray());
 
-        if ($dto->role) {
-            $user->syncRoles([$dto->role]);
-        }
-
         // UserCreated::dispatch($user, Auth::id());
 
         return $user;

@@ -19,7 +19,6 @@ return [
     'select' => 'Select',
 
     'placeholder' => [
-        'select_gender' => 'Select Gender',
         'select_role' => 'Select Role',
         'select_status' => 'Select Status',
     ],

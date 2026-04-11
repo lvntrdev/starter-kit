@@ -63,13 +63,6 @@ export function useAdminMenu() {
             permission: 'api-routes.read',
         },
         {
-            title: 'admin.menu.api_docs',
-            icon: 'pi pi-book',
-            href: '/docs/api',
-            external: true,
-            permission: 'api-docs.read',
-        },
-        {
             title: 'admin.menu.laravel_docs',
             icon: 'pi pi-external-link',
             href: 'https://laravel.com/docs',

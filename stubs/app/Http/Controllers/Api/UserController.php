@@ -9,10 +9,14 @@ use App\Domain\User\DTOs\UserDTO;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\User\StoreUserRequest;
 use App\Http\Requests\Api\User\UpdateUserRequest;
+use App\Http\Resources\Admin\User\UserResource;
 use App\Http\Responses\ApiResponse;
 use App\Http\Responses\DatatableQueryBuilder;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Spatie\QueryBuilder\AllowedFilter;
 
 /**
  * REST API controller for user management (mobile / external clients).
@@ -25,63 +29,81 @@ class UserController extends Controller
     /**
      * List users with search, sort, filters and pagination.
      *
-     * GET /api/users?filter[status]=active&sort=-created_at&per_page=15
+     * GET /api/v1/users?filter[status]=active&sort=-created_at&per_page=15
      */
     public function index(): ApiResponse
     {
         return DatatableQueryBuilder::for(User::class)
-            ->searchable(['name', 'email'])
-            ->sortable(['id', 'name', 'email', 'status', 'created_at'])
-            ->filterable(['status'])
+            ->with(['roles'])
+            ->searchable(['first_name', 'last_name', 'email'])
+            ->sortable(['id', 'first_name', 'last_name', 'email', 'status', 'created_at'])
+            ->filterable([
+                AllowedFilter::exact('status'),
+                AllowedFilter::callback('name', fn (Builder $q, $value) => $q->where(function (Builder $inner) use ($value) {
+                    $escaped = '%'.str_replace(['%', '_'], ['\\%', '\\_'], (string) $value).'%';
+                    $inner->where('first_name', 'like', $escaped)
+                        ->orWhere('last_name', 'like', $escaped);
+                })),
+            ])
             ->defaultSort('-created_at')
+            ->resource(UserResource::class)
             ->response();
     }
 
     /**
      * Create a new user.
      *
-     * POST /api/users
+     * POST /api/v1/users
      */
     public function store(StoreUserRequest $request, CreateUserAction $action): ApiResponse
     {
         $dto = UserDTO::fromArray($request->validated());
         $user = $action->execute($dto);
 
-        return to_api($user, 'User created successfully.', 201);
+        return to_api(new UserResource($user->loadMissing('roles')), 'User created successfully.', 201);
     }
 
     /**
      * Show a single user.
      *
-     * GET /api/users/{user}
+     * GET /api/v1/users/{user}
      */
     public function show(User $user): ApiResponse
     {
-        return to_api($user);
+        return to_api(new UserResource($user->loadMissing('roles')));
     }
 
     /**
      * Update an existing user.
      *
-     * PUT/PATCH /api/users/{user}
+     * PUT/PATCH /api/v1/users/{user}
      */
     public function update(UpdateUserRequest $request, User $user, UpdateUserAction $action): ApiResponse
     {
-        $dto = UserDTO::fromArray($request->validated());
+        $dto = UserDTO::fromArray(array_merge(
+            [
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'email' => $user->email,
+                'status' => $user->status,
+            ],
+            $request->validated(),
+        ));
+
         $user = $action->execute($user, $dto);
 
-        return to_api($user, 'User updated successfully.');
+        return to_api(new UserResource($user->loadMissing('roles')), 'User updated successfully.');
     }
 
     /**
      * Delete a user.
      *
-     * DELETE /api/users/{user}
+     * DELETE /api/v1/users/{user}
      */
-    public function destroy(User $user, DeleteUserAction $action): ApiResponse|JsonResponse
+    public function destroy(Request $request, User $user, DeleteUserAction $action): ApiResponse|JsonResponse
     {
         try {
-            $action->execute($user, auth()->id());
+            $action->execute($user, $request->user()?->id);
 
             return to_api(status: 204);
         } catch (\LogicException $e) {

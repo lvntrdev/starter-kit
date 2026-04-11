@@ -12,6 +12,7 @@
         TitleFieldConfig,
     } from '@lvntr/components/FormBuilder/core';
     import { useApi } from '@/composables/useApi';
+    import { useCan } from '@/composables/useCan';
     import { useDefinition } from '@/composables/useDefinition';
     import { trans } from 'laravel-vue-i18n';
     import SkFormInput from '@lvntr/components/FormBuilder/SkFormInput.vue';
@@ -72,7 +73,15 @@
     }
 
     const api = useApi();
+    const { can } = useCan();
     const { options: definitionOptions, load: loadDefinitions } = useDefinition();
+
+    // ── Permission gate ─────────────────────────────────────────────────────────
+    /**
+     * When config.permission is set and the current user lacks it, the form
+     * becomes read-only: all fields are disabled and the submit button is hidden.
+     */
+    const isReadOnly = computed(() => !!props.config.permission && !can(props.config.permission));
 
     // ── Remote data loading ─────────────────────────────────────────────────────
     const restoringDefaults = ref(false);
@@ -223,7 +232,7 @@
     const hasFileFields = computed(() => resolvedFields.value.some((f) => f.type === 'file-upload'));
 
     function handleSubmit(): void {
-        if (!props.config.submit) {
+        if (!props.config.submit || isReadOnly.value) {
             return;
         }
         const { url, method, preserveScroll = true } = props.config.submit;
@@ -347,6 +356,9 @@
     }
 
     function isDisabled(field: FieldConfig): boolean {
+        if (isReadOnly.value) {
+            return true;
+        }
         return field.disabled ? field.disabled(currentValues.value) : false;
     }
 
@@ -468,7 +480,7 @@
                     <slot name="actions" />
                     <template v-if="isInternalMode">
                         <Button
-                            v-if="!config.actionLabels?.hideSubmit"
+                            v-if="!config.actionLabels?.hideSubmit && !isReadOnly"
                             :label="
                                 config.actionLabels?.submit
                                     ? $t(config.actionLabels.submit)
@@ -699,7 +711,7 @@
                     <slot name="actions" />
                     <template v-if="isInternalMode">
                         <Button
-                            v-if="!config.actionLabels?.hideSubmit"
+                            v-if="!config.actionLabels?.hideSubmit && !isReadOnly"
                             :label="
                                 config.actionLabels?.submit
                                     ? $t(config.actionLabels.submit)

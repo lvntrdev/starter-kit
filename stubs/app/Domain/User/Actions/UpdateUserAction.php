@@ -30,9 +30,6 @@ class UpdateUserAction extends BaseAction
         ));
 
         $user->update($data);
-        if ($dto->role) {
-            $user->syncRoles([$dto->role]);
-        }
 
         $user->refresh();
 

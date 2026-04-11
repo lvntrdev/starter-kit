@@ -718,6 +718,16 @@ export class FormBuilder {
         return this;
     }
 
+    /**
+     * Permission key required to edit the form (e.g. 'users.update').
+     * When the authenticated user lacks this permission, all fields become
+     * disabled and the submit button is hidden.
+     */
+    permission(key: string): this {
+        this.config.permission = key;
+        return this;
+    }
+
     addFields(...fields: BaseFieldBuilder<FieldConfig>[]): this {
         this.config.fields.push(...fields.map((f) => f.build()));
         return this;

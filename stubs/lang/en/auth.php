@@ -21,4 +21,35 @@ return [
     'send_password_reset_link' => 'Send Password Reset Link',
     'back_to_login' => 'Back to Login',
 
+    'login' => [
+        'title' => 'Sign In',
+        'heading' => 'Welcome Back',
+        'subtitle' => 'Please enter your credentials to continue',
+        'email_label' => 'Email Address',
+        'email_placeholder' => 'admin@company.com',
+        'password_label' => 'Password',
+        'forgot_password_link' => 'Forgot password?',
+        'remember' => 'Remember me for 30 days',
+        'submit' => 'Sign In',
+        'no_account' => "Don't have an account?",
+        'create_account' => 'Create an account',
+    ],
+
+    'register' => [
+        'title' => 'Register',
+        'heading' => 'Register',
+        'subtitle' => 'Create a new account',
+        'first_name_label' => 'First Name',
+        'first_name_placeholder' => 'First Name',
+        'last_name_label' => 'Last Name',
+        'last_name_placeholder' => 'Last Name',
+        'email_label' => 'Email',
+        'email_placeholder' => 'example@email.com',
+        'password_label' => 'Password',
+        'password_confirmation_label' => 'Confirm Password',
+        'submit' => 'Register',
+        'has_account' => 'Already have an account?',
+        'sign_in' => 'Sign in',
+    ],
+
 ];

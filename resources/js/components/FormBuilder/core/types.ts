@@ -354,4 +354,10 @@ export interface FormBuilderConfig {
     cardSubtitle?: string;
     /** When true, strip Card bg/shadow/border (transparent mode). Default: false. */
     isCard?: boolean;
+    /**
+     * Permission key required to edit the form (e.g. 'users.update').
+     * When set and the authenticated user lacks the permission, all fields are
+     * disabled and the submit button is hidden.
+     */
+    permission?: string;
 }

@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\UserStatus;
 use App\Traits\HasActivityLogging;
 use App\Traits\HasMediaCollections;
 use Database\Factories\UserFactory;
@@ -40,7 +39,6 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, OAuthen
         'email',
         'password',
         'status',
-        'gender',
     ];
 
     /**
@@ -65,7 +63,6 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, OAuthen
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'status' => UserStatus::class,
         ];
     }
 
@@ -88,7 +85,6 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, OAuthen
         'full_name',
         'initials',
         'avatar_url',
-        'identity_document_url',
     ];
 
     /**
@@ -120,7 +116,6 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, OAuthen
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('avatar')->singleFile();
-        $this->addMediaCollection('identity_document')->singleFile();
     }
 
     /**
@@ -131,28 +126,6 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, OAuthen
         return Attribute::make(
             get: function () {
                 $media = $this->getFirstMedia('avatar');
-
-                if (! $media) {
-                    return null;
-                }
-
-                try {
-                    return $media->getTemporaryUrl(now()->addMinutes(30));
-                } catch (\RuntimeException) {
-                    return $media->getUrl();
-                }
-            },
-        );
-    }
-
-    /**
-     * Get the identity document URL accessor.
-     */
-    protected function identityDocumentUrl(): Attribute
-    {
-        return Attribute::make(
-            get: function () {
-                $media = $this->getFirstMedia('identity_document');
 
                 if (! $media) {
                     return null;
