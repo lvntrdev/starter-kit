@@ -15,7 +15,7 @@
                 "resources/js/*"
             ],
             "@lvntr/*": [
-                "vendor/lvntr/starter-kit/resources/js/*"
+                "vendor/lvntr/laravel-starter-kit/resources/js/*"
             ]
         },
         "types": [
@@ -25,8 +25,8 @@
     "include": [
         "resources/js/**/*.ts",
         "resources/js/**/*.vue",
-        "vendor/lvntr/starter-kit/resources/js/**/*.ts",
-        "vendor/lvntr/starter-kit/resources/js/**/*.vue",
+        "vendor/lvntr/laravel-starter-kit/resources/js/**/*.ts",
+        "vendor/lvntr/laravel-starter-kit/resources/js/**/*.vue",
         "auto-imports.d.ts",
         "components.d.ts"
     ]

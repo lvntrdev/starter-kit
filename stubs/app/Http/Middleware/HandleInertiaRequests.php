@@ -55,7 +55,7 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'appName' => config('app.name'),
             'appLogo' => fn () => ($logo = Setting::getValue('general.logo')) ? Storage::disk('public')->url($logo) : null,
-            'appVersion' => InstalledVersions::getPrettyVersion('lvntr/starter-kit'),
+            'appVersion' => InstalledVersions::getPrettyVersion('lvntr/laravel-starter-kit'),
             'appEnv' => config('app.env'),
             'appDebug' => config('app.debug'),
             'auth' => [
