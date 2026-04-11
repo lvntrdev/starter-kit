@@ -9,8 +9,8 @@
 @import './theme/utilities.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../vendor/lvntr/laravel-starter-kit/resources/js/**/*.vue';
-@source '../../vendor/lvntr/laravel-starter-kit/resources/js/**/*.ts';
+@source '../../vendor/lvntr/starter-kit/resources/js/**/*.vue';
+@source '../../vendor/lvntr/starter-kit/resources/js/**/*.ts';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
 @source '../**/*.js';
