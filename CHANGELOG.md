@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [13.1.4] - 2026-04-12
+
 ### Added
 
 - Granular component publishing — `sk:publish` now supports individual tags (`--tag=datatable`, `--tag=form`, `--tag=tabs`, `--tag=skeleton`, `--tag=ui`). Multiple tags can be combined: `--tag=datatable --tag=ui`.
