@@ -73,6 +73,49 @@ class ApiResponse implements Responsable
     }
 
     /**
+     * Paginated response for a Laravel API ResourceCollection.
+     *
+     * Use this when you want to transform paginated items through an
+     * `JsonResource::collection($paginator)` before returning. It preserves
+     * the resource transformation and exposes pagination metadata.
+     */
+    public static function paginatedCollection(ResourceCollection $collection, string $message = 'Operation successful.'): self
+    {
+        $paginator = $collection->resource;
+
+        // Transform each resource item via its toArray() so the output
+        // matches what `success()` would produce for non-paginated data.
+        $items = $collection->collection->map(
+            fn ($resource) => $resource->toArray(request())
+        )->all();
+
+        $meta = match (true) {
+            $paginator instanceof LengthAwarePaginator => [
+                'current_page' => $paginator->currentPage(),
+                'from' => $paginator->firstItem(),
+                'last_page' => $paginator->lastPage(),
+                'path' => $paginator->path(),
+                'per_page' => $paginator->perPage(),
+                'to' => $paginator->lastItem(),
+                'total' => $paginator->total(),
+            ],
+            $paginator instanceof CursorPaginator => [
+                'path' => $paginator->path(),
+                'per_page' => $paginator->perPage(),
+                'next_cursor' => $paginator->nextCursor()?->encode(),
+                'prev_cursor' => $paginator->previousCursor()?->encode(),
+                'has_more' => $paginator->hasMorePages(),
+            ],
+            default => [],
+        };
+
+        $instance = new self(true, 200, $message, $items);
+        $instance->meta = array_merge($instance->meta, $meta);
+
+        return $instance;
+    }
+
+    /**
      * No content response (204).
      */
     public static function noContent(): JsonResponse

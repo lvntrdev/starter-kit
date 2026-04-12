@@ -61,7 +61,7 @@
         "vue-tsc": "^3.2.5"
     },
     "dependencies": {
-        "@inertiajs/vue3": "^2.3.17",
+        "@inertiajs/vue3": "^3.0.3",
         "@primevue/themes": "^4.5.4",
         "@vueuse/core": "^14.2.1",
         "laravel-vue-i18n": "^2.8.0",

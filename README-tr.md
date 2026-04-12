@@ -9,7 +9,7 @@ Lvntr Starter Kit aktif olarak gelistiriliyor; her yeni surum onu daha olgun, da
 
 Detayli kullanim dokumanlari: [kit-docs.lvntr.dev](https://kit-docs.lvntr.dev/)
 
-**Laravel 13**, **Inertia.js v2**, **Vue 3**, **PrimeVue 4** ve **Tailwind CSS 4** ile olusturulmus, tam donanimli bir Laravel admin panel paketi. DDD (Domain-Driven Design) mimarisi ile rol tabanli yetkilendirme, aktivite kaydi, ayarlar yonetimi ve daha fazlasini icerir.
+**Laravel 13**, **Inertia.js v3**, **Vue 3**, **PrimeVue 4** ve **Tailwind CSS 4** ile olusturulmus, tam donanimli bir Laravel admin panel paketi. DDD (Domain-Driven Design) mimarisi ile rol tabanli yetkilendirme, aktivite kaydi, ayarlar yonetimi ve daha fazlasini icerir.
 
 ## Ozellikler
 
@@ -32,7 +32,7 @@ Detayli kullanim dokumanlari: [kit-docs.lvntr.dev](https://kit-docs.lvntr.dev/)
 | Paket                    | Amac                                                                          |
 | ------------------------ | ----------------------------------------------------------------------------- |
 | **Laravel 13**           | Cekirdek framework (constraint: `^13.0`)                                      |
-| **Inertia.js v2**        | Sunucu tabanli SPA — backend ile frontend arasinda API katmanina gerek yok    |
+| **Inertia.js v3**        | Sunucu tabanli SPA — backend ile frontend arasinda API katmanina gerek yok    |
 | **Laravel Fortify**      | Kimlik dogrulama altyapisi (giris, kayit, 2FA, sifre sifirlama)               |
 | **Laravel Passport**     | OAuth2 API kimlik dogrulamasi (kisisel erisim tokenlari, cihaz yetkilendirme) |
 | **Laravel Wayfinder**    | TypeScript icin tip-guvenli rota olusturma                                    |
@@ -175,7 +175,9 @@ php artisan sk:publish --tag=config
 | ------------------ | --------------------------------------------------------------- |
 | `sk:install`       | Tam kurulum sihirbazi                                           |
 | `sk:update`        | Kullanici degisikliklerini koruyarak paket dosyalarini guncelle |
+| `sk:upgrade`       | Onceki Laravel surumunden yukseltme                             |
 | `sk:publish`       | Ozellestirme icin istege bagli varliklari yayinla               |
+| `site:install`     | Veritabanini sifirla ve varsayilan verilerle yeniden kur        |
 | `make:sk-domain`   | Interaktif olarak eksiksiz bir DDD domain'i olustur             |
 | `remove:sk-domain` | Bir domain'i ve tum dosyalarini kaldir                          |
 | `env:sync`         | .env anahtarlarini .env.example ile senkronize et               |

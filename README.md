@@ -9,7 +9,7 @@ Lvntr Starter Kit is under active development, and each release is shaping it in
 
 Detailed usage docs: [kit-docs.lvntr.dev](https://kit-docs.lvntr.dev/)
 
-A full-featured Laravel admin panel package built with **Laravel 13**, **Inertia.js v2**, **Vue 3**, **PrimeVue 4**, and **Tailwind CSS 4**. Follows DDD (Domain-Driven Design) architecture with built-in role-based permissions, activity logging, settings management, and more.
+A full-featured Laravel admin panel package built with **Laravel 13**, **Inertia.js v3**, **Vue 3**, **PrimeVue 4**, and **Tailwind CSS 4**. Follows DDD (Domain-Driven Design) architecture with built-in role-based permissions, activity logging, settings management, and more.
 
 ## Features
 
@@ -32,7 +32,7 @@ A full-featured Laravel admin panel package built with **Laravel 13**, **Inertia
 | Package                  | Purpose                                                                  |
 | ------------------------ | ------------------------------------------------------------------------ |
 | **Laravel 13**           | Core framework (constraint: `^13.0`)                                     |
-| **Inertia.js v2**        | Server-driven SPA — no API layer needed between backend and frontend     |
+| **Inertia.js v3**        | Server-driven SPA — no API layer needed between backend and frontend     |
 | **Laravel Fortify**      | Authentication backend (login, register, 2FA, password reset)            |
 | **Laravel Passport**     | OAuth2 API authentication (personal access tokens, device authorization) |
 | **Laravel Wayfinder**    | Type-safe route generation for TypeScript                                |
@@ -171,14 +171,16 @@ php artisan sk:publish --tag=config
 
 ## Available Commands
 
-| Command            | Description                                  |
-| ------------------ | -------------------------------------------- |
-| `sk:install`       | Full installation wizard                     |
-| `sk:update`        | Update package files preserving user changes |
-| `sk:publish`       | Publish optional assets for customization    |
-| `make:sk-domain`   | Scaffold a complete DDD domain interactively |
-| `remove:sk-domain` | Remove a domain and all its files            |
-| `env:sync`         | Sync .env keys to .env.example               |
+| Command            | Description                                       |
+| ------------------ | ------------------------------------------------- |
+| `sk:install`       | Full installation wizard                          |
+| `sk:update`        | Update package files preserving user changes      |
+| `sk:upgrade`       | Upgrade from previous Laravel version             |
+| `sk:publish`       | Publish optional assets for customization         |
+| `site:install`     | Reset database and reinstall with default data    |
+| `make:sk-domain`   | Scaffold a complete DDD domain interactively      |
+| `remove:sk-domain` | Remove a domain and all its files                 |
+| `env:sync`         | Sync .env keys to .env.example                    |
 
 ### Domain Scaffolding
 

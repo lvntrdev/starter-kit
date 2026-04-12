@@ -25,7 +25,7 @@
         "php": "^8.2",
         "illuminate/support": "^13.0",
         "dedoc/scramble": "*",
-        "inertiajs/inertia-laravel": "^2.0",
+        "inertiajs/inertia-laravel": "^3.0",
         "laravel/fortify": "^1.35",
         "laravel/passport": "^13.5",
         "laravel/wayfinder": "^0.1",

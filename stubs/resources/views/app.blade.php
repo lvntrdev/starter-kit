@@ -17,7 +17,7 @@
             }
         </style>
 
-        <title inertia>{{ config('app.name', 'Starter Kit 12') }}</title>
+        <title data-inertia>{{ config('app.name', 'Starter Kit 12') }}</title>
 
         <link rel="icon" href="/favicon.ico" sizes="any">
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
