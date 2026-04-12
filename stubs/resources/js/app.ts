@@ -25,16 +25,16 @@ createInertiaApp({
     },
     withApp(app, { ssr }) {
         app.use(i18nVue, {
-                resolve: ssr
-                    ? (lang: string) => {
-                          const langs = import.meta.glob<Record<string, string>>('../../lang/*.json', { eager: true });
-                          return langs[`../../lang/php_${lang}.json`];
-                      }
-                    : async (lang: string) => {
-                          const langs = import.meta.glob<Record<string, string>>('../../lang/*.json');
-                          return await langs[`../../lang/php_${lang}.json`]();
-                      },
-            })
+            resolve: ssr
+                ? (lang: string) => {
+                      const langs = import.meta.glob<Record<string, string>>('../../lang/*.json', { eager: true });
+                      return langs[`../../lang/php_${lang}.json`];
+                  }
+                : async (lang: string) => {
+                      const langs = import.meta.glob<Record<string, string>>('../../lang/*.json');
+                      return await langs[`../../lang/php_${lang}.json`]();
+                  },
+        })
             .use(PrimeVue, {
                 theme: {
                     preset: AppPreset,
