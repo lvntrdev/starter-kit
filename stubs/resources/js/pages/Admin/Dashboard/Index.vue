@@ -4,408 +4,654 @@
 
     const page = usePage();
     const user = computed(() => page.props.auth?.user);
-    const stats = [
-        { label: 'Total Users', value: '1,234', icon: 'pi pi-users', color: 'text-blue-500' },
-        { label: 'Active Sessions', value: '56', icon: 'pi pi-bolt', color: 'text-green-500' },
-        { label: "Today's Requests", value: '8,901', icon: 'pi pi-chart-bar', color: 'text-orange-500' },
+
+    const currentDate = new Date().toLocaleDateString('tr-TR', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
+
+    type Trend = 'up' | 'down';
+
+    interface Kpi {
+        label: string;
+        value: string;
+        delta: string;
+        trend: Trend;
+        icon: string;
+        accent: string;
+        spark: number[];
+    }
+
+    const kpis: Kpi[] = [
         {
-            label: 'System Status',
-            value: 'Active',
-            icon: 'pi pi-check-circle',
-            color: 'text-emerald-500',
+            label: 'Toplam Gelir',
+            value: '₺284.650',
+            delta: '+12,4%',
+            trend: 'up',
+            icon: 'pi pi-wallet',
+            accent: 'emerald',
+            spark: [22, 28, 26, 32, 30, 38, 44, 42, 48, 52, 50, 58],
+        },
+        {
+            label: 'Aktif Kullanıcı',
+            value: '3.842',
+            delta: '+8,1%',
+            trend: 'up',
+            icon: 'pi pi-users',
+            accent: 'sky',
+            spark: [40, 42, 48, 45, 52, 55, 58, 62, 60, 68, 72, 78],
+        },
+        {
+            label: 'Yeni Sipariş',
+            value: '186',
+            delta: '-3,2%',
+            trend: 'down',
+            icon: 'pi pi-shopping-cart',
+            accent: 'amber',
+            spark: [60, 58, 62, 55, 50, 52, 48, 52, 46, 42, 40, 44],
+        },
+        {
+            label: 'Dönüşüm Oranı',
+            value: '%4,68',
+            delta: '+1,9%',
+            trend: 'up',
+            icon: 'pi pi-chart-line',
+            accent: 'violet',
+            spark: [30, 32, 28, 34, 36, 40, 38, 44, 48, 46, 50, 54],
         },
     ];
+
+    const revenueMonths = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+    const revenueCurrent = [38, 52, 45, 62, 58, 72, 68, 84, 78, 92, 88, 104];
+    const revenuePrev = [28, 36, 42, 48, 44, 54, 58, 62, 66, 70, 74, 80];
+
+    const categories = [
+        { label: 'Yazılım', value: 42, color: '#6366f1' },
+        { label: 'Donanım', value: 26, color: '#10b981' },
+        { label: 'Hizmet', value: 18, color: '#f59e0b' },
+        { label: 'Danışmanlık', value: 14, color: '#ef4444' },
+    ];
+
+    const categoryTotal = categories.reduce((sum, c) => sum + c.value, 0);
+
+    interface Order {
+        id: string;
+        customer: string;
+        email: string;
+        product: string;
+        amount: string;
+        status: 'completed' | 'pending' | 'failed';
+        date: string;
+    }
+
+    const recentOrders: Order[] = [
+        {
+            id: '#ORD-4821',
+            customer: 'Ayşe Demir',
+            email: 'ayse@example.com',
+            product: 'Pro Plan',
+            amount: '₺2.499',
+            status: 'completed',
+            date: '2 dk önce',
+        },
+        {
+            id: '#ORD-4820',
+            customer: 'Mehmet Yılmaz',
+            email: 'mehmet@example.com',
+            product: 'Enterprise',
+            amount: '₺8.900',
+            status: 'completed',
+            date: '12 dk önce',
+        },
+        {
+            id: '#ORD-4819',
+            customer: 'Zeynep Kaya',
+            email: 'zeynep@example.com',
+            product: 'Starter',
+            amount: '₺499',
+            status: 'pending',
+            date: '38 dk önce',
+        },
+        {
+            id: '#ORD-4818',
+            customer: 'Emre Şahin',
+            email: 'emre@example.com',
+            product: 'Pro Plan',
+            amount: '₺2.499',
+            status: 'completed',
+            date: '1 sa önce',
+        },
+        {
+            id: '#ORD-4817',
+            customer: 'Elif Özkan',
+            email: 'elif@example.com',
+            product: 'Addon Pack',
+            amount: '₺349',
+            status: 'failed',
+            date: '2 sa önce',
+        },
+        {
+            id: '#ORD-4816',
+            customer: 'Can Arslan',
+            email: 'can@example.com',
+            product: 'Enterprise',
+            amount: '₺8.900',
+            status: 'completed',
+            date: '3 sa önce',
+        },
+    ];
+
+    const statusMap: Record<Order['status'], { label: string; severity: 'success' | 'warn' | 'danger' }> = {
+        completed: { label: 'Tamamlandı', severity: 'success' },
+        pending: { label: 'Bekliyor', severity: 'warn' },
+        failed: { label: 'Başarısız', severity: 'danger' },
+    };
+
+    interface Activity {
+        user: string;
+        action: string;
+        target: string;
+        time: string;
+        icon: string;
+        color: string;
+    }
+
+    const activities: Activity[] = [
+        {
+            user: 'Ayşe D.',
+            action: 'yeni bir sipariş oluşturdu',
+            target: '#ORD-4821',
+            time: '2 dk',
+            icon: 'pi pi-shopping-bag',
+            color: 'bg-emerald-500',
+        },
+        {
+            user: 'Mehmet Y.',
+            action: 'ödeme gerçekleştirdi',
+            target: '₺8.900',
+            time: '12 dk',
+            icon: 'pi pi-credit-card',
+            color: 'bg-sky-500',
+        },
+        {
+            user: 'Zeynep K.',
+            action: 'hesap açtı',
+            target: '',
+            time: '38 dk',
+            icon: 'pi pi-user-plus',
+            color: 'bg-violet-500',
+        },
+        {
+            user: 'Emre Ş.',
+            action: 'plan yükseltti',
+            target: 'Pro → Enterprise',
+            time: '1 sa',
+            icon: 'pi pi-arrow-circle-up',
+            color: 'bg-amber-500',
+        },
+        {
+            user: 'Elif Ö.',
+            action: 'desteğe ulaştı',
+            target: '#TCK-1204',
+            time: '2 sa',
+            icon: 'pi pi-comments',
+            color: 'bg-rose-500',
+        },
+    ];
+
+    interface TopCustomer {
+        name: string;
+        email: string;
+        total: string;
+        orders: number;
+        avatar: string;
+    }
+
+    const topCustomers: TopCustomer[] = [
+        { name: 'Mehmet Yılmaz', email: 'mehmet@example.com', total: '₺42.800', orders: 18, avatar: 'MY' },
+        { name: 'Ayşe Demir', email: 'ayse@example.com', total: '₺28.450', orders: 12, avatar: 'AD' },
+        { name: 'Can Arslan', email: 'can@example.com', total: '₺19.200', orders: 9, avatar: 'CA' },
+        { name: 'Emre Şahin', email: 'emre@example.com', total: '₺14.600', orders: 7, avatar: 'EŞ' },
+    ];
+
+    function sparkPath(points: number[], width = 120, height = 40): string {
+        const max = Math.max(...points);
+        const min = Math.min(...points);
+        const range = max - min || 1;
+        const step = width / (points.length - 1);
+        return points
+            .map((p, i) => {
+                const x = i * step;
+                const y = height - ((p - min) / range) * height;
+                return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+            })
+            .join(' ');
+    }
+
+    function sparkArea(points: number[], width = 120, height = 40): string {
+        return `${sparkPath(points, width, height)} L${width},${height} L0,${height} Z`;
+    }
+
+    const accentClass: Record<string, { text: string; bg: string; stroke: string; fill: string }> = {
+        emerald: {
+            text: 'text-emerald-600 dark:text-emerald-400',
+            bg: 'bg-emerald-50 dark:bg-emerald-500/10',
+            stroke: 'stroke-emerald-500',
+            fill: 'fill-emerald-500/20',
+        },
+        sky: {
+            text: 'text-sky-600 dark:text-sky-400',
+            bg: 'bg-sky-50 dark:bg-sky-500/10',
+            stroke: 'stroke-sky-500',
+            fill: 'fill-sky-500/20',
+        },
+        amber: {
+            text: 'text-amber-600 dark:text-amber-400',
+            bg: 'bg-amber-50 dark:bg-amber-500/10',
+            stroke: 'stroke-amber-500',
+            fill: 'fill-amber-500/20',
+        },
+        violet: {
+            text: 'text-violet-600 dark:text-violet-400',
+            bg: 'bg-violet-50 dark:bg-violet-500/10',
+            stroke: 'stroke-violet-500',
+            fill: 'fill-violet-500/20',
+        },
+    };
+
+    function polarPoint(cx: number, cy: number, r: number, angle: number) {
+        const rad = ((angle - 90) * Math.PI) / 180;
+        return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+    }
+
+    function donutSegment(startAngle: number, endAngle: number, cx = 80, cy = 80, r = 64, innerR = 44) {
+        const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+        const outerStart = polarPoint(cx, cy, r, startAngle);
+        const outerEnd = polarPoint(cx, cy, r, endAngle);
+        const innerStart = polarPoint(cx, cy, innerR, endAngle);
+        const innerEnd = polarPoint(cx, cy, innerR, startAngle);
+        return [
+            `M${outerStart.x.toFixed(2)},${outerStart.y.toFixed(2)}`,
+            `A${r},${r} 0 ${largeArc} 1 ${outerEnd.x.toFixed(2)},${outerEnd.y.toFixed(2)}`,
+            `L${innerStart.x.toFixed(2)},${innerStart.y.toFixed(2)}`,
+            `A${innerR},${innerR} 0 ${largeArc} 0 ${innerEnd.x.toFixed(2)},${innerEnd.y.toFixed(2)}`,
+            'Z',
+        ].join(' ');
+    }
+
+    const donutSegments = computed(() => {
+        let acc = 0;
+        return categories.map((c) => {
+            const startAngle = (acc / categoryTotal) * 360;
+            acc += c.value;
+            const endAngle = (acc / categoryTotal) * 360;
+            return {
+                ...c,
+                path: donutSegment(startAngle, endAngle),
+                percent: Math.round((c.value / categoryTotal) * 100),
+            };
+        });
+    });
+
+    const revenueMax = Math.max(...revenueCurrent, ...revenuePrev);
+
+    function chartPath(points: number[], width = 600, height = 200): string {
+        const step = width / (points.length - 1);
+        return points
+            .map((p, i) => {
+                const x = i * step;
+                const y = height - (p / revenueMax) * (height - 20) - 10;
+                return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+            })
+            .join(' ');
+    }
+
+    function chartArea(points: number[], width = 600, height = 200): string {
+        return `${chartPath(points, width, height)} L${width},${height} L0,${height} Z`;
+    }
 </script>
 
 <template>
     <Head title="Dashboard" />
 
     <AdminLayout>
-        <div class="w-full">
-            <div class="mb-6">
-                <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-0">
-                    Dashboard
-                </h1>
-                <p class="mt-1 text-surface-500 dark:text-surface-400">
-                    Welcome, {{ user?.name }}
-                </p>
-            </div>
+        <div class="w-full space-y-6">
+            <!-- Header -->
+            <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
+                        Hoş geldin, {{ user?.name?.split(' ')[0] || 'Admin' }}
+                    </h1>
+                    <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
+                        {{ currentDate }} — işte bugünün özeti.
+                    </p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <Button label="Dışa Aktar" icon="pi pi-download" severity="secondary" outlined size="small" />
+                    <Button label="Yeni Rapor" icon="pi pi-plus" size="small" />
+                </div>
+            </header>
 
-            <!-- Stats Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <Card v-for="stat in stats" :key="stat.label">
-                    <template #content>
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm text-surface-500 dark:text-surface-400">
-                                    {{ stat.label }}
-                                </p>
-                                <p class="text-2xl font-bold text-surface-900 dark:text-surface-0 mt-1">
-                                    {{ stat.value }}
-                                </p>
-                            </div>
-                            <i :class="[stat.icon, stat.color]" class="text-3xl" />
+            <!-- KPI Grid -->
+            <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div
+                    v-for="kpi in kpis"
+                    :key="kpi.label"
+                    class="relative overflow-hidden rounded-xl border border-surface-200 bg-surface-0 p-5 transition hover:shadow-md dark:border-surface-700 dark:bg-surface-900"
+                >
+                    <div class="flex items-start justify-between">
+                        <div
+                            class="flex h-10 w-10 items-center justify-center rounded-lg"
+                            :class="accentClass[kpi.accent].bg"
+                        >
+                            <i :class="[kpi.icon, accentClass[kpi.accent].text]" class="text-lg" />
                         </div>
-                    </template>
-                </Card>
-            </div>
+                        <span
+                            class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+                            :class="
+                                kpi.trend === 'up'
+                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                    : 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400'
+                            "
+                        >
+                            <i
+                                :class="kpi.trend === 'up' ? 'pi pi-arrow-up' : 'pi pi-arrow-down'"
+                                class="text-[10px]"
+                            />
+                            {{ kpi.delta }}
+                        </span>
+                    </div>
+                    <div class="mt-4">
+                        <p class="text-sm text-surface-500 dark:text-surface-400">
+                            {{ kpi.label }}
+                        </p>
+                        <p class="mt-1 text-2xl font-bold text-surface-900 dark:text-surface-0">
+                            {{ kpi.value }}
+                        </p>
+                    </div>
+                    <svg viewBox="0 0 120 40" class="mt-3 h-10 w-full" preserveAspectRatio="none">
+                        <path :d="sparkArea(kpi.spark)" :class="accentClass[kpi.accent].fill" stroke="none" />
+                        <path
+                            :d="sparkPath(kpi.spark)"
+                            :class="accentClass[kpi.accent].stroke"
+                            stroke-width="2"
+                            fill="none"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+                    </svg>
+                </div>
+            </section>
 
-            <!-- Account Info -->
-            <Card>
-                <template #title>
-                    Account Information
-                </template>
-                <template #content>
-                    <div class="space-y-3">
+            <!-- Revenue + Category -->
+            <section class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <div
+                    class="rounded-xl border border-surface-200 bg-surface-0 p-5 lg:col-span-2 dark:border-surface-700 dark:bg-surface-900"
+                >
+                    <div class="flex items-start justify-between">
                         <div>
-                            <span class="text-sm font-medium text-surface-500 dark:text-surface-400">Full Name</span>
-                            <p class="text-surface-900 dark:text-surface-0">
-                                {{ user?.name }}
+                            <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
+                                Gelir Trendi
+                            </h2>
+                            <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
+                                Son 12 ay — geçen yıla kıyasla
                             </p>
                         </div>
+                        <div class="flex items-center gap-4 text-xs">
+                            <span class="flex items-center gap-1.5 text-surface-600 dark:text-surface-300">
+                                <span class="h-2 w-2 rounded-full bg-indigo-500" /> Bu yıl
+                            </span>
+                            <span class="flex items-center gap-1.5 text-surface-600 dark:text-surface-300">
+                                <span class="h-2 w-2 rounded-full bg-surface-300 dark:bg-surface-600" /> Geçen yıl
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <svg viewBox="0 0 600 220" class="h-56 w-full" preserveAspectRatio="none">
+                            <defs>
+                                <linearGradient id="revFill" x1="0" x2="0" y1="0" y2="1">
+                                    <stop offset="0%" stop-color="#6366f1" stop-opacity="0.35" />
+                                    <stop offset="100%" stop-color="#6366f1" stop-opacity="0" />
+                                </linearGradient>
+                            </defs>
+                            <g class="text-surface-200 dark:text-surface-700">
+                                <line
+                                    v-for="i in 4"
+                                    :key="i"
+                                    :x1="0"
+                                    :x2="600"
+                                    :y1="i * 50"
+                                    :y2="i * 50"
+                                    stroke="currentColor"
+                                    stroke-dasharray="3 4"
+                                    stroke-width="1"
+                                />
+                            </g>
+                            <path :d="chartArea(revenueCurrent)" fill="url(#revFill)" />
+                            <path
+                                :d="chartPath(revenuePrev)"
+                                stroke="currentColor"
+                                class="text-surface-300 dark:text-surface-600"
+                                stroke-width="2"
+                                fill="none"
+                                stroke-dasharray="4 4"
+                                stroke-linecap="round"
+                            />
+                            <path
+                                :d="chartPath(revenueCurrent)"
+                                stroke="#6366f1"
+                                stroke-width="2.5"
+                                fill="none"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                        </svg>
+                        <div class="mt-2 flex justify-between text-xs text-surface-500 dark:text-surface-400">
+                            <span v-for="m in revenueMonths" :key="m">{{ m }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    class="rounded-xl border border-surface-200 bg-surface-0 p-5 dark:border-surface-700 dark:bg-surface-900"
+                >
+                    <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
+                        Kategori Dağılımı
+                    </h2>
+                    <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
+                        Bu çeyrek
+                    </p>
+
+                    <div class="mt-4 flex items-center justify-center">
+                        <div class="relative">
+                            <svg viewBox="0 0 160 160" class="h-40 w-40">
+                                <path v-for="seg in donutSegments" :key="seg.label" :d="seg.path" :fill="seg.color" />
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span class="text-xs text-surface-500 dark:text-surface-400">Toplam</span>
+                                <span class="text-xl font-bold text-surface-900 dark:text-surface-0">
+                                    {{ categoryTotal }}K
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <ul class="mt-4 space-y-2">
+                        <li
+                            v-for="seg in donutSegments"
+                            :key="seg.label"
+                            class="flex items-center justify-between text-sm"
+                        >
+                            <span class="flex items-center gap-2 text-surface-700 dark:text-surface-300">
+                                <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: seg.color }" />
+                                {{ seg.label }}
+                            </span>
+                            <span class="font-medium text-surface-900 dark:text-surface-0">%{{ seg.percent }}</span>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Orders + Activity -->
+            <section class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <div
+                    class="rounded-xl border border-surface-200 bg-surface-0 lg:col-span-2 dark:border-surface-700 dark:bg-surface-900"
+                >
+                    <div
+                        class="flex items-center justify-between border-b border-surface-200 p-5 dark:border-surface-700"
+                    >
                         <div>
-                            <span class="text-sm font-medium text-surface-500 dark:text-surface-400">Email</span>
-                            <p class="text-surface-900 dark:text-surface-0">
-                                {{ user?.email }}
+                            <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
+                                Son Siparişler
+                            </h2>
+                            <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
+                                Son 24 saat
+                            </p>
+                        </div>
+                        <Button label="Tümünü Gör" icon="pi pi-arrow-right" icon-pos="right" text size="small" />
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-surface-50 dark:bg-surface-800/50">
+                                <tr
+                                    class="text-left text-xs uppercase tracking-wider text-surface-500 dark:text-surface-400"
+                                >
+                                    <th class="px-5 py-3 font-medium">
+                                        Sipariş
+                                    </th>
+                                    <th class="px-5 py-3 font-medium">
+                                        Müşteri
+                                    </th>
+                                    <th class="px-5 py-3 font-medium">
+                                        Ürün
+                                    </th>
+                                    <th class="px-5 py-3 font-medium">
+                                        Tutar
+                                    </th>
+                                    <th class="px-5 py-3 font-medium">
+                                        Durum
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-surface-200 dark:divide-surface-700">
+                                <tr
+                                    v-for="order in recentOrders"
+                                    :key="order.id"
+                                    class="hover:bg-surface-50 dark:hover:bg-surface-800/30"
+                                >
+                                    <td class="px-5 py-3 font-mono text-xs text-surface-600 dark:text-surface-400">
+                                        {{ order.id }}
+                                    </td>
+                                    <td class="px-5 py-3">
+                                        <div class="font-medium text-surface-900 dark:text-surface-0">
+                                            {{ order.customer }}
+                                        </div>
+                                        <div class="text-xs text-surface-500 dark:text-surface-400">
+                                            {{ order.date }}
+                                        </div>
+                                    </td>
+                                    <td class="px-5 py-3 text-surface-700 dark:text-surface-300">
+                                        {{ order.product }}
+                                    </td>
+                                    <td class="px-5 py-3 font-semibold text-surface-900 dark:text-surface-0">
+                                        {{ order.amount }}
+                                    </td>
+                                    <td class="px-5 py-3">
+                                        <Tag
+                                            :value="statusMap[order.status].label"
+                                            :severity="statusMap[order.status].severity"
+                                        />
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div
+                    class="rounded-xl border border-surface-200 bg-surface-0 dark:border-surface-700 dark:bg-surface-900"
+                >
+                    <div class="border-b border-surface-200 p-5 dark:border-surface-700">
+                        <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
+                            Aktivite Akışı
+                        </h2>
+                        <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
+                            Canlı güncelleniyor
+                        </p>
+                    </div>
+
+                    <ul class="space-y-4 p-5">
+                        <li v-for="(a, i) in activities" :key="i" class="flex gap-3">
+                            <div
+                                class="flex h-8 w-8 flex-none items-center justify-center rounded-full text-white"
+                                :class="a.color"
+                            >
+                                <i :class="a.icon" class="text-sm" />
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm text-surface-800 dark:text-surface-200">
+                                    <span class="font-medium">{{ a.user }}</span>
+                                    {{ a.action }}
+                                    <span v-if="a.target" class="font-medium">{{ a.target }}</span>
+                                </p>
+                                <p class="mt-0.5 text-xs text-surface-500 dark:text-surface-400">
+                                    {{ a.time }} önce
+                                </p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Top Customers -->
+            <section
+                class="rounded-xl border border-surface-200 bg-surface-0 dark:border-surface-700 dark:bg-surface-900"
+            >
+                <div class="flex items-center justify-between border-b border-surface-200 p-5 dark:border-surface-700">
+                    <div>
+                        <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
+                            Öne Çıkan Müşteriler
+                        </h2>
+                        <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
+                            En çok harcama yapanlar
+                        </p>
+                    </div>
+                    <Button label="Raporu Gör" icon="pi pi-external-link" icon-pos="right" text size="small" />
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
+                    <div
+                        v-for="(c, i) in topCustomers"
+                        :key="c.email"
+                        class="flex items-center gap-3 rounded-lg border border-surface-200 p-4 transition hover:border-primary-400 dark:border-surface-700 dark:hover:border-primary-500"
+                    >
+                        <div class="relative">
+                            <div
+                                class="flex h-11 w-11 items-center justify-center rounded-full bg-linear-to-br from-primary-500 to-violet-500 text-sm font-semibold text-white"
+                            >
+                                {{ c.avatar }}
+                            </div>
+                            <span
+                                class="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 text-xs font-bold text-white ring-2 ring-surface-0 dark:ring-surface-900"
+                            >
+                                {{ i + 1 }}
+                            </span>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-medium text-surface-900 dark:text-surface-0">
+                                {{ c.name }}
+                            </p>
+                            <p class="truncate text-xs text-surface-500 dark:text-surface-400">
+                                {{ c.orders }} sipariş · {{ c.total }}
                             </p>
                         </div>
                     </div>
-                </template>
-            </Card>
-        </div>
-
-        <div>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque luctus urna id dui maximus iaculis. Vivamus
-            lacinia sodales consectetur. Praesent finibus, felis ac lobortis egestas, purus ligula hendrerit odio, id
-            fringilla ligula velit ut magna. Quisque eget nisi in augue interdum faucibus. In consectetur suscipit
-            tincidunt. Quisque sed est velit. Proin tempor purus vel justo sollicitudin, eu vestibulum lacus viverra.
-            Phasellus malesuada fermentum ultrices. Fusce eget dui pharetra, varius mi ac, tincidunt risus. Pellentesque
-            id posuere tellus. Nulla sed quam vitae dui pellentesque finibus. Donec non nisl felis. Nullam aliquet
-            congue tempus. Cras hendrerit neque quis enim malesuada viverra. Fusce vel dolor id nisi convallis
-            elementum. Aliquam ut est magna. Etiam egestas molestie pretium. Nunc tristique odio eu eros vulputate, quis
-            consequat tortor viverra. Donec ultricies luctus massa, in mattis orci molestie in. Morbi sagittis
-            consectetur diam. In sed metus ut diam cursus placerat nec sed urna. Donec eu vehicula lectus. Nullam
-            consectetur posuere turpis, nec porttitor arcu sollicitudin eu. Nunc placerat velit quam, nec auctor odio
-            cursus viverra. Donec quis aliquam ipsum. Etiam quis blandit sapien. Maecenas fermentum laoreet volutpat. In
-            ut semper erat. Aenean semper leo lorem, non molestie risus congue eu. In varius ligula eu pretium tempor.
-            Morbi in quam efficitur, commodo ligula sed, pulvinar ex. Donec semper, ex vel sagittis pulvinar, ex neque
-            ornare leo, eget euismod lacus lorem ac tellus. Nullam congue feugiat sem nec lobortis. Phasellus
-            consectetur sollicitudin bibendum. Suspendisse tortor nisi, pretium eget tincidunt quis, pellentesque ac
-            magna. Proin ac nisi quis elit porta imperdiet sed eget nisl. Cras feugiat auctor risus, vel scelerisque mi
-            pulvinar quis. Nulla molestie vestibulum velit. Vestibulum porttitor ipsum purus, non aliquet felis porta
-            vel. Suspendisse imperdiet posuere odio, in vehicula elit feugiat vitae. Pellentesque vulputate fermentum
-            egestas. In finibus lorem rutrum ornare placerat. Sed id nunc quis erat venenatis dapibus. Quisque sed diam
-            in nibh finibus rhoncus vitae id nisi. Morbi luctus nulla vitae lobortis efficitur. Etiam mollis nisl a
-            dolor venenatis, vitae luctus erat pulvinar. Suspendisse enim nisl, lobortis id tortor ut, egestas placerat
-            ipsum. Phasellus eros justo, sodales et dui quis, accumsan tincidunt justo. Vestibulum ante ipsum primis in
-            faucibus orci luctus et ultrices posuere cubilia curae; Phasellus semper enim nec consectetur facilisis. Sed
-            facilisis, ipsum vel ornare consequat, eros lacus vestibulum erat, quis mollis metus orci et lorem. Donec
-            augue nulla, auctor efficitur turpis quis, hendrerit interdum metus. In ultricies, elit vel tincidunt
-            iaculis, est enim aliquet augue, quis egestas metus libero at dui. Sed venenatis ipsum massa, in pulvinar
-            arcu pretium nec. Nullam elementum malesuada tristique. Proin vel est quis dui consequat pretium. Etiam ac
-            magna libero. In a odio ante. Vestibulum ac nibh mollis, viverra massa sit amet, cursus tortor. Duis porta
-            risus ut luctus ultricies. Praesent convallis turpis nisl, vitae commodo purus varius et. Maecenas ac nunc
-            dapibus, iaculis velit at, maximus mauris. Ut nibh ipsum, euismod at dui molestie, mollis sollicitudin
-            dolor. Duis eleifend sollicitudin pretium. Duis semper ante condimentum ipsum hendrerit, id sollicitudin
-            sapien pellentesque. Suspendisse nec pulvinar ante. Suspendisse augue ante, euismod non ornare in, fermentum
-            non ipsum. Nulla suscipit, augue pellentesque pharetra volutpat, erat ipsum posuere elit, et ullamcorper
-            eros nisi in elit. Suspendisse massa erat, gravida at dui ut, porttitor aliquam eros. Donec risus ex,
-            iaculis vitae mi ac, molestie vulputate turpis. Aenean congue dictum ipsum nec efficitur. Nam suscipit odio
-            et mattis rhoncus. Ut nulla lectus, aliquet eu pretium eu, suscipit scelerisque mi. Donec blandit arcu at
-            arcu pretium, id congue neque lobortis. Morbi efficitur lorem at congue gravida. Integer semper blandit
-            odio, a consectetur nisi rhoncus dapibus. Nam eu elementum magna. Curabitur eget convallis nibh. Sed
-            interdum eros non feugiat tristique. Suspendisse volutpat mi quis purus blandit rhoncus. Sed nec lobortis
-            felis. Quisque scelerisque massa quis purus accumsan vestibulum non tempus turpis. Nam fringilla facilisis
-            tortor id ultrices. Donec hendrerit efficitur leo, convallis tempor lorem maximus at. Vivamus gravida nunc
-            ex, eu pulvinar arcu tincidunt consectetur. Quisque cursus elit vitae massa molestie cursus eget hendrerit
-            massa. Sed accumsan nibh nisi, vitae condimentum tortor tempus non. Aenean pulvinar orci augue, sit amet
-            porta urna porttitor id. Sed mollis interdum dui sit amet viverra. Vestibulum sed vulputate odio, vel
-            fermentum ligula. Morbi laoreet a nisl ac sollicitudin. Orci varius natoque penatibus et magnis dis
-            parturient montes, nascetur ridiculus mus. Nam cursus pulvinar efficitur. Sed eget ante tortor. Integer vel
-            dui vel est rutrum gravida. Curabitur elementum placerat tempor. Quisque rutrum finibus iaculis.
-            Pellentesque vulputate egestas ligula, at interdum nibh lobortis vel. Proin lectus ipsum, gravida id
-            vehicula a, pretium quis urna. Maecenas eget sem tincidunt, pharetra urna feugiat, finibus mi. Maecenas
-            efficitur, magna at lobortis ullamcorper, dui libero venenatis urna, nec luctus velit justo id sem. Nam
-            convallis feugiat eros in interdum. Proin in odio ultrices, eleifend libero a, lacinia nisl. Aliquam erat
-            volutpat. Mauris lacinia nulla massa, sed scelerisque ipsum scelerisque ut. Cras mollis erat id interdum
-            porttitor. Nulla a sodales elit. Integer viverra elit at nulla cursus, ac fringilla neque ornare. Cras
-            posuere et mi non rutrum. Cras placerat felis non placerat tempor. Mauris eget lectus dictum, euismod arcu
-            et, elementum massa.Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque luctus urna id dui
-            maximus iaculis. Vivamus lacinia sodales consectetur. Praesent finibus, felis ac lobortis egestas, purus
-            ligula hendrerit odio, id fringilla ligula velit ut magna. Quisque eget nisi in augue interdum faucibus. In
-            consectetur suscipit tincidunt. Quisque sed est velit. Proin tempor purus vel justo sollicitudin, eu
-            vestibulum lacus viverra. Phasellus malesuada fermentum ultrices. Fusce eget dui pharetra, varius mi ac,
-            tincidunt risus. Pellentesque id posuere tellus. Nulla sed quam vitae dui pellentesque finibus. Donec non
-            nisl felis. Nullam aliquet congue tempus. Cras hendrerit neque quis enim malesuada viverra. Fusce vel dolor
-            id nisi convallis elementum. Aliquam ut est magna. Etiam egestas molestie pretium. Nunc tristique odio eu
-            eros vulputate, quis consequat tortor viverra. Donec ultricies luctus massa, in mattis orci molestie in.
-            Morbi sagittis consectetur diam. In sed metus ut diam cursus placerat nec sed urna. Donec eu vehicula
-            lectus. Nullam consectetur posuere turpis, nec porttitor arcu sollicitudin eu. Nunc placerat velit quam, nec
-            auctor odio cursus viverra. Donec quis aliquam ipsum. Etiam quis blandit sapien. Maecenas fermentum laoreet
-            volutpat. In ut semper erat. Aenean semper leo lorem, non molestie risus congue eu. In varius ligula eu
-            pretium tempor. Morbi in quam efficitur, commodo ligula sed, pulvinar ex. Donec semper, ex vel sagittis
-            pulvinar, ex neque ornare leo, eget euismod lacus lorem ac tellus. Nullam congue feugiat sem nec lobortis.
-            Phasellus consectetur sollicitudin bibendum. Suspendisse tortor nisi, pretium eget tincidunt quis,
-            pellentesque ac magna. Proin ac nisi quis elit porta imperdiet sed eget nisl. Cras feugiat auctor risus, vel
-            scelerisque mi pulvinar quis. Nulla molestie vestibulum velit. Vestibulum porttitor ipsum purus, non aliquet
-            felis porta vel. Suspendisse imperdiet posuere odio, in vehicula elit feugiat vitae. Pellentesque vulputate
-            fermentum egestas. In finibus lorem rutrum ornare placerat. Sed id nunc quis erat venenatis dapibus. Quisque
-            sed diam in nibh finibus rhoncus vitae id nisi. Morbi luctus nulla vitae lobortis efficitur. Etiam mollis
-            nisl a dolor venenatis, vitae luctus erat pulvinar. Suspendisse enim nisl, lobortis id tortor ut, egestas
-            placerat ipsum. Phasellus eros justo, sodales et dui quis, accumsan tincidunt justo. Vestibulum ante ipsum
-            primis in faucibus orci luctus et ultrices posuere cubilia curae; Phasellus semper enim nec consectetur
-            facilisis. Sed facilisis, ipsum vel ornare consequat, eros lacus vestibulum erat, quis mollis metus orci et
-            lorem. Donec augue nulla, auctor efficitur turpis quis, hendrerit interdum metus. In ultricies, elit vel
-            tincidunt iaculis, est enim aliquet augue, quis egestas metus libero at dui. Sed venenatis ipsum massa, in
-            pulvinar arcu pretium nec. Nullam elementum malesuada tristique. Proin vel est quis dui consequat pretium.
-            Etiam ac magna libero. In a odio ante. Vestibulum ac nibh mollis, viverra massa sit amet, cursus tortor.
-            Duis porta risus ut luctus ultricies. Praesent convallis turpis nisl, vitae commodo purus varius et.
-            Maecenas ac nunc dapibus, iaculis velit at, maximus mauris. Ut nibh ipsum, euismod at dui molestie, mollis
-            sollicitudin dolor. Duis eleifend sollicitudin pretium. Duis semper ante condimentum ipsum hendrerit, id
-            sollicitudin sapien pellentesque. Suspendisse nec pulvinar ante. Suspendisse augue ante, euismod non ornare
-            in, fermentum non ipsum. Nulla suscipit, augue pellentesque pharetra volutpat, erat ipsum posuere elit, et
-            ullamcorper eros nisi in elit. Suspendisse massa erat, gravida at dui ut, porttitor aliquam eros. Donec
-            risus ex, iaculis vitae mi ac, molestie vulputate turpis. Aenean congue dictum ipsum nec efficitur. Nam
-            suscipit odio et mattis rhoncus. Ut nulla lectus, aliquet eu pretium eu, suscipit scelerisque mi. Donec
-            blandit arcu at arcu pretium, id congue neque lobortis. Morbi efficitur lorem at congue gravida. Integer
-            semper blandit odio, a consectetur nisi rhoncus dapibus. Nam eu elementum magna. Curabitur eget convallis
-            nibh. Sed interdum eros non feugiat tristique. Suspendisse volutpat mi quis purus blandit rhoncus. Sed nec
-            lobortis felis. Quisque scelerisque massa quis purus accumsan vestibulum non tempus turpis. Nam fringilla
-            facilisis tortor id ultrices. Donec hendrerit efficitur leo, convallis tempor lorem maximus at. Vivamus
-            gravida nunc ex, eu pulvinar arcu tincidunt consectetur. Quisque cursus elit vitae massa molestie cursus
-            eget hendrerit massa. Sed accumsan nibh nisi, vitae condimentum tortor tempus non. Aenean pulvinar orci
-            augue, sit amet porta urna porttitor id. Sed mollis interdum dui sit amet viverra. Vestibulum sed vulputate
-            odio, vel fermentum ligula. Morbi laoreet a nisl ac sollicitudin. Orci varius natoque penatibus et magnis
-            dis parturient montes, nascetur ridiculus mus. Nam cursus pulvinar efficitur. Sed eget ante tortor. Integer
-            vel dui vel est rutrum gravida. Curabitur elementum placerat tempor. Quisque rutrum finibus iaculis.
-            Pellentesque vulputate egestas ligula, at interdum nibh lobortis vel. Proin lectus ipsum, gravida id
-            vehicula a, pretium quis urna. Maecenas eget sem tincidunt, pharetra urna feugiat, finibus mi. Maecenas
-            efficitur, magna at lobortis ullamcorper, dui libero venenatis urna, nec luctus velit justo id sem. Nam
-            convallis feugiat eros in interdum. Proin in odio ultrices, eleifend libero a, lacinia nisl. Aliquam erat
-            volutpat. Mauris lacinia nulla massa, sed scelerisque ipsum scelerisque ut. Cras mollis erat id interdum
-            porttitor. Nulla a sodales elit. Integer viverra elit at nulla cursus, ac fringilla neque ornare. Cras
-            posuere et mi non rutrum. Cras placerat felis non placerat tempor. Mauris eget lectus dictum, euismod arcu
-            et, elementum massa.Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque luctus urna id dui
-            maximus iaculis. Vivamus lacinia sodales consectetur. Praesent finibus, felis ac lobortis egestas, purus
-            ligula hendrerit odio, id fringilla ligula velit ut magna. Quisque eget nisi in augue interdum faucibus. In
-            consectetur suscipit tincidunt. Quisque sed est velit. Proin tempor purus vel justo sollicitudin, eu
-            vestibulum lacus viverra. Phasellus malesuada fermentum ultrices. Fusce eget dui pharetra, varius mi ac,
-            tincidunt risus. Pellentesque id posuere tellus. Nulla sed quam vitae dui pellentesque finibus. Donec non
-            nisl felis. Nullam aliquet congue tempus. Cras hendrerit neque quis enim malesuada viverra. Fusce vel dolor
-            id nisi convallis elementum. Aliquam ut est magna. Etiam egestas molestie pretium. Nunc tristique odio eu
-            eros vulputate, quis consequat tortor viverra. Donec ultricies luctus massa, in mattis orci molestie in.
-            Morbi sagittis consectetur diam. In sed metus ut diam cursus placerat nec sed urna. Donec eu vehicula
-            lectus. Nullam consectetur posuere turpis, nec porttitor arcu sollicitudin eu. Nunc placerat velit quam, nec
-            auctor odio cursus viverra. Donec quis aliquam ipsum. Etiam quis blandit sapien. Maecenas fermentum laoreet
-            volutpat. In ut semper erat. Aenean semper leo lorem, non molestie risus congue eu. In varius ligula eu
-            pretium tempor. Morbi in quam efficitur, commodo ligula sed, pulvinar ex. Donec semper, ex vel sagittis
-            pulvinar, ex neque ornare leo, eget euismod lacus lorem ac tellus. Nullam congue feugiat sem nec lobortis.
-            Phasellus consectetur sollicitudin bibendum. Suspendisse tortor nisi, pretium eget tincidunt quis,
-            pellentesque ac magna. Proin ac nisi quis elit porta imperdiet sed eget nisl. Cras feugiat auctor risus, vel
-            scelerisque mi pulvinar quis. Nulla molestie vestibulum velit. Vestibulum porttitor ipsum purus, non aliquet
-            felis porta vel. Suspendisse imperdiet posuere odio, in vehicula elit feugiat vitae. Pellentesque vulputate
-            fermentum egestas. In finibus lorem rutrum ornare placerat. Sed id nunc quis erat venenatis dapibus. Quisque
-            sed diam in nibh finibus rhoncus vitae id nisi. Morbi luctus nulla vitae lobortis efficitur. Etiam mollis
-            nisl a dolor venenatis, vitae luctus erat pulvinar. Suspendisse enim nisl, lobortis id tortor ut, egestas
-            placerat ipsum. Phasellus eros justo, sodales et dui quis, accumsan tincidunt justo. Vestibulum ante ipsum
-            primis in faucibus orci luctus et ultrices posuere cubilia curae; Phasellus semper enim nec consectetur
-            facilisis. Sed facilisis, ipsum vel ornare consequat, eros lacus vestibulum erat, quis mollis metus orci et
-            lorem. Donec augue nulla, auctor efficitur turpis quis, hendrerit interdum metus. In ultricies, elit vel
-            tincidunt iaculis, est enim aliquet augue, quis egestas metus libero at dui. Sed venenatis ipsum massa, in
-            pulvinar arcu pretium nec. Nullam elementum malesuada tristique. Proin vel est quis dui consequat pretium.
-            Etiam ac magna libero. In a odio ante. Vestibulum ac nibh mollis, viverra massa sit amet, cursus tortor.
-            Duis porta risus ut luctus ultricies. Praesent convallis turpis nisl, vitae commodo purus varius et.
-            Maecenas ac nunc dapibus, iaculis velit at, maximus mauris. Ut nibh ipsum, euismod at dui molestie, mollis
-            sollicitudin dolor. Duis eleifend sollicitudin pretium. Duis semper ante condimentum ipsum hendrerit, id
-            sollicitudin sapien pellentesque. Suspendisse nec pulvinar ante. Suspendisse augue ante, euismod non ornare
-            in, fermentum non ipsum. Nulla suscipit, augue pellentesque pharetra volutpat, erat ipsum posuere elit, et
-            ullamcorper eros nisi in elit. Suspendisse massa erat, gravida at dui ut, porttitor aliquam eros. Donec
-            risus ex, iaculis vitae mi ac, molestie vulputate turpis. Aenean congue dictum ipsum nec efficitur. Nam
-            suscipit odio et mattis rhoncus. Ut nulla lectus, aliquet eu pretium eu, suscipit scelerisque mi. Donec
-            blandit arcu at arcu pretium, id congue neque lobortis. Morbi efficitur lorem at congue gravida. Integer
-            semper blandit odio, a consectetur nisi rhoncus dapibus. Nam eu elementum magna. Curabitur eget convallis
-            nibh. Sed interdum eros non feugiat tristique. Suspendisse volutpat mi quis purus blandit rhoncus. Sed nec
-            lobortis felis. Quisque scelerisque massa quis purus accumsan vestibulum non tempus turpis. Nam fringilla
-            facilisis tortor id ultrices. Donec hendrerit efficitur leo, convallis tempor lorem maximus at. Vivamus
-            gravida nunc ex, eu pulvinar arcu tincidunt consectetur. Quisque cursus elit vitae massa molestie cursus
-            eget hendrerit massa. Sed accumsan nibh nisi, vitae condimentum tortor tempus non. Aenean pulvinar orci
-            augue, sit amet porta urna porttitor id. Sed mollis interdum dui sit amet viverra. Vestibulum sed vulputate
-            odio, vel fermentum ligula. Morbi laoreet a nisl ac sollicitudin. Orci varius natoque penatibus et magnis
-            dis parturient montes, nascetur ridiculus mus. Nam cursus pulvinar efficitur. Sed eget ante tortor. Integer
-            vel dui vel est rutrum gravida. Curabitur elementum placerat tempor. Quisque rutrum finibus iaculis.
-            Pellentesque vulputate egestas ligula, at interdum nibh lobortis vel. Proin lectus ipsum, gravida id
-            vehicula a, pretium quis urna. Maecenas eget sem tincidunt, pharetra urna feugiat, finibus mi. Maecenas
-            efficitur, magna at lobortis ullamcorper, dui libero venenatis urna, nec luctus velit justo id sem. Nam
-            convallis feugiat eros in interdum. Proin in odio ultrices, eleifend libero a, lacinia nisl. Aliquam erat
-            volutpat. Mauris lacinia nulla massa, sed scelerisque ipsum scelerisque ut. Cras mollis erat id interdum
-            porttitor. Nulla a sodales elit. Integer viverra elit at nulla cursus, ac fringilla neque ornare. Cras
-            posuere et mi non rutrum. Cras placerat felis non placerat tempor. Mauris eget lectus dictum, euismod arcu
-            et, elementum massa.Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque luctus urna id dui
-            maximus iaculis. Vivamus lacinia sodales consectetur. Praesent finibus, felis ac lobortis egestas, purus
-            ligula hendrerit odio, id fringilla ligula velit ut magna. Quisque eget nisi in augue interdum faucibus. In
-            consectetur suscipit tincidunt. Quisque sed est velit. Proin tempor purus vel justo sollicitudin, eu
-            vestibulum lacus viverra. Phasellus malesuada fermentum ultrices. Fusce eget dui pharetra, varius mi ac,
-            tincidunt risus. Pellentesque id posuere tellus. Nulla sed quam vitae dui pellentesque finibus. Donec non
-            nisl felis. Nullam aliquet congue tempus. Cras hendrerit neque quis enim malesuada viverra. Fusce vel dolor
-            id nisi convallis elementum. Aliquam ut est magna. Etiam egestas molestie pretium. Nunc tristique odio eu
-            eros vulputate, quis consequat tortor viverra. Donec ultricies luctus massa, in mattis orci molestie in.
-            Morbi sagittis consectetur diam. In sed metus ut diam cursus placerat nec sed urna. Donec eu vehicula
-            lectus. Nullam consectetur posuere turpis, nec porttitor arcu sollicitudin eu. Nunc placerat velit quam, nec
-            auctor odio cursus viverra. Donec quis aliquam ipsum. Etiam quis blandit sapien. Maecenas fermentum laoreet
-            volutpat. In ut semper erat. Aenean semper leo lorem, non molestie risus congue eu. In varius ligula eu
-            pretium tempor. Morbi in quam efficitur, commodo ligula sed, pulvinar ex. Donec semper, ex vel sagittis
-            pulvinar, ex neque ornare leo, eget euismod lacus lorem ac tellus. Nullam congue feugiat sem nec lobortis.
-            Phasellus consectetur sollicitudin bibendum. Suspendisse tortor nisi, pretium eget tincidunt quis,
-            pellentesque ac magna. Proin ac nisi quis elit porta imperdiet sed eget nisl. Cras feugiat auctor risus, vel
-            scelerisque mi pulvinar quis. Nulla molestie vestibulum velit. Vestibulum porttitor ipsum purus, non aliquet
-            felis porta vel. Suspendisse imperdiet posuere odio, in vehicula elit feugiat vitae. Pellentesque vulputate
-            fermentum egestas. In finibus lorem rutrum ornare placerat. Sed id nunc quis erat venenatis dapibus. Quisque
-            sed diam in nibh finibus rhoncus vitae id nisi. Morbi luctus nulla vitae lobortis efficitur. Etiam mollis
-            nisl a dolor venenatis, vitae luctus erat pulvinar. Suspendisse enim nisl, lobortis id tortor ut, egestas
-            placerat ipsum. Phasellus eros justo, sodales et dui quis, accumsan tincidunt justo. Vestibulum ante ipsum
-            primis in faucibus orci luctus et ultrices posuere cubilia curae; Phasellus semper enim nec consectetur
-            facilisis. Sed facilisis, ipsum vel ornare consequat, eros lacus vestibulum erat, quis mollis metus orci et
-            lorem. Donec augue nulla, auctor efficitur turpis quis, hendrerit interdum metus. In ultricies, elit vel
-            tincidunt iaculis, est enim aliquet augue, quis egestas metus libero at dui. Sed venenatis ipsum massa, in
-            pulvinar arcu pretium nec. Nullam elementum malesuada tristique. Proin vel est quis dui consequat pretium.
-            Etiam ac magna libero. In a odio ante. Vestibulum ac nibh mollis, viverra massa sit amet, cursus tortor.
-            Duis porta risus ut luctus ultricies. Praesent convallis turpis nisl, vitae commodo purus varius et.
-            Maecenas ac nunc dapibus, iaculis velit at, maximus mauris. Ut nibh ipsum, euismod at dui molestie, mollis
-            sollicitudin dolor. Duis eleifend sollicitudin pretium. Duis semper ante condimentum ipsum hendrerit, id
-            sollicitudin sapien pellentesque. Suspendisse nec pulvinar ante. Suspendisse augue ante, euismod non ornare
-            in, fermentum non ipsum. Nulla suscipit, augue pellentesque pharetra volutpat, erat ipsum posuere elit, et
-            ullamcorper eros nisi in elit. Suspendisse massa erat, gravida at dui ut, porttitor aliquam eros. Donec
-            risus ex, iaculis vitae mi ac, molestie vulputate turpis. Aenean congue dictum ipsum nec efficitur. Nam
-            suscipit odio et mattis rhoncus. Ut nulla lectus, aliquet eu pretium eu, suscipit scelerisque mi. Donec
-            blandit arcu at arcu pretium, id congue neque lobortis. Morbi efficitur lorem at congue gravida. Integer
-            semper blandit odio, a consectetur nisi rhoncus dapibus. Nam eu elementum magna. Curabitur eget convallis
-            nibh. Sed interdum eros non feugiat tristique. Suspendisse volutpat mi quis purus blandit rhoncus. Sed nec
-            lobortis felis. Quisque scelerisque massa quis purus accumsan vestibulum non tempus turpis. Nam fringilla
-            facilisis tortor id ultrices. Donec hendrerit efficitur leo, convallis tempor lorem maximus at. Vivamus
-            gravida nunc ex, eu pulvinar arcu tincidunt consectetur. Quisque cursus elit vitae massa molestie cursus
-            eget hendrerit massa. Sed accumsan nibh nisi, vitae condimentum tortor tempus non. Aenean pulvinar orci
-            augue, sit amet porta urna porttitor id. Sed mollis interdum dui sit amet viverra. Vestibulum sed vulputate
-            odio, vel fermentum ligula. Morbi laoreet a nisl ac sollicitudin. Orci varius natoque penatibus et magnis
-            dis parturient montes, nascetur ridiculus mus. Nam cursus pulvinar efficitur. Sed eget ante tortor. Integer
-            vel dui vel est rutrum gravida. Curabitur elementum placerat tempor. Quisque rutrum finibus iaculis.
-            Pellentesque vulputate egestas ligula, at interdum nibh lobortis vel. Proin lectus ipsum, gravida id
-            vehicula a, pretium quis urna. Maecenas eget sem tincidunt, pharetra urna feugiat, finibus mi. Maecenas
-            efficitur, magna at lobortis ullamcorper, dui libero venenatis urna, nec luctus velit justo id sem. Nam
-            convallis feugiat eros in interdum. Proin in odio ultrices, eleifend libero a, lacinia nisl. Aliquam erat
-            volutpat. Mauris lacinia nulla massa, sed scelerisque ipsum scelerisque ut. Cras mollis erat id interdum
-            porttitor. Nulla a sodales elit. Integer viverra elit at nulla cursus, ac fringilla neque ornare. Cras
-            posuere et mi non rutrum. Cras placerat felis non placerat tempor. Mauris eget lectus dictum, euismod arcu
-            et, elementum massa.Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque luctus urna id dui
-            maximus iaculis. Vivamus lacinia sodales consectetur. Praesent finibus, felis ac lobortis egestas, purus
-            ligula hendrerit odio, id fringilla ligula velit ut magna. Quisque eget nisi in augue interdum faucibus. In
-            consectetur suscipit tincidunt. Quisque sed est velit. Proin tempor purus vel justo sollicitudin, eu
-            vestibulum lacus viverra. Phasellus malesuada fermentum ultrices. Fusce eget dui pharetra, varius mi ac,
-            tincidunt risus. Pellentesque id posuere tellus. Nulla sed quam vitae dui pellentesque finibus. Donec non
-            nisl felis. Nullam aliquet congue tempus. Cras hendrerit neque quis enim malesuada viverra. Fusce vel dolor
-            id nisi convallis elementum. Aliquam ut est magna. Etiam egestas molestie pretium. Nunc tristique odio eu
-            eros vulputate, quis consequat tortor viverra. Donec ultricies luctus massa, in mattis orci molestie in.
-            Morbi sagittis consectetur diam. In sed metus ut diam cursus placerat nec sed urna. Donec eu vehicula
-            lectus. Nullam consectetur posuere turpis, nec porttitor arcu sollicitudin eu. Nunc placerat velit quam, nec
-            auctor odio cursus viverra. Donec quis aliquam ipsum. Etiam quis blandit sapien. Maecenas fermentum laoreet
-            volutpat. In ut semper erat. Aenean semper leo lorem, non molestie risus congue eu. In varius ligula eu
-            pretium tempor. Morbi in quam efficitur, commodo ligula sed, pulvinar ex. Donec semper, ex vel sagittis
-            pulvinar, ex neque ornare leo, eget euismod lacus lorem ac tellus. Nullam congue feugiat sem nec lobortis.
-            Phasellus consectetur sollicitudin bibendum. Suspendisse tortor nisi, pretium eget tincidunt quis,
-            pellentesque ac magna. Proin ac nisi quis elit porta imperdiet sed eget nisl. Cras feugiat auctor risus, vel
-            scelerisque mi pulvinar quis. Nulla molestie vestibulum velit. Vestibulum porttitor ipsum purus, non aliquet
-            felis porta vel. Suspendisse imperdiet posuere odio, in vehicula elit feugiat vitae. Pellentesque vulputate
-            fermentum egestas. In finibus lorem rutrum ornare placerat. Sed id nunc quis erat venenatis dapibus. Quisque
-            sed diam in nibh finibus rhoncus vitae id nisi. Morbi luctus nulla vitae lobortis efficitur. Etiam mollis
-            nisl a dolor venenatis, vitae luctus erat pulvinar. Suspendisse enim nisl, lobortis id tortor ut, egestas
-            placerat ipsum. Phasellus eros justo, sodales et dui quis, accumsan tincidunt justo. Vestibulum ante ipsum
-            primis in faucibus orci luctus et ultrices posuere cubilia curae; Phasellus semper enim nec consectetur
-            facilisis. Sed facilisis, ipsum vel ornare consequat, eros lacus vestibulum erat, quis mollis metus orci et
-            lorem. Donec augue nulla, auctor efficitur turpis quis, hendrerit interdum metus. In ultricies, elit vel
-            tincidunt iaculis, est enim aliquet augue, quis egestas metus libero at dui. Sed venenatis ipsum massa, in
-            pulvinar arcu pretium nec. Nullam elementum malesuada tristique. Proin vel est quis dui consequat pretium.
-            Etiam ac magna libero. In a odio ante. Vestibulum ac nibh mollis, viverra massa sit amet, cursus tortor.
-            Duis porta risus ut luctus ultricies. Praesent convallis turpis nisl, vitae commodo purus varius et.
-            Maecenas ac nunc dapibus, iaculis velit at, maximus mauris. Ut nibh ipsum, euismod at dui molestie, mollis
-            sollicitudin dolor. Duis eleifend sollicitudin pretium. Duis semper ante condimentum ipsum hendrerit, id
-            sollicitudin sapien pellentesque. Suspendisse nec pulvinar ante. Suspendisse augue ante, euismod non ornare
-            in, fermentum non ipsum. Nulla suscipit, augue pellentesque pharetra volutpat, erat ipsum posuere elit, et
-            ullamcorper eros nisi in elit. Suspendisse massa erat, gravida at dui ut, porttitor aliquam eros. Donec
-            risus ex, iaculis vitae mi ac, molestie vulputate turpis. Aenean congue dictum ipsum nec efficitur. Nam
-            suscipit odio et mattis rhoncus. Ut nulla lectus, aliquet eu pretium eu, suscipit scelerisque mi. Donec
-            blandit arcu at arcu pretium, id congue neque lobortis. Morbi efficitur lorem at congue gravida. Integer
-            semper blandit odio, a consectetur nisi rhoncus dapibus. Nam eu elementum magna. Curabitur eget convallis
-            nibh. Sed interdum eros non feugiat tristique. Suspendisse volutpat mi quis purus blandit rhoncus. Sed nec
-            lobortis felis. Quisque scelerisque massa quis purus accumsan vestibulum non tempus turpis. Nam fringilla
-            facilisis tortor id ultrices. Donec hendrerit efficitur leo, convallis tempor lorem maximus at. Vivamus
-            gravida nunc ex, eu pulvinar arcu tincidunt consectetur. Quisque cursus elit vitae massa molestie cursus
-            eget hendrerit massa. Sed accumsan nibh nisi, vitae condimentum tortor tempus non. Aenean pulvinar orci
-            augue, sit amet porta urna porttitor id. Sed mollis interdum dui sit amet viverra. Vestibulum sed vulputate
-            odio, vel fermentum ligula. Morbi laoreet a nisl ac sollicitudin. Orci varius natoque penatibus et magnis
-            dis parturient montes, nascetur ridiculus mus. Nam cursus pulvinar efficitur. Sed eget ante tortor. Integer
-            vel dui vel est rutrum gravida. Curabitur elementum placerat tempor. Quisque rutrum finibus iaculis.
-            Pellentesque vulputate egestas ligula, at interdum nibh lobortis vel. Proin lectus ipsum, gravida id
-            vehicula a, pretium quis urna. Maecenas eget sem tincidunt, pharetra urna feugiat, finibus mi. Maecenas
-            efficitur, magna at lobortis ullamcorper, dui libero venenatis urna, nec luctus velit justo id sem. Nam
-            convallis feugiat eros in interdum. Proin in odio ultrices, eleifend libero a, lacinia nisl. Aliquam erat
-            volutpat. Mauris lacinia nulla massa, sed scelerisque ipsum scelerisque ut. Cras mollis erat id interdum
-            porttitor. Nulla a sodales elit. Integer viverra elit at nulla cursus, ac fringilla neque ornare. Cras
-            posuere et mi non rutrum. Cras placerat felis non placerat tempor. Mauris eget lectus dictum, euismod arcu
-            et, elementum massa.Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque luctus urna id dui
-            maximus iaculis. Vivamus lacinia sodales consectetur. Praesent finibus, felis ac lobortis egestas, purus
-            ligula hendrerit odio, id fringilla ligula velit ut magna. Quisque eget nisi in augue interdum faucibus. In
-            consectetur suscipit tincidunt. Quisque sed est velit. Proin tempor purus vel justo sollicitudin, eu
-            vestibulum lacus viverra. Phasellus malesuada fermentum ultrices. Fusce eget dui pharetra, varius mi ac,
-            tincidunt risus. Pellentesque id posuere tellus. Nulla sed quam vitae dui pellentesque finibus. Donec non
-            nisl felis. Nullam aliquet congue tempus. Cras hendrerit neque quis enim malesuada viverra. Fusce vel dolor
-            id nisi convallis elementum. Aliquam ut est magna. Etiam egestas molestie pretium. Nunc tristique odio eu
-            eros vulputate, quis consequat tortor viverra. Donec ultricies luctus massa, in mattis orci molestie in.
-            Morbi sagittis consectetur diam. In sed metus ut diam cursus placerat nec sed urna. Donec eu vehicula
-            lectus. Nullam consectetur posuere turpis, nec porttitor arcu sollicitudin eu. Nunc placerat velit quam, nec
-            auctor odio cursus viverra. Donec quis aliquam ipsum. Etiam quis blandit sapien. Maecenas fermentum laoreet
-            volutpat. In ut semper erat. Aenean semper leo lorem, non molestie risus congue eu. In varius ligula eu
-            pretium tempor. Morbi in quam efficitur, commodo ligula sed, pulvinar ex. Donec semper, ex vel sagittis
-            pulvinar, ex neque ornare leo, eget euismod lacus lorem ac tellus. Nullam congue feugiat sem nec lobortis.
-            Phasellus consectetur sollicitudin bibendum. Suspendisse tortor nisi, pretium eget tincidunt quis,
-            pellentesque ac magna. Proin ac nisi quis elit porta imperdiet sed eget nisl. Cras feugiat auctor risus, vel
-            scelerisque mi pulvinar quis. Nulla molestie vestibulum velit. Vestibulum porttitor ipsum purus, non aliquet
-            felis porta vel. Suspendisse imperdiet posuere odio, in vehicula elit feugiat vitae. Pellentesque vulputate
-            fermentum egestas. In finibus lorem rutrum ornare placerat. Sed id nunc quis erat venenatis dapibus. Quisque
-            sed diam in nibh finibus rhoncus vitae id nisi. Morbi luctus nulla vitae lobortis efficitur. Etiam mollis
-            nisl a dolor venenatis, vitae luctus erat pulvinar. Suspendisse enim nisl, lobortis id tortor ut, egestas
-            placerat ipsum. Phasellus eros justo, sodales et dui quis, accumsan tincidunt justo. Vestibulum ante ipsum
-            primis in faucibus orci luctus et ultrices posuere cubilia curae; Phasellus semper enim nec consectetur
-            facilisis. Sed facilisis, ipsum vel ornare consequat, eros lacus vestibulum erat, quis mollis metus orci et
-            lorem. Donec augue nulla, auctor efficitur turpis quis, hendrerit interdum metus. In ultricies, elit vel
-            tincidunt iaculis, est enim aliquet augue, quis egestas metus libero at dui. Sed venenatis ipsum massa, in
-            pulvinar arcu pretium nec. Nullam elementum malesuada tristique. Proin vel est quis dui consequat pretium.
-            Etiam ac magna libero. In a odio ante. Vestibulum ac nibh mollis, viverra massa sit amet, cursus tortor.
-            Duis porta risus ut luctus ultricies. Praesent convallis turpis nisl, vitae commodo purus varius et.
-            Maecenas ac nunc dapibus, iaculis velit at, maximus mauris. Ut nibh ipsum, euismod at dui molestie, mollis
-            sollicitudin dolor. Duis eleifend sollicitudin pretium. Duis semper ante condimentum ipsum hendrerit, id
-            sollicitudin sapien pellentesque. Suspendisse nec pulvinar ante. Suspendisse augue ante, euismod non ornare
-            in, fermentum non ipsum. Nulla suscipit, augue pellentesque pharetra volutpat, erat ipsum posuere elit, et
-            ullamcorper eros nisi in elit. Suspendisse massa erat, gravida at dui ut, porttitor aliquam eros. Donec
-            risus ex, iaculis vitae mi ac, molestie vulputate turpis. Aenean congue dictum ipsum nec efficitur. Nam
-            suscipit odio et mattis rhoncus. Ut nulla lectus, aliquet eu pretium eu, suscipit scelerisque mi. Donec
-            blandit arcu at arcu pretium, id congue neque lobortis. Morbi efficitur lorem at congue gravida. Integer
-            semper blandit odio, a consectetur nisi rhoncus dapibus. Nam eu elementum magna. Curabitur eget convallis
-            nibh. Sed interdum eros non feugiat tristique. Suspendisse volutpat mi quis purus blandit rhoncus. Sed nec
-            lobortis felis. Quisque scelerisque massa quis purus accumsan vestibulum non tempus turpis. Nam fringilla
-            facilisis tortor id ultrices. Donec hendrerit efficitur leo, convallis tempor lorem maximus at. Vivamus
-            gravida nunc ex, eu pulvinar arcu tincidunt consectetur. Quisque cursus elit vitae massa molestie cursus
-            eget hendrerit massa. Sed accumsan nibh nisi, vitae condimentum tortor tempus non. Aenean pulvinar orci
-            augue, sit amet porta urna porttitor id. Sed mollis interdum dui sit amet viverra. Vestibulum sed vulputate
-            odio, vel fermentum ligula. Morbi laoreet a nisl ac sollicitudin. Orci varius natoque penatibus et magnis
-            dis parturient montes, nascetur ridiculus mus. Nam cursus pulvinar efficitur. Sed eget ante tortor. Integer
-            vel dui vel est rutrum gravida. Curabitur elementum placerat tempor. Quisque rutrum finibus iaculis.
-            Pellentesque vulputate egestas ligula, at interdum nibh lobortis vel. Proin lectus ipsum, gravida id
-            vehicula a, pretium quis urna. Maecenas eget sem tincidunt, pharetra urna feugiat, finibus mi. Maecenas
-            efficitur, magna at lobortis ullamcorper, dui libero venenatis urna, nec luctus velit justo id sem. Nam
-            convallis feugiat eros in interdum. Proin in odio ultrices, eleifend libero a, lacinia nisl. Aliquam erat
-            volutpat. Mauris lacinia nulla massa, sed scelerisque ipsum scelerisque ut. Cras mollis erat id interdum
-            porttitor. Nulla a sodales elit. Integer viverra elit at nulla cursus, ac fringilla neque ornare. Cras
-            posuere et mi non rutrum. Cras placerat felis non placerat tempor. Mauris eget lectus dictum, euismod arcu
-            et, elementum massa.
+                </div>
+            </section>
         </div>
     </AdminLayout>
 </template>
