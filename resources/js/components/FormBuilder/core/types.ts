@@ -242,6 +242,10 @@ export interface ColorSelectorFieldConfig extends BaseFieldConfig {
     colors?: string[];
     /** Tone steps to display. Defaults to [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]. */
     tones?: number[];
+    /** Output format for emitted value. Defaults to 'name'. */
+    format?: 'hex' | 'name' | 'name-tone';
+    /** Default tone when format requires one. Defaults to 500. */
+    defaultTone?: number;
 }
 
 export interface SlotFieldConfig extends BaseFieldConfig {

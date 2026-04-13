@@ -223,10 +223,14 @@
         },
     };
 
+    type ColorFormat = 'hex' | 'name' | 'name-tone';
+
     interface Props {
         modelValue?: string;
         colors?: string[];
         tones?: number[];
+        format?: ColorFormat;
+        defaultTone?: number;
         disabled?: boolean;
         invalid?: boolean;
     }
@@ -253,6 +257,8 @@
             'rose',
         ],
         tones: () => [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950],
+        format: 'name',
+        defaultTone: 500,
         disabled: false,
         invalid: false,
     });
@@ -261,45 +267,175 @@
         'update:modelValue': [value: string];
     }>();
 
-    const selectedColor = computed<string>({
-        get: () => props.modelValue,
-        set: (value) => emit('update:modelValue', value),
+    const selectedColor = ref<string>('');
+    const selectedTone = ref<number>(props.defaultTone);
+
+    function findByHex(hex: string): { color: string; tone: number } | null {
+        const normalized = hex.toLowerCase();
+        for (const [name, palette] of Object.entries(COLOR_PALETTE)) {
+            for (const [tone, value] of Object.entries(palette)) {
+                if (value.toLowerCase() === normalized) {
+                    return { color: name, tone: Number(tone) };
+                }
+            }
+        }
+        return null;
+    }
+
+    function parseModelValue(value: string): void {
+        if (!value) {
+            selectedColor.value = '';
+            selectedTone.value = props.defaultTone;
+            return;
+        }
+        if (props.format === 'name') {
+            selectedColor.value = value;
+            selectedTone.value = props.defaultTone;
+            return;
+        }
+        if (props.format === 'name-tone') {
+            const idx = value.lastIndexOf('-');
+            const tonePart = Number(value.slice(idx + 1));
+            if (idx > 0 && !Number.isNaN(tonePart)) {
+                selectedColor.value = value.slice(0, idx);
+                selectedTone.value = tonePart;
+            } else {
+                selectedColor.value = value;
+                selectedTone.value = props.defaultTone;
+            }
+            return;
+        }
+        const match = findByHex(value);
+        if (match) {
+            selectedColor.value = match.color;
+            selectedTone.value = match.tone;
+        } else {
+            selectedColor.value = '';
+            selectedTone.value = props.defaultTone;
+        }
+    }
+
+    function computeEmitValue(): string {
+        if (!selectedColor.value) {
+            return '';
+        }
+        if (props.format === 'name') {
+            return selectedColor.value;
+        }
+        if (props.format === 'name-tone') {
+            return `${selectedColor.value}-${selectedTone.value}`;
+        }
+        return COLOR_PALETTE[selectedColor.value]?.[selectedTone.value] ?? '';
+    }
+
+    parseModelValue(props.modelValue);
+
+    watch(
+        () => props.modelValue,
+        (value) => {
+            if (value !== computeEmitValue()) {
+                parseModelValue(value);
+            }
+        },
+    );
+
+    function updateColor(value: string): void {
+        selectedColor.value = value;
+        emit('update:modelValue', computeEmitValue());
+    }
+
+    function updateTone(tone: number): void {
+        if (props.format === 'name') {
+            return;
+        }
+        selectedTone.value = tone;
+        emit('update:modelValue', computeEmitValue());
+    }
+
+    const showToneSelector = computed<boolean>(() => props.format !== 'name');
+
+    const selectionLabel = computed<string>(() => {
+        if (!selectedColor.value) {
+            return '';
+        }
+        if (props.format === 'hex') {
+            return COLOR_PALETTE[selectedColor.value]?.[selectedTone.value] ?? '';
+        }
+        return `${selectedColor.value}-${selectedTone.value}`;
     });
 
     function getToneStyle(color: string, tone: number): Record<string, string> {
         const hex = COLOR_PALETTE[color]?.[tone] ?? 'transparent';
         return { backgroundColor: hex, outlineColor: hex };
     }
+
+    function isToneActive(color: string, tone: number): boolean {
+        return selectedColor.value === color && selectedTone.value === tone;
+    }
 </script>
 
 <template>
-    <Select v-model="selectedColor" :options="colors" :disabled="disabled" :invalid="invalid" class="w-full">
-        <template #option="slotProps">
-            <div class="flex items-center gap-3 w-full">
-                <span class="flex-1 capitalize">{{ slotProps.option }}</span>
-                <ul class="flex gap-1">
-                    <li
-                        v-for="tone in tones"
-                        :key="`option-${String(slotProps.option)}-${tone}`"
-                        class="size-4 rounded-full border-2 border-white outline-1 dark:border-surface-800"
-                        :style="getToneStyle(String(slotProps.option), tone)"
+    <div class="flex flex-col gap-2">
+        <Select
+            :model-value="selectedColor"
+            :options="colors"
+            :disabled="disabled"
+            :invalid="invalid"
+            class="w-full"
+            @update:model-value="updateColor"
+        >
+            <template #option="slotProps">
+                <div class="flex items-center gap-3 w-full">
+                    <span class="flex-1 capitalize">{{ slotProps.option }}</span>
+                    <ul class="flex gap-1">
+                        <li
+                            v-for="tone in tones"
+                            :key="`option-${String(slotProps.option)}-${tone}`"
+                            class="size-4 rounded-full border-2 border-white outline-1 dark:border-surface-800"
+                            :style="getToneStyle(String(slotProps.option), tone)"
+                        />
+                    </ul>
+                </div>
+            </template>
+            <template #value="slotProps">
+                <div v-if="slotProps.value" class="flex items-center gap-3 w-full">
+                    <span class="flex-1 capitalize">{{ slotProps.value }}</span>
+                    <ul class="flex gap-1">
+                        <li
+                            v-for="tone in tones"
+                            :key="`value-${String(slotProps.value)}-${tone}`"
+                            class="size-4 rounded-full border-2 border-white outline-1 dark:border-surface-800"
+                            :style="getToneStyle(String(slotProps.value), tone)"
+                        />
+                    </ul>
+                </div>
+                <span v-else class="text-surface-400">Select a color</span>
+            </template>
+        </Select>
+
+        <div
+            v-if="showToneSelector && selectedColor"
+            class="flex items-center gap-2 flex-wrap mt-2 border border-slate-300 rounded p-4 dark:border-surface-700"
+        >
+            <span class="font-bold text-surface-500 dark:text-surface-400 shrink-0">Tone:</span>
+            <ul class="flex gap-1.5 flex-wrap">
+                <li v-for="tone in tones" :key="`tone-${tone}`">
+                    <button
+                        type="button"
+                        class="size-6 rounded-full border-2 outline-1 transition"
+                        :class="
+                            isToneActive(selectedColor, tone)
+                                ? 'border-surface-900 dark:border-surface-0 scale-110'
+                                : 'border-white dark:border-surface-800'
+                        "
+                        :style="getToneStyle(selectedColor, tone)"
+                        :title="`${selectedColor}-${tone}`"
+                        :disabled="disabled"
+                        @click="updateTone(tone)"
                     />
-                </ul>
-            </div>
-        </template>
-        <template #value="slotProps">
-            <div v-if="slotProps.value" class="flex items-center gap-3 w-full">
-                <span class="flex-1 capitalize">{{ slotProps.value }}</span>
-                <ul class="flex gap-1">
-                    <li
-                        v-for="tone in tones"
-                        :key="`value-${String(slotProps.value)}-${tone}`"
-                        class="size-4 rounded-full border-2 border-white outline-1 dark:border-surface-800"
-                        :style="getToneStyle(String(slotProps.value), tone)"
-                    />
-                </ul>
-            </div>
-            <span v-else class="text-surface-400">Select a color</span>
-        </template>
-    </Select>
+                </li>
+            </ul>
+            <span class="text-surface-700 dark:text-surface-300 ml-1">{{ selectionLabel }}</span>
+        </div>
+    </div>
 </template>

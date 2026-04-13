@@ -2,67 +2,68 @@
 
 ![Tests](https://img.shields.io/badge/tests-passing-22c55e?style=flat-square)
 ![License](https://img.shields.io/badge/license-PolyForm--Noncommercial%201.0.0-f59e0b?style=flat-square)
-![Packagist Surum](https://img.shields.io/packagist/v/lvntr/laravel-starter-kit?style=flat-square&label=packagist)
+![Packagist Sürüm](https://img.shields.io/packagist/v/lvntr/laravel-starter-kit?style=flat-square&label=packagist)
 ![Downloads](https://img.shields.io/packagist/dt/lvntr/laravel-starter-kit?style=flat-square&label=downloads)
 
-Lvntr Starter Kit aktif olarak gelistiriliyor; her yeni surum onu daha olgun, daha kapsamli ve admin odakli bir Laravel platformuna donusturuyor.
+Lvntr Starter Kit aktif olarak geliştiriliyor; her yeni sürüm onu daha olgun, daha kapsamlı ve admin odaklı bir Laravel platformuna dönüştürüyor.
 
-Detayli kullanim dokumanlari: [kit-docs.lvntr.dev](https://kit-docs.lvntr.dev/)
+> **Web Sitesi & Dökümantasyon:** [starter-kit.lvntr.dev](https://starter-kit.lvntr.dev/)
+> Detaylı kullanım kılavuzları, örnekler ve referans dökümanlarının yer aldığı resmi web sitesi.
 
-**Laravel 13**, **Inertia.js v3**, **Vue 3**, **PrimeVue 4** ve **Tailwind CSS 4** ile olusturulmus, tam donanimli bir Laravel admin panel paketi. DDD (Domain-Driven Design) mimarisi ile rol tabanli yetkilendirme, aktivite kaydi, ayarlar yonetimi ve daha fazlasini icerir.
+**Laravel 13**, **Inertia.js v3**, **Vue 3**, **PrimeVue 4** ve **Tailwind CSS 4** ile oluşturulmuş, tam donanımlı bir Laravel admin panel paketi. DDD (Domain-Driven Design) mimarisi ile rol tabanlı yetkilendirme, aktivite kaydı, ayarlar yönetimi ve daha fazlasını içerir.
 
-## Ozellikler
+## Özellikler
 
 - **DDD Mimarisi** — Action'lar, DTO'lar, Query'ler, Event'ler, Listener'lar
-- **Rol ve Yetki Yonetimi** — Spatie Permission ile dinamik kaynak bazli yetkiler
-- **Kullanici Yonetimi** — Avatar yukleme, soft delete, 2FA destegi ile CRUD
-- **Aktivite Kaydi** — Spatie Activity Log ile gozatilabilir admin arayuzu
-- **Ayarlar Paneli** — Genel, Kimlik Dogrulama, Mail, Depolama ayarlari veritabaninda saklanir
-- **OAuth2 API** — Laravel Passport ile kisisel erisim tokenlari ve cihaz yetkilendirme
-- **Domain Iskelet Olusturucu** — `make:sk-domain` komutu ile interaktif tam DDD katmani
-- **FormBuilder / DatatableBuilder / TabBuilder** — Yeniden kullanilabilir Vue bilesen olusturuculari
-- **Coklu Dil Destegi** — Ceviri dosyalari dahil, kolayca genisletilebilir
-- **API Yanit Olusturucu** — Akici, tutarli API yanitlari ve sayfalama destegi
-- **Guvenlik Baslik Middleware** — X-Frame-Options, HSTS, CSP ve daha fazlasi
+- **Rol ve Yetki Yönetimi** — Spatie Permission ile dinamik kaynak bazlı yetkiler
+- **Kullanıcı Yönetimi** — Avatar yükleme, soft delete, 2FA desteği ile CRUD
+- **Aktivite Kaydı** — Spatie Activity Log ile gözatılabilir admin arayüzü
+- **Ayarlar Paneli** — Genel, Kimlik Doğrulama, Mail, Depolama ayarları veritabanında saklanır
+- **OAuth2 API** — Laravel Passport ile kişisel erişim tokenları ve cihaz yetkilendirme
+- **Domain İskelet Oluşturucu** — `make:sk-domain` komutu ile interaktif tam DDD katmanı
+- **FormBuilder / DatatableBuilder / TabBuilder** — Yeniden kullanılabilir Vue bileşen oluşturucuları
+- **Çoklu Dil Desteği** — Çeviri dosyaları dahil, kolayca genişletilebilir
+- **API Yanıt Oluşturucu** — Akıcı, tutarlı API yanıtları ve sayfalama desteği
+- **Güvenlik Başlık Middleware** — X-Frame-Options, HSTS, CSP ve daha fazlası
 
-## Teknoloji Yigini
+## Teknoloji Yığını
 
 ### Backend (PHP / Composer)
 
-| Paket                    | Amac                                                                          |
+| Paket                    | Amaç                                                                          |
 | ------------------------ | ----------------------------------------------------------------------------- |
-| **Laravel 13**           | Cekirdek framework (constraint: `^13.0`)                                      |
-| **Inertia.js v3**        | Sunucu tabanli SPA — backend ile frontend arasinda API katmanina gerek yok    |
-| **Laravel Fortify**      | Kimlik dogrulama altyapisi (giris, kayit, 2FA, sifre sifirlama)               |
-| **Laravel Passport**     | OAuth2 API kimlik dogrulamasi (kisisel erisim tokenlari, cihaz yetkilendirme) |
-| **Laravel Wayfinder**    | TypeScript icin tip-guvenli rota olusturma                                    |
-| **Spatie Permission**    | Dinamik kaynak bazli yetkilerle rol ve yetki yonetimi                         |
-| **Spatie Activity Log**  | Gozatilabilir admin arayuzu ile model aktivite kaydi                          |
-| **Spatie Media Library** | Dosya yuklemeleri ve medya koleksiyonlari (avatarlar, ekler)                  |
-| **Spatie Query Builder** | Sorgu dizisi uzerinden filtreleme, siralama ve iliski dahil etme              |
-| **Spatie Translatable**  | Coklu dil model ozellikleri (JSON tabanli)                                    |
+| **Laravel 13**           | Çekirdek framework (constraint: `^13.0`)                                      |
+| **Inertia.js v3**        | Sunucu tabanlı SPA — backend ile frontend arasında API katmanına gerek yok    |
+| **Laravel Fortify**      | Kimlik doğrulama altyapısı (giriş, kayıt, 2FA, şifre sıfırlama)               |
+| **Laravel Passport**     | OAuth2 API kimlik doğrulaması (kişisel erişim tokenları, cihaz yetkilendirme) |
+| **Laravel Wayfinder**    | TypeScript için tip-güvenli rota oluşturma                                    |
+| **Spatie Permission**    | Dinamik kaynak bazlı yetkilerle rol ve yetki yönetimi                         |
+| **Spatie Activity Log**  | Gözatılabilir admin arayüzü ile model aktivite kaydı                          |
+| **Spatie Media Library** | Dosya yüklemeleri ve medya koleksiyonları (avatarlar, ekler)                  |
+| **Spatie Query Builder** | Sorgu dizisi üzerinden filtreleme, sıralama ve ilişki dahil etme              |
+| **Spatie Translatable**  | Çoklu dil model özellikleri (JSON tabanlı)                                    |
 
 ### Frontend (Node / npm)
 
-| Paket                | Amac                                                         |
+| Paket                | Amaç                                                         |
 | -------------------- | ------------------------------------------------------------ |
 | **Vue 3**            | Reaktif UI framework                                         |
-| **PrimeVue 4**       | UI bilesen kutuphanesi (DataTable, Dialog, Toast, Menu, vb.) |
+| **PrimeVue 4**       | UI bileşen kütüphanesi (DataTable, Dialog, Toast, Menu, vb.) |
 | **Tailwind CSS 4**   | Utility-first CSS framework                                  |
-| **Inertia.js Vue 3** | Inertia SPA icin istemci tarafi adaptoru                     |
-| **VueUse**           | Vue composition yardimci araclari koleksiyonu                |
-| **laravel-vue-i18n** | Laravel ceviri dosyalarini dogrudan Vue'da kullanma          |
+| **Inertia.js Vue 3** | Inertia SPA için istemci tarafı adaptörü                     |
+| **VueUse**           | Vue composition yardımcı araçları koleksiyonu                |
+| **laravel-vue-i18n** | Laravel çeviri dosyalarını doğrudan Vue'da kullanma          |
 
-### Gelistirme Araclari
+### Geliştirme Araçları
 
-| Arac                    | Amac                                   |
+| Araç                    | Amaç                                   |
 | ----------------------- | -------------------------------------- |
-| **Vite**                | HMR ile frontend derleme araci         |
-| **TypeScript**          | Frontend kodu icin tip guvenligi       |
+| **Vite**                | HMR ile frontend derleme aracı         |
+| **TypeScript**          | Frontend kodu için tip güvenliği       |
 | **ESLint + Prettier**   | Kod linting ve formatlama              |
-| **Vitest**              | Vue bilesenleri icin birim testi       |
-| **Husky + lint-staged** | Kod kalitesi icin pre-commit hook'lari |
-| **Commitizen**          | Konvansiyonel commit mesajlari         |
+| **Vitest**              | Vue bileşenleri için birim testi       |
+| **Husky + lint-staged** | Kod kalitesi için pre-commit hook'ları |
+| **Commitizen**          | Konvansiyonel commit mesajları         |
 
 ## Gereksinimler
 
@@ -79,35 +80,35 @@ Detayli kullanim dokumanlari: [kit-docs.lvntr.dev](https://kit-docs.lvntr.dev/)
 composer require lvntr/laravel-starter-kit:^13.0
 ```
 
-### 2. Kurulum komutunu calistirin
+### 2. Kurulum komutunu çalıştırın
 
 ```bash
 php artisan sk:install
 ```
 
-Bu interaktif sihirbaz sunlari yapacak:
+Bu interaktif sihirbaz şunları yapacak:
 
-1. Tum uygulama iskelesini yayinlar (Controller'lar, Model'ler, Route'lar, Vue sayfalari, vb.)
-2. Paket yapilandirma dosyasini yayinlar
-3. Veritabani migration'larini calistirir
-4. Seeder'lari calistirir (Roller, Yetkiler, Tanimlar, Ayarlar)
-5. Passport sifreleme anahtarlarini olusturur
-6. Varsayilan admin kullanicisi olusturur
-7. npm bagimliliklerini yukler ve frontend'i derler
+1. Tüm uygulama iskelesini yayınlar (Controller'lar, Model'ler, Route'lar, Vue sayfaları, vb.)
+2. Paket yapılandırma dosyasını yayınlar
+3. Veritabanı migration'larını çalıştırır
+4. Seeder'ları çalıştırır (Roller, Yetkiler, Tanımlar, Ayarlar)
+5. Passport şifreleme anahtarlarını oluşturur
+6. Varsayılan admin kullanıcısı oluşturur
+7. npm bağımlılıklarını yükler ve frontend'i derler
 
-**Etkilesimsiz mod (CI/CD):**
+**Etkileşimsiz mod (CI/CD):**
 
 ```bash
 php artisan sk:install --no-interaction
 ```
 
-**Mevcut dosyalarin uzerine yaz:**
+**Mevcut dosyaların üzerine yaz:**
 
 ```bash
 php artisan sk:install --force
 ```
 
-### 3. `.env` dosyanizi yapilandirin
+### 3. `.env` dosyanızı yapılandırın
 
 ```env
 APP_NAME="Uygulamam"
@@ -119,84 +120,84 @@ DB_USERNAME=root
 DB_PASSWORD=
 ```
 
-### 4. Admin paneline erisin
+### 4. Admin paneline erişin
 
-Tarayicinizi acip uygulama URL'nize gidin. Kurulum sonrasi gosterilen admin bilgileriyle giris yapin (varsayilan: `admin@demo.com` / `password`).
+Tarayıcınızı açıp uygulama URL'nize gidin. Kurulum sonrası gösterilen admin bilgileriyle giriş yapın (varsayılan: `admin@demo.com` / `password`).
 
-## Guncelleme
+## Güncelleme
 
-Paketin yeni bir surumu yayinlandiginda:
+Paketin yeni bir sürümü yayınlandığında:
 
 ```bash
 composer update lvntr/laravel-starter-kit
 php artisan sk:update
 ```
 
-Guncelleme komutu dosyalari guvenli sekilde guncellemek icin **hash tabanli izleme sistemi** kullanir:
+Güncelleme komutu dosyaları güvenli şekilde güncellemek için **hash tabanlı izleme sistemi** kullanır:
 
-- **Cekirdek dosyalar** (BaseAction, BaseDTO, Trait'ler, Middleware, helper'lar) her zaman guncellenir
-- **Kullanici tarafindan degistirilebilir dosyalar** (Controller'lar, Sayfalar, Route'lar) sadece siz degistirmemisseniz guncellenir
+- **Çekirdek dosyalar** (BaseAction, BaseDTO, Trait'ler, Middleware, helper'lar) her zaman güncellenir
+- **Kullanıcı tarafından değiştirilebilir dosyalar** (Controller'lar, Sayfalar, Route'lar) sadece siz değiştirmemişseniz güncellenir
 - **Yeni dosyalar** paketten otomatik olarak eklenir
-- **Yeni migration'lar** tespit edilir ve istege bagli olarak calistirilir
+- **Yeni migration'lar** tespit edilir ve isteğe bağlı olarak çalıştırılır
 
-**Uygulamadan once degisiklikleri onizleyin:**
+**Uygulamadan önce değişiklikleri önizleyin:**
 
 ```bash
 php artisan sk:update --dry-run
 ```
 
-**Her seyi zorla guncelle (degisikliklerinizin uzerine yazar):**
+**Her şeyi zorla güncelle (değişikliklerinizin üzerine yazar):**
 
 ```bash
 php artisan sk:update --force
 ```
 
-## Istege Bagli Varliklari Yayinlama
+## İsteğe Bağlı Varlıkları Yayınlama
 
-Paket, Vue bilesenlerini, dil dosyalarini ve yapilandirmayi varsayilan olarak paketin icinde tutar. Ozellestirmeniz gerekiyorsa projenize yayinlayin:
+Paket, Vue bileşenlerini, dil dosyalarını ve yapılandırmayı varsayılan olarak paketin içinde tutar. Özelleştirmeniz gerekiyorsa projenize yayınlayın:
 
 ```bash
-# Interaktif secim
+# İnteraktif seçim
 php artisan sk:publish
 
-# Vue bilesenlerini yayinla (FormBuilder, DatatableBuilder, vb.)
+# Vue bileşenlerini yayınla (FormBuilder, DatatableBuilder, vb.)
 php artisan sk:publish --tag=components
 
-# Dil dosyalarini yayinla
+# Dil dosyalarını yayınla
 php artisan sk:publish --tag=lang
 
-# Yapilandirma dosyasini yayinla
+# Yapılandırma dosyasını yayınla
 php artisan sk:publish --tag=config
 ```
 
 ## Mevcut Komutlar
 
-| Komut              | Aciklama                                                        |
+| Komut              | Açıklama                                                        |
 | ------------------ | --------------------------------------------------------------- |
-| `sk:install`       | Tam kurulum sihirbazi                                           |
-| `sk:update`        | Kullanici degisikliklerini koruyarak paket dosyalarini guncelle |
-| `sk:upgrade`       | Onceki Laravel surumunden yukseltme                             |
-| `sk:publish`       | Ozellestirme icin istege bagli varliklari yayinla               |
-| `site:install`     | Veritabanini sifirla ve varsayilan verilerle yeniden kur        |
-| `make:sk-domain`   | Interaktif olarak eksiksiz bir DDD domain'i olustur             |
-| `remove:sk-domain` | Bir domain'i ve tum dosyalarini kaldir                          |
-| `env:sync`         | .env anahtarlarini .env.example ile senkronize et               |
+| `sk:install`       | Tam kurulum sihirbazı                                           |
+| `sk:update`        | Kullanıcı değişikliklerini koruyarak paket dosyalarını güncelle |
+| `sk:upgrade`       | Önceki Laravel sürümünden yükseltme                             |
+| `sk:publish`       | Özelleştirme için isteğe bağlı varlıkları yayınla               |
+| `site:install`     | Veritabanını sıfırla ve varsayılan verilerle yeniden kur        |
+| `make:sk-domain`   | İnteraktif olarak eksiksiz bir DDD domain'i oluştur             |
+| `remove:sk-domain` | Bir domain'i ve tüm dosyalarını kaldır                          |
+| `env:sync`         | .env anahtarlarını .env.example ile senkronize et               |
 
-### Domain Iskelet Olusturma
+### Domain İskelet Oluşturma
 
-Tum DDD katmanlariyla yeni bir domain olusturun:
+Tüm DDD katmanlarıyla yeni bir domain oluşturun:
 
 ```bash
-# Interaktif mod
+# İnteraktif mod
 php artisan make:sk-domain
 
-# Seceneklerle
+# Seçeneklerle
 php artisan make:sk-domain Product --fields="name:string,price:decimal" --admin --api --events --vue=full
 ```
 
-Bu komut sunlari olusturur: Model, Migration, Factory, DTO, Action'lar, Event'ler, Listener'lar, Controller'lar, FormRequest'ler, Route'lar ve Vue sayfalari.
+Bu komut şunları oluşturur: Model, Migration, Factory, DTO, Action'lar, Event'ler, Listener'lar, Controller'lar, FormRequest'ler, Route'lar ve Vue sayfaları.
 
-Bir domain'i kaldirin:
+Bir domain'i kaldırın:
 
 ```bash
 php artisan remove:sk-domain Product
@@ -204,68 +205,68 @@ php artisan remove:sk-domain Product
 
 ## Mimari
 
-### Paket Yapisi
+### Paket Yapısı
 
 ```
 lvntr/laravel-starter-kit/
-├── src/                          # Cekirdek paket kodu (asla yayinlanmaz)
+├── src/                          # Çekirdek paket kodu (asla yayınlanmaz)
 │   ├── StarterKitServiceProvider.php
 │   ├── Console/Commands/         # sk:install, sk:update, make:sk-domain, vb.
 │   ├── Domain/Shared/            # BaseAction, BaseDTO, ActionPipeline
 │   ├── Enums/                    # PermissionEnum
 │   ├── Http/Middleware/          # CheckResourcePermission, SecurityHeaders
-│   ├── Http/Responses/           # ApiResponse olusturucu
-│   ├── Support/                  # Paket destek siniflari
+│   ├── Http/Responses/           # ApiResponse oluşturucu
+│   ├── Support/                  # Paket destek sınıfları
 │   ├── Traits/                   # HasActivityLogging, HasMediaCollections
 │   └── helpers.php               # to_api(), format_date()
 ├── resources/
-│   ├── js/components/            # Vue bilesenleri (istege bagli yayinlanabilir)
-│   └── lang/                     # Ceviri dosyalari (istege bagli yayinlanabilir)
-├── stubs/                        # Kurulumda uygulamaya kopyalanir
+│   ├── js/components/            # Vue bileşenleri (isteğe bağlı yayınlanabilir)
+│   └── lang/                     # Çeviri dosyaları (isteğe bağlı yayınlanabilir)
+├── stubs/                        # Kurulumda uygulamaya kopyalanır
 │   ├── app/                      # Controller'lar, Model'ler, Domain, Provider'lar, Enum'lar
 │   ├── config/                   # permission-resources.php, settings.php
 │   ├── database/                 # Migration'lar, Seeder'lar, Factory'ler
-│   ├── routes/                   # Web ve API route'lari
-│   ├── resources/js/             # Vue sayfalari, Layout'lar, Composable'lar, Tema
+│   ├── routes/                   # Web ve API route'ları
+│   ├── resources/js/             # Vue sayfaları, Layout'lar, Composable'lar, Tema
 │   └── bootstrap/                # app.php, providers.php
 └── config/
-    └── starter-kit.php           # Paket yapilandirmasi
+    └── starter-kit.php           # Paket yapılandırması
 ```
 
-### Uygulama Yapisi (kurulumdan sonra)
+### Uygulama Yapısı (kurulumdan sonra)
 
 ```
 app/
-├── Domain/                       # DDD is mantigi
+├── Domain/                       # DDD iş mantığı
 │   ├── User/                     # Action'lar, DTO'lar, Query'ler, Event'ler, Listener'lar
 │   ├── Role/
 │   ├── Auth/
 │   ├── Setting/
 │   ├── ActivityLog/
-│   └── Shared/                   # Temel siniflar (paket tarafindan guncellenir)
+│   └── Shared/                   # Temel sınıflar (paket tarafından güncellenir)
 ├── Http/
-│   ├── Controllers/Admin/        # Admin panel controller'lari
-│   ├── Controllers/Api/          # REST API controller'lari
+│   ├── Controllers/Admin/        # Admin panel controller'ları
+│   ├── Controllers/Api/          # REST API controller'ları
 │   └── Middleware/
 ├── Models/
 ├── Enums/
 └── Providers/
 ```
 
-### Guncelleme Stratejisi
+### Güncelleme Stratejisi
 
-| Dosya Kategorisi                                    | `sk:update` ile Davranis                     |
+| Dosya Kategorisi                                    | `sk:update` ile Davranış                     |
 | --------------------------------------------------- | -------------------------------------------- |
-| `Domain/Shared/`, Trait'ler, Middleware, helper'lar | Her zaman guncellenir                        |
-| Controller'lar, Model'ler, Sayfalar, Route'lar      | Sadece kullanici degistirmemisse guncellenir |
-| Kullanicinin kendi domain'leri                      | Asla dokunulmaz                              |
+| `Domain/Shared/`, Trait'ler, Middleware, helper'lar | Her zaman güncellenir                        |
+| Controller'lar, Model'ler, Sayfalar, Route'lar      | Sadece kullanıcı değiştirmemişse güncellenir |
+| Kullanıcının kendi domain'leri                      | Asla dokunulmaz                              |
 | Paketten gelen yeni dosyalar                        | Otomatik olarak eklenir                      |
 
-## Paket Bilesenlerini Kullanma
+## Paket Bileşenlerini Kullanma
 
-### Vue Bilesenleri (yayinlamadan)
+### Vue Bileşenleri (yayınlamadan)
 
-Bilesenler paketten otomatik olarak cozumlenir. Vue dosyalarinizda kullanin:
+Bileşenler paketten otomatik olarak çözümlenir. Vue dosyalarınızda kullanın:
 
 ```vue
 <template>
@@ -275,15 +276,15 @@ Bilesenler paketten otomatik olarak cozumlenir. Vue dosyalarinizda kullanin:
 </template>
 ```
 
-### Ceviriler
+### Çeviriler
 
 ```php
-// Paket ad alanindan
+// Paket ad alanından
 __('starter-kit::admin.menu.dashboard')
 __('starter-kit::message.created')
 ```
 
-### Temel Siniflar
+### Temel Sınıflar
 
 ```php
 use Lvntr\StarterKit\Domain\Shared\Actions\BaseAction;

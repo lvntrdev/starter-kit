@@ -555,6 +555,16 @@ export class ColorSelectorBuilder extends BaseFieldBuilder<ColorSelectorFieldCon
         this.config.tones = tones;
         return this;
     }
+
+    format(format: 'hex' | 'name' | 'name-tone'): this {
+        this.config.format = format;
+        return this;
+    }
+
+    defaultTone(tone: number): this {
+        this.config.defaultTone = tone;
+        return this;
+    }
 }
 
 export class SlotBuilder extends BaseFieldBuilder<SlotFieldConfig> {

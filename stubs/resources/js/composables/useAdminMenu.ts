@@ -71,7 +71,7 @@ export function useAdminMenu() {
         {
             title: 'admin.menu.kits_docs',
             icon: 'pi pi-external-link',
-            href: 'https://kit-docs.lvntr.dev',
+            href: 'https://starter-kit.lvntr.dev',
             external: true,
         },
     ];

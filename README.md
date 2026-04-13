@@ -9,7 +9,8 @@
 
 Lvntr Starter Kit is under active development, and each release is shaping it into a more complete admin-first Laravel platform.
 
-Detailed usage docs: [kit-docs.lvntr.dev](https://kit-docs.lvntr.dev/)
+> **Website & Documentation:** [starter-kit.lvntr.dev](https://starter-kit.lvntr.dev/)
+> Official website with complete guides, usage examples, and reference docs.
 
 A full-featured Laravel admin panel package built with **Laravel 13**, **Inertia.js v3**, **Vue 3**, **PrimeVue 4**, and **Tailwind CSS 4**. Follows DDD (Domain-Driven Design) architecture with built-in role-based permissions, activity logging, settings management, and more.
 

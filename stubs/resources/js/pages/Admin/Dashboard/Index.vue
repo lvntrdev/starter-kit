@@ -5,7 +5,7 @@
     const page = usePage();
     const user = computed(() => page.props.auth?.user);
 
-    const currentDate = new Date().toLocaleDateString('tr-TR', {
+    const currentDate = new Date().toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
@@ -26,36 +26,36 @@
 
     const kpis: Kpi[] = [
         {
-            label: 'Toplam Gelir',
-            value: '₺284.650',
-            delta: '+12,4%',
+            label: 'Total Revenue',
+            value: '$284,650',
+            delta: '+12.4%',
             trend: 'up',
             icon: 'pi pi-wallet',
             accent: 'emerald',
             spark: [22, 28, 26, 32, 30, 38, 44, 42, 48, 52, 50, 58],
         },
         {
-            label: 'Aktif Kullanıcı',
-            value: '3.842',
-            delta: '+8,1%',
+            label: 'Active Users',
+            value: '3,842',
+            delta: '+8.1%',
             trend: 'up',
             icon: 'pi pi-users',
             accent: 'sky',
             spark: [40, 42, 48, 45, 52, 55, 58, 62, 60, 68, 72, 78],
         },
         {
-            label: 'Yeni Sipariş',
+            label: 'New Orders',
             value: '186',
-            delta: '-3,2%',
+            delta: '-3.2%',
             trend: 'down',
             icon: 'pi pi-shopping-cart',
             accent: 'amber',
             spark: [60, 58, 62, 55, 50, 52, 48, 52, 46, 42, 40, 44],
         },
         {
-            label: 'Dönüşüm Oranı',
-            value: '%4,68',
-            delta: '+1,9%',
+            label: 'Conversion Rate',
+            value: '4.68%',
+            delta: '+1.9%',
             trend: 'up',
             icon: 'pi pi-chart-line',
             accent: 'violet',
@@ -63,15 +63,15 @@
         },
     ];
 
-    const revenueMonths = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+    const revenueMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const revenueCurrent = [38, 52, 45, 62, 58, 72, 68, 84, 78, 92, 88, 104];
     const revenuePrev = [28, 36, 42, 48, 44, 54, 58, 62, 66, 70, 74, 80];
 
     const categories = [
-        { label: 'Yazılım', value: 42, color: '#6366f1' },
-        { label: 'Donanım', value: 26, color: '#10b981' },
-        { label: 'Hizmet', value: 18, color: '#f59e0b' },
-        { label: 'Danışmanlık', value: 14, color: '#ef4444' },
+        { label: 'Software', value: 42, color: '#6366f1' },
+        { label: 'Hardware', value: 26, color: '#10b981' },
+        { label: 'Service', value: 18, color: '#f59e0b' },
+        { label: 'Consulting', value: 14, color: '#ef4444' },
     ];
 
     const categoryTotal = categories.reduce((sum, c) => sum + c.value, 0);
@@ -89,64 +89,64 @@
     const recentOrders: Order[] = [
         {
             id: '#ORD-4821',
-            customer: 'Ayşe Demir',
-            email: 'ayse@example.com',
+            customer: 'Alice Smith',
+            email: 'alice@example.com',
             product: 'Pro Plan',
-            amount: '₺2.499',
+            amount: '$2,499',
             status: 'completed',
-            date: '2 dk önce',
+            date: '2 min ago',
         },
         {
             id: '#ORD-4820',
-            customer: 'Mehmet Yılmaz',
-            email: 'mehmet@example.com',
+            customer: 'Michael Johnson',
+            email: 'michael@example.com',
             product: 'Enterprise',
-            amount: '₺8.900',
+            amount: '$8,900',
             status: 'completed',
-            date: '12 dk önce',
+            date: '12 min ago',
         },
         {
             id: '#ORD-4819',
-            customer: 'Zeynep Kaya',
-            email: 'zeynep@example.com',
+            customer: 'Sarah Williams',
+            email: 'sarah@example.com',
             product: 'Starter',
-            amount: '₺499',
+            amount: '$499',
             status: 'pending',
-            date: '38 dk önce',
+            date: '38 min ago',
         },
         {
             id: '#ORD-4818',
-            customer: 'Emre Şahin',
-            email: 'emre@example.com',
+            customer: 'David Brown',
+            email: 'david@example.com',
             product: 'Pro Plan',
-            amount: '₺2.499',
+            amount: '$2,499',
             status: 'completed',
-            date: '1 sa önce',
+            date: '1 hr ago',
         },
         {
             id: '#ORD-4817',
-            customer: 'Elif Özkan',
-            email: 'elif@example.com',
+            customer: 'Emma Davis',
+            email: 'emma@example.com',
             product: 'Addon Pack',
-            amount: '₺349',
+            amount: '$349',
             status: 'failed',
-            date: '2 sa önce',
+            date: '2 hr ago',
         },
         {
             id: '#ORD-4816',
-            customer: 'Can Arslan',
-            email: 'can@example.com',
+            customer: 'Chris Wilson',
+            email: 'chris@example.com',
             product: 'Enterprise',
-            amount: '₺8.900',
+            amount: '$8,900',
             status: 'completed',
-            date: '3 sa önce',
+            date: '3 hr ago',
         },
     ];
 
     const statusMap: Record<Order['status'], { label: string; severity: 'success' | 'warn' | 'danger' }> = {
-        completed: { label: 'Tamamlandı', severity: 'success' },
-        pending: { label: 'Bekliyor', severity: 'warn' },
-        failed: { label: 'Başarısız', severity: 'danger' },
+        completed: { label: 'Completed', severity: 'success' },
+        pending: { label: 'Pending', severity: 'warn' },
+        failed: { label: 'Failed', severity: 'danger' },
     };
 
     interface Activity {
@@ -160,42 +160,42 @@
 
     const activities: Activity[] = [
         {
-            user: 'Ayşe D.',
-            action: 'yeni bir sipariş oluşturdu',
+            user: 'Alice S.',
+            action: 'placed a new order',
             target: '#ORD-4821',
-            time: '2 dk',
+            time: '2 min',
             icon: 'pi pi-shopping-bag',
             color: 'bg-emerald-500',
         },
         {
-            user: 'Mehmet Y.',
-            action: 'ödeme gerçekleştirdi',
-            target: '₺8.900',
-            time: '12 dk',
+            user: 'Michael J.',
+            action: 'made a payment of',
+            target: '$8,900',
+            time: '12 min',
             icon: 'pi pi-credit-card',
             color: 'bg-sky-500',
         },
         {
-            user: 'Zeynep K.',
-            action: 'hesap açtı',
+            user: 'Sarah W.',
+            action: 'created an account',
             target: '',
-            time: '38 dk',
+            time: '38 min',
             icon: 'pi pi-user-plus',
             color: 'bg-violet-500',
         },
         {
-            user: 'Emre Ş.',
-            action: 'plan yükseltti',
+            user: 'David B.',
+            action: 'upgraded plan',
             target: 'Pro → Enterprise',
-            time: '1 sa',
+            time: '1 hr',
             icon: 'pi pi-arrow-circle-up',
             color: 'bg-amber-500',
         },
         {
-            user: 'Elif Ö.',
-            action: 'desteğe ulaştı',
+            user: 'Emma D.',
+            action: 'contacted support',
             target: '#TCK-1204',
-            time: '2 sa',
+            time: '2 hr',
             icon: 'pi pi-comments',
             color: 'bg-rose-500',
         },
@@ -210,10 +210,10 @@
     }
 
     const topCustomers: TopCustomer[] = [
-        { name: 'Mehmet Yılmaz', email: 'mehmet@example.com', total: '₺42.800', orders: 18, avatar: 'MY' },
-        { name: 'Ayşe Demir', email: 'ayse@example.com', total: '₺28.450', orders: 12, avatar: 'AD' },
-        { name: 'Can Arslan', email: 'can@example.com', total: '₺19.200', orders: 9, avatar: 'CA' },
-        { name: 'Emre Şahin', email: 'emre@example.com', total: '₺14.600', orders: 7, avatar: 'EŞ' },
+        { name: 'Michael Johnson', email: 'michael@example.com', total: '$42,800', orders: 18, avatar: 'MJ' },
+        { name: 'Alice Smith', email: 'alice@example.com', total: '$28,450', orders: 12, avatar: 'AS' },
+        { name: 'Chris Wilson', email: 'chris@example.com', total: '$19,200', orders: 9, avatar: 'CW' },
+        { name: 'David Brown', email: 'david@example.com', total: '$14,600', orders: 7, avatar: 'DB' },
     ];
 
     function sparkPath(points: number[], width = 120, height = 40): string {
@@ -322,15 +322,15 @@
             <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight text-surface-900 dark:text-surface-0">
-                        Hoş geldin, {{ user?.name?.split(' ')[0] || 'Admin' }}
+                        Welcome, {{ user?.name?.split(' ')[0] || 'Admin' }}
                     </h1>
                     <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
-                        {{ currentDate }} — işte bugünün özeti.
+                        {{ currentDate }} — here's today's summary.
                     </p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <Button label="Dışa Aktar" icon="pi pi-download" severity="secondary" outlined size="small" />
-                    <Button label="Yeni Rapor" icon="pi pi-plus" size="small" />
+                    <Button label="Export" icon="pi pi-download" severity="secondary" outlined size="small" />
+                    <Button label="New Report" icon="pi pi-plus" size="small" />
                 </div>
             </header>
 
@@ -393,18 +393,18 @@
                     <div class="flex items-start justify-between">
                         <div>
                             <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
-                                Gelir Trendi
+                                Revenue Trend
                             </h2>
                             <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
-                                Son 12 ay — geçen yıla kıyasla
+                                Last 12 months — compared to previous year
                             </p>
                         </div>
                         <div class="flex items-center gap-4 text-xs">
                             <span class="flex items-center gap-1.5 text-surface-600 dark:text-surface-300">
-                                <span class="h-2 w-2 rounded-full bg-indigo-500" /> Bu yıl
+                                <span class="h-2 w-2 rounded-full bg-indigo-500" /> This year
                             </span>
                             <span class="flex items-center gap-1.5 text-surface-600 dark:text-surface-300">
-                                <span class="h-2 w-2 rounded-full bg-surface-300 dark:bg-surface-600" /> Geçen yıl
+                                <span class="h-2 w-2 rounded-full bg-surface-300 dark:bg-surface-600" /> Last year
                             </span>
                         </div>
                     </div>
@@ -459,10 +459,10 @@
                     class="rounded-xl border border-surface-200 bg-surface-0 p-5 dark:border-surface-700 dark:bg-surface-900"
                 >
                     <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
-                        Kategori Dağılımı
+                        Category Distribution
                     </h2>
                     <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
-                        Bu çeyrek
+                        This quarter
                     </p>
 
                     <div class="mt-4 flex items-center justify-center">
@@ -471,7 +471,7 @@
                                 <path v-for="seg in donutSegments" :key="seg.label" :d="seg.path" :fill="seg.color" />
                             </svg>
                             <div class="absolute inset-0 flex flex-col items-center justify-center">
-                                <span class="text-xs text-surface-500 dark:text-surface-400">Toplam</span>
+                                <span class="text-xs text-surface-500 dark:text-surface-400">Total</span>
                                 <span class="text-xl font-bold text-surface-900 dark:text-surface-0">
                                     {{ categoryTotal }}K
                                 </span>
@@ -489,7 +489,7 @@
                                 <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: seg.color }" />
                                 {{ seg.label }}
                             </span>
-                            <span class="font-medium text-surface-900 dark:text-surface-0">%{{ seg.percent }}</span>
+                            <span class="font-medium text-surface-900 dark:text-surface-0">{{ seg.percent }}%</span>
                         </li>
                     </ul>
                 </div>
@@ -505,13 +505,13 @@
                     >
                         <div>
                             <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
-                                Son Siparişler
+                                Recent Orders
                             </h2>
                             <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
-                                Son 24 saat
+                                Last 24 hours
                             </p>
                         </div>
-                        <Button label="Tümünü Gör" icon="pi pi-arrow-right" icon-pos="right" text size="small" />
+                        <Button label="View All" icon="pi pi-arrow-right" icon-pos="right" text size="small" />
                     </div>
 
                     <div class="overflow-x-auto">
@@ -521,19 +521,19 @@
                                     class="text-left text-xs uppercase tracking-wider text-surface-500 dark:text-surface-400"
                                 >
                                     <th class="px-5 py-3 font-medium">
-                                        Sipariş
+                                        Order
                                     </th>
                                     <th class="px-5 py-3 font-medium">
-                                        Müşteri
+                                        Customer
                                     </th>
                                     <th class="px-5 py-3 font-medium">
-                                        Ürün
+                                        Product
                                     </th>
                                     <th class="px-5 py-3 font-medium">
-                                        Tutar
+                                        Amount
                                     </th>
                                     <th class="px-5 py-3 font-medium">
-                                        Durum
+                                        Status
                                     </th>
                                 </tr>
                             </thead>
@@ -577,10 +577,10 @@
                 >
                     <div class="border-b border-surface-200 p-5 dark:border-surface-700">
                         <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
-                            Aktivite Akışı
+                            Activity Feed
                         </h2>
                         <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
-                            Canlı güncelleniyor
+                            Live updates
                         </p>
                     </div>
 
@@ -599,7 +599,7 @@
                                     <span v-if="a.target" class="font-medium">{{ a.target }}</span>
                                 </p>
                                 <p class="mt-0.5 text-xs text-surface-500 dark:text-surface-400">
-                                    {{ a.time }} önce
+                                    {{ a.time }} ago
                                 </p>
                             </div>
                         </li>
@@ -614,13 +614,13 @@
                 <div class="flex items-center justify-between border-b border-surface-200 p-5 dark:border-surface-700">
                     <div>
                         <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
-                            Öne Çıkan Müşteriler
+                            Top Customers
                         </h2>
                         <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
-                            En çok harcama yapanlar
+                            Highest spenders
                         </p>
                     </div>
-                    <Button label="Raporu Gör" icon="pi pi-external-link" icon-pos="right" text size="small" />
+                    <Button label="View Report" icon="pi pi-external-link" icon-pos="right" text size="small" />
                 </div>
 
                 <div class="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -646,7 +646,7 @@
                                 {{ c.name }}
                             </p>
                             <p class="truncate text-xs text-surface-500 dark:text-surface-400">
-                                {{ c.orders }} sipariş · {{ c.total }}
+                                {{ c.orders }} orders · {{ c.total }}
                             </p>
                         </div>
                     </div>

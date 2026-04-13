@@ -617,6 +617,8 @@
             v-model="stringVal"
             :colors="asColorSelector.colors"
             :tones="asColorSelector.tones"
+            :format="asColorSelector.format"
+            :default-tone="asColorSelector.defaultTone"
             :disabled="disabled"
             :invalid="invalid"
             v-bind="extraProps"
