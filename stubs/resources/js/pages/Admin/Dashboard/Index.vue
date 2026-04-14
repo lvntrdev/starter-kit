@@ -392,7 +392,9 @@
                 >
                     <div class="flex items-start justify-between">
                         <div>
-                            <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">Revenue Trend</h2>
+                            <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
+                                Revenue Trend
+                            </h2>
                             <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
                                 Last 12 months — compared to previous year
                             </p>
@@ -456,8 +458,12 @@
                 <div
                     class="rounded-xl border border-surface-200 bg-surface-0 p-5 dark:border-surface-700 dark:bg-surface-900"
                 >
-                    <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">Category Distribution</h2>
-                    <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">This quarter</p>
+                    <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
+                        Category Distribution
+                    </h2>
+                    <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
+                        This quarter
+                    </p>
 
                     <div class="mt-4 flex items-center justify-center">
                         <div class="relative">
@@ -498,8 +504,12 @@
                         class="flex items-center justify-between border-b border-surface-200 p-5 dark:border-surface-700"
                     >
                         <div>
-                            <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">Recent Orders</h2>
-                            <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">Last 24 hours</p>
+                            <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
+                                Recent Orders
+                            </h2>
+                            <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
+                                Last 24 hours
+                            </p>
                         </div>
                         <Button label="View All" icon="pi pi-arrow-right" icon-pos="right" text size="small" />
                     </div>
@@ -510,11 +520,21 @@
                                 <tr
                                     class="text-left text-xs uppercase tracking-wider text-surface-500 dark:text-surface-400"
                                 >
-                                    <th class="px-5 py-3 font-medium">Order</th>
-                                    <th class="px-5 py-3 font-medium">Customer</th>
-                                    <th class="px-5 py-3 font-medium">Product</th>
-                                    <th class="px-5 py-3 font-medium">Amount</th>
-                                    <th class="px-5 py-3 font-medium">Status</th>
+                                    <th class="px-5 py-3 font-medium">
+                                        Order
+                                    </th>
+                                    <th class="px-5 py-3 font-medium">
+                                        Customer
+                                    </th>
+                                    <th class="px-5 py-3 font-medium">
+                                        Product
+                                    </th>
+                                    <th class="px-5 py-3 font-medium">
+                                        Amount
+                                    </th>
+                                    <th class="px-5 py-3 font-medium">
+                                        Status
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-surface-200 dark:divide-surface-700">
@@ -556,8 +576,12 @@
                     class="rounded-xl border border-surface-200 bg-surface-0 dark:border-surface-700 dark:bg-surface-900"
                 >
                     <div class="border-b border-surface-200 p-5 dark:border-surface-700">
-                        <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">Activity Feed</h2>
-                        <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">Live updates</p>
+                        <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
+                            Activity Feed
+                        </h2>
+                        <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
+                            Live updates
+                        </p>
                     </div>
 
                     <ul class="space-y-4 p-5">
@@ -574,7 +598,9 @@
                                     {{ a.action }}
                                     <span v-if="a.target" class="font-medium">{{ a.target }}</span>
                                 </p>
-                                <p class="mt-0.5 text-xs text-surface-500 dark:text-surface-400">{{ a.time }} ago</p>
+                                <p class="mt-0.5 text-xs text-surface-500 dark:text-surface-400">
+                                    {{ a.time }} ago
+                                </p>
                             </div>
                         </li>
                     </ul>
@@ -587,8 +613,12 @@
             >
                 <div class="flex items-center justify-between border-b border-surface-200 p-5 dark:border-surface-700">
                     <div>
-                        <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">Top Customers</h2>
-                        <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">Highest spenders</p>
+                        <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
+                            Top Customers
+                        </h2>
+                        <p class="mt-1 text-sm text-surface-500 dark:text-surface-400">
+                            Highest spenders
+                        </p>
                     </div>
                     <Button label="View Report" icon="pi pi-external-link" icon-pos="right" text size="small" />
                 </div>

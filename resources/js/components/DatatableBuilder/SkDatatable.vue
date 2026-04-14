@@ -136,7 +136,9 @@
     const sortOrder = ref<'asc' | 'desc'>('asc');
     const currentPage = ref(1);
 
-    type FilterValue = string | number | Date | (Date | null)[] | null;
+    type DateFilterValue = Date | null;
+    type DaterangeFilterValue = DateFilterValue[] | null;
+    type FilterValue = string | number | Date | DateFilterValue[] | null;
 
     const activeFilters = ref<Record<string, FilterValue>>(
         Object.fromEntries(props.config.filters.map((f) => [f.key, null])),
@@ -753,22 +755,22 @@
                         />
                         <DatePicker
                             v-else-if="filter.type === 'date'"
-                            :model-value="(activeFilters[filter.key] as Date | null)"
+                            :model-value="activeFilters[filter.key] as DateFilterValue"
                             :placeholder="filter.placeholder ?? resolveFilterLabel(filter)"
                             date-format="dd.mm.yy"
                             show-button-bar
                             class="min-w-48"
-                            @update:model-value="(val) => (activeFilters[filter.key] = (val as Date | null))"
+                            @update:model-value="(val) => (activeFilters[filter.key] = val as DateFilterValue)"
                         />
                         <DatePicker
                             v-else-if="filter.type === 'daterange'"
-                            :model-value="(activeFilters[filter.key] as (Date | null)[] | null)"
+                            :model-value="activeFilters[filter.key] as DaterangeFilterValue"
                             :placeholder="filter.placeholder ?? resolveFilterLabel(filter)"
                             date-format="dd.mm.yy"
                             selection-mode="range"
                             show-button-bar
                             class="min-w-56"
-                            @update:model-value="(val) => (activeFilters[filter.key] = (val as (Date | null)[] | null))"
+                            @update:model-value="(val) => (activeFilters[filter.key] = val as DaterangeFilterValue)"
                         />
                     </div>
                     <!-- END FILTERS GROUP -->
@@ -854,22 +856,22 @@
                         />
                         <DatePicker
                             v-else-if="filter.type === 'date'"
-                            :model-value="(activeFilters[filter.key] as Date | null)"
+                            :model-value="activeFilters[filter.key] as DateFilterValue"
                             :placeholder="filter.placeholder ?? resolveFilterLabel(filter)"
                             date-format="dd.mm.yy"
                             show-button-bar
                             class="w-full"
-                            @update:model-value="(val) => (activeFilters[filter.key] = (val as Date | null))"
+                            @update:model-value="(val) => (activeFilters[filter.key] = val as DateFilterValue)"
                         />
                         <DatePicker
                             v-else-if="filter.type === 'daterange'"
-                            :model-value="(activeFilters[filter.key] as (Date | null)[] | null)"
+                            :model-value="activeFilters[filter.key] as DaterangeFilterValue"
                             :placeholder="filter.placeholder ?? resolveFilterLabel(filter)"
                             date-format="dd.mm.yy"
                             selection-mode="range"
                             show-button-bar
                             class="w-full"
-                            @update:model-value="(val) => (activeFilters[filter.key] = (val as (Date | null)[] | null))"
+                            @update:model-value="(val) => (activeFilters[filter.key] = val as DaterangeFilterValue)"
                         />
                     </div>
                 </div>
@@ -1006,13 +1008,14 @@
                                                 ]
                                             "
                                             :icon="
-                                                (column.icons?.[
+                                                column.icons?.[
                                                     getNestedValue(row, column.tagKey ?? column.key) as string
                                                 ] ??
                                                     definition.find(
                                                         column.tagKey!,
                                                         getNestedValue(row, column.key) as string | number | boolean,
-                                                    )?.icon) ?? undefined
+                                                    )?.icon ??
+                                                    undefined
                                             "
                                             :icon-pos="column.tagIconPos"
                                             :soft="column.tagSoft"
