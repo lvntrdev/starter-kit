@@ -68,7 +68,7 @@ php artisan sk:install
 
 That's it. The installer sets up migrations, seeders, Passport keys, a default admin user, and builds the frontend.
 
-Full step-by-step guide: [starter-kit.lvntr.dev/docs/install](https://starter-kit.lvntr.dev/)
+Full step-by-step guide: [starter-kit.lvntr.dev/docs/install](https://starter-kit.lvntr.dev/docs/install)
 
 ## Requirements
 
