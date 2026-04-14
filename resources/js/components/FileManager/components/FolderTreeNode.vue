@@ -29,7 +29,7 @@
     <div class="fm-tree-node">
         <button
             type="button"
-            class="group flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors"
+            class="group flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors"
             :class="[
                 selectedId === node.id
                     ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-200'

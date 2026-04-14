@@ -87,10 +87,7 @@ class FolderContentsQuery
             ->values()
             ->all();
 
-        $stats = [
-            'file_count' => $mediaList->count(),
-            'total_size' => (int) $mediaList->sum('size'),
-        ];
+        $stats = $this->computeAggregateStats($context, $folderId, $childrenMap);
 
         return [
             'folder' => $folder ? [
@@ -152,6 +149,38 @@ class FolderContentsQuery
         }
 
         return $out;
+    }
+
+    /**
+     * Aggregate file count + size for the current folder and its whole subtree.
+     *
+     * When $folderId is null, covers all files in the context (root view).
+     *
+     * @param  array<string, array<int, string>>  $childrenMap
+     * @return array{file_count: int, total_size: int}
+     */
+    private function computeAggregateStats(
+        FileManagerContextDTO $context,
+        ?string $folderId,
+        array $childrenMap,
+    ): array {
+        $query = Media::query()
+            ->where('model_type', $context->ownerType)
+            ->where('model_id', $context->ownerId)
+            ->where('collection_name', 'files');
+
+        if ($folderId !== null) {
+            $subtreeIds = $this->collectSubtreeIds($folderId, $childrenMap);
+            $query->whereIn('folder_id', $subtreeIds);
+        }
+
+        /** @var object{c: int|string, s: int|string}|null $row */
+        $row = $query->selectRaw('count(*) as c, coalesce(sum(size), 0) as s')->first();
+
+        return [
+            'file_count' => $row ? (int) $row->c : 0,
+            'total_size' => $row ? (int) $row->s : 0,
+        ];
     }
 
     /**

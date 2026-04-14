@@ -4,6 +4,7 @@ namespace App\Domain\FileManager\Actions;
 
 use App\Domain\FileManager\DTOs\FileManagerContextDTO;
 use App\Domain\Shared\Actions\BaseAction;
+use Illuminate\Support\Facades\Storage;
 use LogicException;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -21,6 +22,11 @@ class DownloadFileAction extends BaseAction
             throw new LogicException(__('file-manager.errors.file_out_of_context'));
         }
 
-        return response()->download($media->getPath(), $media->file_name);
+        $disk = Storage::disk($media->disk);
+        $path = $media->getPathRelativeToRoot();
+
+        return $disk->download($path, $media->file_name, [
+            'Content-Type' => $media->mime_type,
+        ]);
     }
 }

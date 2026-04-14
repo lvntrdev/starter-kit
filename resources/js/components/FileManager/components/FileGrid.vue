@@ -1,16 +1,18 @@
 <script setup lang="ts">
+    import { trans } from 'laravel-vue-i18n';
     import { computed, onBeforeUnmount, ref } from 'vue';
-    import type { FileItem, FolderSummary, SelectionKey } from '../types';
+    import type { FileItem, FolderSummary, PendingUpload, SelectionKey } from '../types';
 
     interface Props {
         folders: FolderSummary[];
         files: FileItem[];
+        pending?: PendingUpload[];
         loading?: boolean;
         emptyLabel?: string;
         isSelected: (type: 'folder' | 'file', id: string | number) => boolean;
     }
 
-    const props = defineProps<Props>();
+    const props = withDefaults(defineProps<Props>(), { pending: () => [] });
     const emit = defineEmits<{
         (e: 'open-folder', folderId: string): void;
         (e: 'open-file', file: FileItem): void;
@@ -18,12 +20,19 @@
         (e: 'context-file', event: MouseEvent, file: FileItem): void;
         (e: 'context-empty', event: MouseEvent): void;
         (e: 'toggle-select', type: 'folder' | 'file', id: string | number, event: MouseEvent): void;
+        (e: 'check-toggle', type: 'folder' | 'file', id: string | number): void;
         (e: 'set-selection', keys: SelectionKey[]): void;
         (e: 'clear-selection'): void;
         (e: 'download-file', file: FileItem): void;
+        (e: 'dismiss-pending', tempId: string): void;
+        (e: 'drop-on-folder', targetFolderId: string, event: DragEvent): void;
+        (e: 'internal-drag-start', type: 'folder' | 'file', id: string | number): void;
+        (e: 'internal-drag-end'): void;
     }>();
 
-    const isEmpty = computed(() => !props.loading && props.folders.length === 0 && props.files.length === 0);
+    const isEmpty = computed(
+        () => !props.loading && props.folders.length === 0 && props.files.length === 0 && props.pending.length === 0,
+    );
 
     function humanSize(bytes: number): string {
         if (!bytes) return '0 B';
@@ -246,6 +255,60 @@
         window.removeEventListener('mousemove', onWindowMouseMove);
     });
 
+    // ── Click / open logic ───────────────────────────────────────
+    function onFolderTileClick(folder: FolderSummary, event: MouseEvent): void {
+        if (event.ctrlKey || event.metaKey || event.shiftKey) {
+            emit('toggle-select', 'folder', folder.id, event);
+        }
+    }
+
+    function onFileTileClick(file: FileItem, event: MouseEvent): void {
+        if (event.ctrlKey || event.metaKey || event.shiftKey) {
+            emit('toggle-select', 'file', file.id, event);
+            return;
+        }
+        emit('open-file', file);
+    }
+
+    // ── Internal drag-drop (move) ────────────────────────────────
+    const dropTargetId = ref<string | null>(null);
+
+    function onTileDragStart(type: 'folder' | 'file', id: string | number, event: DragEvent): void {
+        if (!event.dataTransfer) return;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('application/x-fm-item', JSON.stringify({ type, id: String(id) }));
+        emit('internal-drag-start', type, id);
+    }
+
+    function onTileDragEnd(): void {
+        dropTargetId.value = null;
+        emit('internal-drag-end');
+    }
+
+    function isInternalDrag(event: DragEvent): boolean {
+        return !!event.dataTransfer?.types.includes('application/x-fm-item');
+    }
+
+    function onFolderDragOver(folder: FolderSummary, event: DragEvent): void {
+        if (!isInternalDrag(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+        dropTargetId.value = folder.id;
+    }
+
+    function onFolderDragLeave(folder: FolderSummary): void {
+        if (dropTargetId.value === folder.id) dropTargetId.value = null;
+    }
+
+    function onFolderDrop(folder: FolderSummary, event: DragEvent): void {
+        if (!isInternalDrag(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        dropTargetId.value = null;
+        emit('drop-on-folder', folder.id, event);
+    }
+
     function onGridContextMenu(event: MouseEvent): void {
         const target = event.target as HTMLElement;
         if (target.closest('.fm-tile') || target.closest('button, a, input')) return;
@@ -262,8 +325,36 @@
         @mousedown="onGridMouseDown"
         @contextmenu="onGridContextMenu"
     >
-        <div v-if="isEmpty" class="text-muted-color flex h-48 items-center justify-center text-base">
-            {{ emptyLabel ?? 'This folder is empty.' }}
+        <div v-if="isEmpty" class="fm-empty flex min-h-80 flex-col items-center justify-center gap-5 p-10">
+            <svg
+                class="text-surface-300 dark:text-surface-600"
+                width="112"
+                height="112"
+                viewBox="0 0 120 120"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+            >
+                <path d="M14 36a6 6 0 0 1 6-6h22l8 10h36a6 6 0 0 1 6 6v42a6 6 0 0 1-6 6H20a6 6 0 0 1-6-6V36Z" />
+                <path d="M14 44h92" opacity="0.6" />
+            </svg>
+
+            <h3 class="text-lg font-semibold text-surface-800 dark:text-surface-100">
+                {{ emptyLabel ?? 'This folder is empty.' }}
+            </h3>
+
+            <ul
+                class="grid max-w-md grid-cols-[auto_1fr] items-start gap-x-3 gap-y-2.5 text-left text-surface-500 dark:text-surface-400"
+            >
+                <i class="pi pi-cloud-upload mt-0.5 text-surface-400" style="font-size: 1.05rem" />
+                <span>{{ trans('file-manager.labels.empty_hint_upload') }}</span>
+
+                <i class="pi pi-folder-plus mt-0.5 text-surface-400" style="font-size: 1.05rem" />
+                <span>{{ trans('file-manager.labels.empty_hint_new_folder') }}</span>
+            </ul>
         </div>
 
         <template v-else>
@@ -278,25 +369,38 @@
                     :key="`folder-${folder.id}`"
                     role="button"
                     tabindex="0"
+                    draggable="true"
                     :data-fm-key="`folder:${folder.id}`"
                     class="fm-tile fm-folder-tile group relative flex flex-col gap-3 rounded-2xl p-5 text-left transition-all"
-                    :class="
+                    :class="[
                         isSelected('folder', folder.id)
                             ? 'bg-primary-100 ring-2 ring-primary-400 dark:bg-primary-950/50'
-                            : `${folderPalette(folder.id).bg} hover:-translate-y-0.5`
-                    "
-                    @click="(ev) => emit('toggle-select', 'folder', folder.id, ev)"
+                            : `${folderPalette(folder.id).bg} hover:-translate-y-0.5`,
+                        dropTargetId === folder.id ? 'ring-2 ring-primary-500 ring-offset-2' : '',
+                    ]"
+                    @click="(ev) => onFolderTileClick(folder, ev)"
                     @dblclick="emit('open-folder', folder.id)"
                     @keydown.enter.prevent="emit('open-folder', folder.id)"
                     @contextmenu.prevent="(ev) => emit('context-folder', ev, folder)"
+                    @dragstart="(ev) => onTileDragStart('folder', folder.id, ev)"
+                    @dragend="onTileDragEnd"
+                    @dragover="(ev) => onFolderDragOver(folder, ev)"
+                    @dragleave="() => onFolderDragLeave(folder)"
+                    @drop="(ev) => onFolderDrop(folder, ev)"
                 >
-                    <!-- 3-dot menu -->
+                    <!-- Selection checkbox (top-right) -->
                     <button
                         type="button"
-                        class="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded text-surface-400 opacity-0 transition-opacity hover:bg-white/60 hover:text-surface-700 group-hover:opacity-100 dark:hover:bg-surface-800 dark:hover:text-surface-200"
-                        @click.stop="(ev) => emit('context-folder', ev, folder)"
+                        class="fm-check absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-md border-2 transition-all"
+                        :class="
+                            isSelected('folder', folder.id)
+                                ? 'border-primary-500 bg-primary-500 text-white shadow-sm opacity-100'
+                                : 'border-surface-300 bg-white/90 text-transparent opacity-0 hover:border-primary-400 group-hover:opacity-100 dark:border-surface-600 dark:bg-surface-900/80'
+                        "
+                        :aria-pressed="isSelected('folder', folder.id)"
+                        @click.stop="emit('check-toggle', 'folder', folder.id)"
                     >
-                        <i class="pi pi-ellipsis-v" style="font-size: 0.9rem" />
+                        <i v-if="isSelected('folder', folder.id)" class="pi pi-check" style="font-size: 0.8rem" />
                     </button>
 
                     <!-- Icon square -->
@@ -311,19 +415,19 @@
                     </div>
 
                     <div class="min-w-0">
-                        <div class="truncate text-base font-semibold" :title="folder.name">
+                        <div class="truncate font-semibold" :title="folder.name">
                             {{ folder.name }}
                         </div>
-                        <div class="mt-0.5 text-xs text-surface-500 dark:text-surface-400">
+                        <div class="mt-0.5 text-surface-500 dark:text-surface-400">
                             {{ folder.file_count ?? 0 }} files · {{ humanSize(folder.total_size ?? 0) }}
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Files -->
+            <!-- Files + pending uploads -->
             <div
-                v-if="files.length > 0"
+                v-if="files.length > 0 || pending.length > 0"
                 class="grid gap-4"
                 style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr))"
             >
@@ -332,6 +436,7 @@
                     :key="`file-${file.id}`"
                     role="button"
                     tabindex="0"
+                    draggable="true"
                     :data-fm-key="`file:${file.id}`"
                     class="fm-tile fm-file-tile group relative flex flex-col overflow-hidden rounded-2xl border text-left transition-all"
                     :class="
@@ -339,10 +444,11 @@
                             ? 'border-primary-500 ring-2 ring-primary-200 dark:ring-primary-800'
                             : 'border-surface-200 hover:-translate-y-0.5 dark:border-surface-700'
                     "
-                    @click="(ev) => emit('toggle-select', 'file', file.id, ev)"
-                    @dblclick="emit('open-file', file)"
+                    @click="(ev) => onFileTileClick(file, ev)"
                     @keydown.enter.prevent="emit('open-file', file)"
                     @contextmenu.prevent="(ev) => emit('context-file', ev, file)"
+                    @dragstart="(ev) => onTileDragStart('file', file.id, ev)"
+                    @dragend="onTileDragEnd"
                 >
                     <!-- Preview area -->
                     <div
@@ -368,6 +474,22 @@
                                 <i class="pi pi-play text-white" style="font-size: 1.2rem" />
                             </span>
                         </template>
+
+                        <!-- Selection checkbox (top-right) -->
+                        <button
+                            type="button"
+                            class="fm-check absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-md border-2 transition-all"
+                            :class="
+                                isSelected('file', file.id)
+                                    ? 'border-primary-500 bg-primary-500 text-white shadow-sm opacity-100'
+                                    : 'border-white/80 bg-black/30 text-transparent opacity-0 backdrop-blur-sm hover:border-primary-400 group-hover:opacity-100'
+                            "
+                            :aria-pressed="isSelected('file', file.id)"
+                            @click.stop="emit('check-toggle', 'file', file.id)"
+                        >
+                            <i v-if="isSelected('file', file.id)" class="pi pi-check" style="font-size: 0.8rem" />
+                        </button>
+
                     </div>
 
                     <!-- Info bar -->
@@ -378,10 +500,10 @@
                             style="font-size: 1rem"
                         />
                         <div class="min-w-0 flex-1">
-                            <div class="truncate text-sm font-medium" :title="file.file_name">
+                            <div class="truncate font-medium" :title="file.file_name">
                                 {{ file.file_name }}
                             </div>
-                            <div class="text-[11px] text-surface-500 dark:text-surface-400">
+                            <div class="text-surface-500 dark:text-surface-400">
                                 {{ humanSize(file.size) }}
                                 <span v-if="file.created_at" class="mx-0.5">·</span>
                                 <span v-if="file.created_at">{{ relativeDate(file.created_at) }}</span>
@@ -393,6 +515,81 @@
                             @click.stop="emit('download-file', file)"
                         >
                             <i class="pi pi-download" style="font-size: 0.9rem" />
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Pending upload tiles -->
+                <div
+                    v-for="item in pending"
+                    :key="item.tempId"
+                    class="fm-tile fm-file-tile fm-pending-tile relative flex flex-col overflow-hidden rounded-2xl border text-left"
+                    :class="
+                        item.error
+                            ? 'border-rose-300 dark:border-rose-800'
+                            : 'border-surface-200 dark:border-surface-700'
+                    "
+                >
+                    <div
+                        class="fm-preview relative flex h-32 items-center justify-center overflow-hidden"
+                        :class="item.error ? 'bg-rose-50 dark:bg-rose-950/40' : paletteFor(item.mimeType).preview"
+                    >
+                        <i
+                            v-if="item.error"
+                            class="pi pi-exclamation-triangle text-rose-500"
+                            style="font-size: 2.75rem"
+                        />
+                        <i
+                            v-else
+                            class="pi"
+                            :class="[paletteFor(item.mimeType).icon, paletteFor(item.mimeType).iconColor]"
+                            style="font-size: 2.75rem"
+                        />
+                        <div
+                            v-if="!item.error"
+                            class="absolute inset-x-0 bottom-0 h-1.5 bg-white/30 dark:bg-black/30"
+                        >
+                            <div
+                                class="h-full bg-primary-500 transition-all duration-200"
+                                :style="{ width: `${item.progress}%` }"
+                            />
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2.5 bg-surface-0 px-3 py-2.5 dark:bg-surface-900">
+                        <i
+                            class="pi shrink-0"
+                            :class="
+                                item.error
+                                    ? 'pi-times-circle text-rose-500'
+                                    : `pi-spin pi-spinner ${paletteFor(item.mimeType).iconClass}`
+                            "
+                            style="font-size: 1rem"
+                        />
+                        <div class="min-w-0 flex-1">
+                            <div class="truncate font-medium" :title="item.name">
+                                {{ item.name }}
+                            </div>
+                            <div
+                                :class="
+                                    item.error
+                                        ? 'text-rose-500'
+                                        : 'text-surface-500 dark:text-surface-400'
+                                "
+                            >
+                                <template v-if="item.error">{{ item.error }}</template>
+                                <template v-else>
+                                    {{ trans('file-manager.labels.uploading') }} · {{ item.progress }}%
+                                </template>
+                            </div>
+                        </div>
+                        <button
+                            v-if="item.error"
+                            type="button"
+                            class="shrink-0 rounded p-1 text-surface-400 transition-opacity hover:bg-surface-100 hover:text-surface-700 dark:hover:bg-surface-800 dark:hover:text-surface-200"
+                            :title="trans('file-manager.labels.dismiss')"
+                            @click.stop="emit('dismiss-pending', item.tempId)"
+                        >
+                            <i class="pi pi-times" style="font-size: 0.9rem" />
                         </button>
                     </div>
                 </div>
@@ -419,6 +616,9 @@
     }
     .fm-folder-tile {
         min-height: 130px;
+    }
+    .fm-pending-tile {
+        cursor: default;
     }
     .fm-file-tile {
         min-height: 190px;

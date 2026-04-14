@@ -21,7 +21,7 @@
     <div class="fm-folder-tree flex h-full flex-col gap-1 overflow-y-auto p-4">
         <button
             type="button"
-            class="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors"
+            class="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left font-medium transition-colors"
             :class="
                 isRootActive
                     ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-200'

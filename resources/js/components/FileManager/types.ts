@@ -57,3 +57,13 @@ export interface SelectedItem {
     type: 'folder' | 'file';
     id: string;
 }
+
+export interface PendingUpload {
+    tempId: string;
+    name: string;
+    size: number;
+    mimeType: string;
+    progress: number;
+    error: string | null;
+    folderId: string | null;
+}

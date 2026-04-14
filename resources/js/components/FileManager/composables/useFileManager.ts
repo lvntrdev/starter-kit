@@ -6,6 +6,7 @@ import type {
     FolderContents,
     FolderNode,
     FolderSummary,
+    PendingUpload,
     SelectedItem,
     SelectionKey,
     SortDirection,
@@ -51,6 +52,8 @@ export function useFileManager(options: Options) {
     const direction = ref<SortDirection>('asc');
 
     const selectedKeys = ref<Set<SelectionKey>>(new Set());
+
+    const pendingUploads = ref<PendingUpload[]>([]);
 
     const contextQuery = computed(() => {
         const params = new URLSearchParams({ context: options.context });
@@ -230,48 +233,105 @@ export function useFileManager(options: Options) {
         await refresh();
     }
 
-    async function uploadFiles(
-        files: FileList | File[],
-        folderId: string | null = currentFolderId.value,
-    ): Promise<UploadResponse> {
-        const formData = new FormData();
-        formData.append('context', options.context);
-        if (options.contextId) {
-            formData.append('context_id', options.contextId);
-        }
-        if (folderId) {
-            formData.append('folder_id', folderId);
-        }
-        for (const file of Array.from(files)) {
-            formData.append('files[]', file);
-        }
+    function updatePending(tempId: string, patch: Partial<PendingUpload>): void {
+        pendingUploads.value = pendingUploads.value.map((p) => (p.tempId === tempId ? { ...p, ...patch } : p));
+    }
 
-        const xsrf = decodeURIComponent(
+    function removePending(tempId: string): void {
+        pendingUploads.value = pendingUploads.value.filter((p) => p.tempId !== tempId);
+    }
+
+    function xsrfToken(): string {
+        return decodeURIComponent(
             document.cookie
                 .split('; ')
                 .find((c) => c.startsWith('XSRF-TOKEN='))
                 ?.split('=')[1] ?? '',
         );
+    }
 
-        const response = await fetch('/file-manager/files', {
-            method: 'POST',
-            headers: {
-                Accept: 'application/json',
-                'X-XSRF-TOKEN': xsrf,
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            credentials: 'same-origin',
-            body: formData,
+    function uploadSingle(file: File, folderId: string | null, tempId: string): Promise<FileItem[]> {
+        return new Promise((resolve, reject) => {
+            const formData = new FormData();
+            formData.append('context', options.context);
+            if (options.contextId) formData.append('context_id', options.contextId);
+            if (folderId) formData.append('folder_id', folderId);
+            formData.append('files[]', file);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/file-manager/files');
+            xhr.setRequestHeader('Accept', 'application/json');
+            xhr.setRequestHeader('X-XSRF-TOKEN', xsrfToken());
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            xhr.withCredentials = true;
+
+            xhr.upload.addEventListener('progress', (event) => {
+                if (!event.lengthComputable) return;
+                const pct = Math.min(99, Math.round((event.loaded / event.total) * 100));
+                updatePending(tempId, { progress: pct });
+            });
+
+            xhr.onload = () => {
+                try {
+                    const envelope = JSON.parse(xhr.responseText);
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve((envelope.data as UploadResponse).files);
+                    } else {
+                        reject(new Error(envelope?.message ?? 'Upload failed'));
+                    }
+                } catch {
+                    reject(new Error('Upload failed'));
+                }
+            };
+            xhr.onerror = () => reject(new Error('Network error'));
+            xhr.send(formData);
         });
+    }
 
-        const envelope = await response.json();
+    async function uploadFiles(
+        files: FileList | File[],
+        folderId: string | null = currentFolderId.value,
+    ): Promise<{ uploaded: FileItem[]; errors: string[] }> {
+        const list = Array.from(files);
+        if (list.length === 0) return { uploaded: [], errors: [] };
 
-        if (!response.ok) {
-            throw new Error(envelope?.message ?? 'Upload failed');
+        const queued = list.map<PendingUpload>((file) => ({
+            tempId: `pending:${crypto.randomUUID()}`,
+            name: file.name,
+            size: file.size,
+            mimeType: file.type || 'application/octet-stream',
+            progress: 0,
+            error: null,
+            folderId,
+        }));
+        pendingUploads.value = [...pendingUploads.value, ...queued];
+
+        const uploaded: FileItem[] = [];
+        const errors: string[] = [];
+
+        const tasks = list.map(async (file, idx) => {
+            const { tempId } = queued[idx];
+            try {
+                const result = await uploadSingle(file, folderId, tempId);
+                updatePending(tempId, { progress: 100 });
+                uploaded.push(...result);
+            } catch (err) {
+                const message = (err as Error).message ?? 'Upload failed';
+                updatePending(tempId, { error: message });
+                errors.push(`${file.name}: ${message}`);
+            }
+        });
+        await Promise.allSettled(tasks);
+
+        for (const p of queued) {
+            if (!p.error) removePending(p.tempId);
         }
-
         await loadContents(currentFolderId.value);
-        return envelope.data as UploadResponse;
+        return { uploaded, errors };
+    }
+
+    function dismissPending(tempId: string): void {
+        removePending(tempId);
     }
 
     return {
@@ -285,6 +345,7 @@ export function useFileManager(options: Options) {
         selectedKeys,
         selectionCount,
         selectedItems,
+        pendingUploads,
         loadTree,
         loadContents,
         refresh,
@@ -302,6 +363,7 @@ export function useFileManager(options: Options) {
         bulkDelete,
         moveItem,
         uploadFiles,
+        dismissPending,
     };
 }
 
