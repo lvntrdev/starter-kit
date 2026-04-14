@@ -13,7 +13,8 @@ class PublishCommand extends Command
 {
     protected $signature = 'sk:publish
         {--tag=* : Tag(s) to publish (components, datatable, form, tabs, skeleton, ui, lang, config)}
-        {--force : Overwrite existing files}';
+        {--force : Overwrite existing files}
+        {--destination= : Override destination base path (for testing or custom layouts)}';
 
     protected $description = 'Publish optional Starter Kit assets for customization';
 
@@ -152,7 +153,7 @@ class PublishCommand extends Command
 
         $config = self::PUBLISHABLE_TAGS[$tag];
         $source = StarterKitServiceProvider::basePath($config['source']);
-        $destination = base_path($config['destination']);
+        $destination = $this->resolveDestination($config['destination']);
 
         if (! file_exists($source)) {
             $this->components->error("Source not found: {$source}");
@@ -183,6 +184,28 @@ class PublishCommand extends Command
         }
 
         return $count;
+    }
+
+    /**
+     * Resolve the absolute destination path.
+     *
+     * When --destination is not provided, falls back to base_path() which
+     * preserves the historical behavior. When provided, the tag's relative
+     * destination is resolved under the override root so tests (or custom
+     * layouts) can publish into an isolated directory without touching the
+     * project's source tree.
+     */
+    private function resolveDestination(string $relative): string
+    {
+        $override = $this->option('destination');
+
+        if (! is_string($override) || $override === '') {
+            return base_path($relative);
+        }
+
+        $root = rtrim($override, DIRECTORY_SEPARATOR);
+
+        return $root.DIRECTORY_SEPARATOR.ltrim($relative, DIRECTORY_SEPARATOR);
     }
 
     /**

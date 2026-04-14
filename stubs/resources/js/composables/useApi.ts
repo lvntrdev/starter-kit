@@ -75,7 +75,21 @@ async function request<T = unknown>(method: HttpMethod, url: string, payload?: u
         return null as T;
     }
 
-    const json: ApiEnvelope<T> = await response.json();
+    let json: ApiEnvelope<T>;
+    try {
+        json = (await response.json()) as ApiEnvelope<T>;
+    } catch {
+        // Non-JSON response (HTML error page, empty body, proxy timeout, etc.)
+        // Synthesize an envelope so the caller gets a consistent ApiError.
+        throw new ApiError(response.status, {
+            success: false,
+            status: response.status,
+            message: response.ok
+                ? 'Sunucudan geçersiz yanıt alındı.'
+                : `İstek başarısız oldu (${response.status}).`,
+            data: null as unknown as T,
+        });
+    }
 
     if (!response.ok || !json.success) {
         throw new ApiError(response.status, json as ApiEnvelope);
@@ -105,11 +119,18 @@ export function useApi(apiOptions: UseApiOptions = {}) {
         try {
             return await promise;
         } catch (error) {
-            if (toast && error instanceof ApiError) {
+            if (toast) {
+                const detail =
+                    error instanceof ApiError
+                        ? error.message
+                        : error instanceof Error && error.message
+                          ? error.message
+                          : 'Ağ hatası. Lütfen tekrar deneyin.';
+
                 toast.add({
                     severity: 'error',
                     summary: 'Hata',
-                    detail: error.message,
+                    detail,
                     group: 'bc',
                     life: 5000,
                 });

@@ -42,7 +42,7 @@ class DatatableQueryBuilder
     /** @var string[] */
     private array $withRelations = [];
 
-    private int $defaultPerPage = 10;
+    private int $defaultPerPage;
 
     /** @var class-string<JsonResource>|null */
     private ?string $resourceClass = null;
@@ -50,6 +50,7 @@ class DatatableQueryBuilder
     private function __construct(string|Builder $subject)
     {
         $this->subject = $subject;
+        $this->defaultPerPage = (int) config('starter-kit.datatable.default_per_page', 10);
     }
 
     /**
@@ -61,7 +62,14 @@ class DatatableQueryBuilder
     }
 
     /**
-     * Columns that are searchable via filter[search] (LIKE on each column, OR combined).
+     * Columns that are searchable via filter[search].
+     *
+     * Semantics: the search value is split by whitespace into words; each word
+     * must match at least one of the given columns (LIKE '%word%', OR across
+     * columns) AND all words must match (AND across words). So a query like
+     * `filter[search]=john doe` against `['name', 'email']` matches rows where
+     * every word appears in at least one of name/email. Wildcards `%` and `_`
+     * in the search value are escaped.
      *
      * @param  string[]  $fields
      */

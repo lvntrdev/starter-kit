@@ -39,4 +39,19 @@ return [
 
     'published_hashes' => storage_path('starter-kit/hashes.json'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Datatable defaults
+    |--------------------------------------------------------------------------
+    |
+    | Used by DatatableQueryBuilder when the caller does not override the
+    | value via perPage() or ?per_page=. Existing callers are unaffected —
+    | the builder falls back to 10 when this key is absent.
+    |
+    */
+
+    'datatable' => [
+        'default_per_page' => (int) env('STARTER_KIT_DATATABLE_PER_PAGE', 10),
+    ],
+
 ];
