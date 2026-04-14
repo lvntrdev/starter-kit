@@ -84,9 +84,7 @@ async function request<T = unknown>(method: HttpMethod, url: string, payload?: u
         throw new ApiError(response.status, {
             success: false,
             status: response.status,
-            message: response.ok
-                ? 'Sunucudan geçersiz yanıt alındı.'
-                : `İstek başarısız oldu (${response.status}).`,
+            message: response.ok ? 'Sunucudan geçersiz yanıt alındı.' : `İstek başarısız oldu (${response.status}).`,
             data: null as unknown as T,
         });
     }
