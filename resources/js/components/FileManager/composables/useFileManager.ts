@@ -34,6 +34,18 @@ function selectionKey(type: 'folder' | 'file', id: string | number): SelectionKe
     return `${type}:${String(id)}` as SelectionKey;
 }
 
+function generateTempId(): string {
+    const cryptoObj = typeof globalThis !== 'undefined' ? globalThis.crypto : undefined;
+    if (cryptoObj?.randomUUID) {
+        return cryptoObj.randomUUID();
+    }
+    if (cryptoObj?.getRandomValues) {
+        const bytes = cryptoObj.getRandomValues(new Uint8Array(16));
+        return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    }
+    return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
+}
+
 export function useFileManager(options: Options) {
     const api = useApi();
 
@@ -309,7 +321,7 @@ export function useFileManager(options: Options) {
         if (list.length === 0) return { uploaded: [], errors: [] };
 
         const queued = list.map<PendingUpload>((file) => ({
-            tempId: `pending:${crypto.randomUUID()}`,
+            tempId: `pending:${generateTempId()}`,
             name: file.name,
             size: file.size,
             mimeType: file.type || 'application/octet-stream',
