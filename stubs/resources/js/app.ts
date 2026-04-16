@@ -25,16 +25,13 @@ createInertiaApp({
         return title ? `${title} - ${appName}` : appName;
     },
     withApp(app, { ssr }) {
+        // Tek eager glob — SSR'da sync resolve sart, client'ta Promise.resolve ile sarmalanir.
+        // Dual static+dynamic glob Vite "dynamic import will not move module into another chunk"
+        // uyarisi cikariyor; lang JSON'lari kucuk oldugu icin tek bundle'a almak maliyetsiz.
+        const langs = import.meta.glob<Record<string, string>>('../../lang/*.json', { eager: true });
+        const resolveLang = (lang: string) => langs[`../../lang/php_${lang}.json`];
         app.use(i18nVue, {
-            resolve: ssr
-                ? (lang: string) => {
-                      const langs = import.meta.glob<Record<string, string>>('../../lang/*.json', { eager: true });
-                      return langs[`../../lang/php_${lang}.json`];
-                  }
-                : async (lang: string) => {
-                      const langs = import.meta.glob<Record<string, string>>('../../lang/*.json');
-                      return await langs[`../../lang/php_${lang}.json`]();
-                  },
+            resolve: ssr ? resolveLang : (lang: string) => Promise.resolve(resolveLang(lang)),
         })
             .use(PrimeVue, {
                 theme: {
