@@ -5,6 +5,49 @@ All notable changes to `lvntr/laravel-starter-kit` will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [13.3.0] - 2026-04-17
+
+### Added
+
+- **Cloudflare Turnstile captcha** — login, register and password-reset flows can now be protected by Turnstile. Ships with a `turnstile` middleware alias (`ValidateTurnstile`), a `TurnstileRule` for FormRequest validation, `TurnstileSettingsDTO`, and a **Settings → Turnstile** admin tab. Site key / secret key are managed from the UI.
+
+- **Last login tracking** — `UpdateLastLogin` listener on the `Illuminate\Auth\Events\Login` event writes `last_login_at` and `last_login_ip` to the user. Surfaced on user detail pages and in the users datatable.
+
+- **Inactive user block on login** — `FortifyServiceProvider` now rejects the login attempt when the user's status is not `active`, returning a clear error instead of starting a session. Admins can suspend accounts without deleting them.
+
+- **`BaseFormRequest`** — shared parent for every admin/API FormRequest. Centralises `authorize()` defaults, Turnstile guard wiring, and attribute translation. All shipped FormRequests have been migrated to extend it.
+
+- **`SkAttributeTranslationLoader`** — resolves `sk-attribute.{field}` keys for validation error messages (with sensible fallbacks), wired globally via `AppServiceProvider`.
+
+- **CI workflow** — `.github/workflows/ci.yml` runs `composer validate --strict` and PHP syntax lint on `src/` and `stubs/` across a PHP 8.3 / 8.4 matrix.
+
+- **`docs/ARCHITECTURE.md`** — package architecture reference: src vs stubs ownership, Vue component consumption paths (vendor-direct alias / `sk:publish` / mixed), and a forward notice of the upcoming base-class namespace move.
+
+### Changed
+
+- **Shipped translations now carry an `sk-*` filename prefix** — every `stubs/lang/{locale}/*.php` has a `sk-` counterpart (`sk-admin.php`, `sk-auth.php`, `sk-button.php`, `sk-datatable.php`, `sk-menu.php`, `sk-setting.php`, `sk-user.php`, …). All shipped Vue pages and PHP code now reference the new keys (`__('sk-button.save')` instead of `__('button.save')`), so consumer apps can freely own the unprefixed namespace.
+
+- **FileManager actions** — consistent response envelopes and captcha-aware request validation.
+
+- **`SettingsDefaultsQuery`** — now returns Turnstile defaults alongside existing sections.
+
+### Compatibility
+
+- The **legacy `starter-kit::` translation namespace is untouched.** `resources/lang/` inside the package still ships the original `admin.php`, `button.php`, `validation.php`, … files. Existing `__('starter-kit::admin.menu')` calls and any `lang/vendor/starter-kit/` publishes keep resolving — nothing to migrate unless you want to.
+
+- The **legacy unprefixed stubs** (`stubs/lang/en/admin.php`, `button.php`, …) are still shipped next to the new `sk-*` files, so if your application calls `__('admin.menu')` from your own code (because a previous install copied those files into `lang/en/`), nothing breaks. The legacy stubs will be removed in a future major release.
+
+- **`sk:update` does not overwrite `lang/` files** (translations are not in `SAFE_UPDATE_PATHS`). The new `sk-*.php` files ship via `stubs/lang/` and are **not** picked up automatically by `composer update` or `sk:update`. To pull them into an existing installation, copy them manually from the vendor directory:
+
+  ```bash
+  cp vendor/lvntr/laravel-starter-kit/stubs/lang/en/sk-*.php lang/en/
+  cp vendor/lvntr/laravel-starter-kit/stubs/lang/tr/sk-*.php lang/tr/
+  ```
+
+  Then migrate your own Vue / PHP code to the new keys at your own pace. If you do not use the new `sk-*` keys anywhere, you can simply ignore this change — the legacy behaviour is untouched.
+
+---
+
 ## [13.2.9] - 2026-04-16
 
 ### Fixed
