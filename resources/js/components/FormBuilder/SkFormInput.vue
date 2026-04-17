@@ -16,9 +16,15 @@
         ToggleButtonFieldConfig,
     } from '@lvntr/components/FormBuilder/core';
     import ColorSelector from '@lvntr/components/FormBuilder/SkColorSelector.vue';
+    import FilePreviewModal, {
+        suggestedPreviewWidth,
+        type FilePreviewFile,
+    } from '@lvntr/components/ui/FilePreviewModal.vue';
     import { InputGroup } from 'primevue';
     import { useApi } from '@/composables/useApi';
     import { useConfirm } from '@/composables/useConfirm';
+    import { useDialog } from '@/composables/useDialog';
+    import { useImageLightbox } from '@/composables/useImageLightbox';
     import { trans } from 'laravel-vue-i18n';
 
     interface Props {
@@ -147,6 +153,18 @@
         if (mime.includes('wordprocessing') || mime.includes('msword') || mime.includes('.document'))
             return 'pi pi-file-word';
         return 'pi pi-file';
+    }
+
+    const dialog = useDialog();
+    const lightbox = useImageLightbox();
+
+    function openFilePreview(file: FilePreviewFile): void {
+        if (file.mimeType?.startsWith('image/')) {
+            lightbox.open(file.url, file.name);
+            return;
+        }
+        const width = suggestedPreviewWidth(file.mimeType);
+        dialog.open(FilePreviewModal, { file }, file.name, width ? { width } : {});
     }
 
     function handleFileSelect(event: Event): void {
@@ -555,7 +573,11 @@
             <!-- Existing media list -->
             <div v-if="existingFiles.length" class="sk-fb__file-list">
                 <div v-for="media in existingFiles" :key="`existing-${media.id}`" class="sk-fb__file-item">
-                    <a :href="media.url" target="_blank" rel="noopener noreferrer" class="sk-fb__file-preview-link">
+                    <button
+                        type="button"
+                        class="sk-fb__file-preview-link"
+                        @click="openFilePreview({ url: media.url, name: media.name, mimeType: media.mime_type, size: media.size })"
+                    >
                         <img
                             v-if="isImageMime(media.mime_type)"
                             :src="media.url"
@@ -563,16 +585,15 @@
                             class="sk-fb__file-thumb"
                         >
                         <i v-else :class="[fileIcon(media.mime_type), 'sk-fb__file-icon']" />
-                    </a>
+                    </button>
                     <div class="sk-fb__file-info">
-                        <a
-                            :href="media.url"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        <button
+                            type="button"
                             class="sk-fb__file-name sk-fb__file-name--link"
+                            @click="openFilePreview({ url: media.url, name: media.name, mimeType: media.mime_type, size: media.size })"
                         >
                             {{ media.name }}
-                        </a>
+                        </button>
                         <p class="sk-fb__file-size">
                             {{ formatFileSize(media.size) }}
                         </p>
@@ -595,19 +616,22 @@
                     :key="`new-${index}`"
                     class="sk-fb__file-item sk-fb__file-item--new"
                 >
-                    <a :href="item.url" target="_blank" rel="noopener noreferrer" class="sk-fb__file-preview-link">
+                    <button
+                        type="button"
+                        class="sk-fb__file-preview-link"
+                        @click="openFilePreview({ url: item.url, name: item.file.name, mimeType: item.file.type, size: item.file.size })"
+                    >
                         <img v-if="item.isImage" :src="item.url" :alt="item.file.name" class="sk-fb__file-thumb">
                         <i v-else :class="[fileIcon(item.file.type), 'sk-fb__file-icon']" />
-                    </a>
+                    </button>
                     <div class="sk-fb__file-info">
-                        <a
-                            :href="item.url"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        <button
+                            type="button"
                             class="sk-fb__file-name sk-fb__file-name--link"
+                            @click="openFilePreview({ url: item.url, name: item.file.name, mimeType: item.file.type, size: item.file.size })"
                         >
                             {{ item.file.name }}
-                        </a>
+                        </button>
                         <p class="sk-fb__file-size">
                             {{ formatFileSize(item.file.size) }}
                         </p>

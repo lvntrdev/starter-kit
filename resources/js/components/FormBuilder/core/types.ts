@@ -33,6 +33,12 @@ export interface BaseFieldConfig {
     label: string;
     type: FieldType;
     required?: boolean;
+    /**
+     * Whether `label` is a translation key (default: true) or a pre-resolved raw string.
+     * Set false via `.trans(false)` when passing an already-translated string like `$t('admin.example')`
+     * so the template renders `label` as-is instead of calling `$t()` on it.
+     */
+    translateLabel?: boolean;
     /** Placement for the field label in vertical form layout. */
     labelPlacement?: 'top' | 'inline';
     /** Position of the control relative to its label text. */

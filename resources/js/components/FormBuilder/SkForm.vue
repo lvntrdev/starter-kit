@@ -17,6 +17,15 @@
     import { trans } from 'laravel-vue-i18n';
     import SkFormInput from '@lvntr/components/FormBuilder/SkFormInput.vue';
 
+    /**
+     * Render a field's label: translates it via laravel-vue-i18n when the label is
+     * a translation key (default), or returns it as-is when the field opted out
+     * via `.trans(false)` — i.e. already holds a pre-resolved string.
+     */
+    function displayLabel(field: FieldConfig): string {
+        return field.translateLabel === false ? field.label : trans(field.label);
+    }
+
     interface Props {
         config: FormBuilderConfig;
         /**
@@ -549,7 +558,7 @@
                                 v-if="field.type === 'title'"
                                 class="sk-fb__title"
                             >
-                                {{ $t(field.label) }}
+                                {{ displayLabel(field) }}
                             </component>
 
                             <!-- ── Slot ─────────────────────────────────────── -->
@@ -566,7 +575,7 @@
                                     <div class="sk-fb__inline-row">
                                         <template v-if="isControlRight(field) && !field.hideLabel">
                                             <label :for="field.key" class="sk-fb__label sk-fb__label--inline">
-                                                {{ $t(field.label) }}
+                                                {{ displayLabel(field) }}
                                                 <span v-if="field.required" class="sk-fb__required">*</span>
                                             </label>
                                         </template>
@@ -590,7 +599,7 @@
 
                                         <template v-if="!isControlRight(field) && !field.hideLabel">
                                             <label :for="field.key" class="sk-fb__label sk-fb__label--inline">
-                                                {{ $t(field.label) }}
+                                                {{ displayLabel(field) }}
                                                 <span v-if="field.required" class="sk-fb__required">*</span>
                                             </label>
                                         </template>
@@ -614,7 +623,7 @@
                                             :for="field.key"
                                             class="sk-fb__label sk-fb__label--field-inline"
                                         >
-                                            {{ $t(field.label) }}
+                                            {{ displayLabel(field) }}
                                             <span v-if="field.required" class="sk-fb__required">*</span>
                                         </label>
 
@@ -640,7 +649,7 @@
 
                                     <template v-else>
                                         <label v-if="!field.hideLabel" :for="field.key" class="sk-fb__label">
-                                            {{ $t(field.label) }}
+                                            {{ displayLabel(field) }}
                                             <span v-if="field.required" class="sk-fb__required">*</span>
                                         </label>
 
@@ -676,7 +685,7 @@
                                     :for="field.key"
                                     class="sk-fb__label sk-fb__label--horizontal"
                                 >
-                                    {{ $t(field.label) }}
+                                    {{ displayLabel(field) }}
                                     <span v-if="field.required" class="sk-fb__required">*</span>
                                 </label>
 

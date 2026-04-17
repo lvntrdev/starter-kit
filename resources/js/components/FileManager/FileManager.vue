@@ -1,5 +1,7 @@
 <script setup lang="ts">
     import { useConfirm } from '@/composables/useConfirm';
+    import { useDialog } from '@/composables/useDialog';
+    import { useImageLightbox } from '@/composables/useImageLightbox';
     import { trans } from 'laravel-vue-i18n';
     import Button from 'primevue/button';
     import ContextMenu from 'primevue/contextmenu';
@@ -9,6 +11,7 @@
     import Select from 'primevue/select';
     import { useToast } from 'primevue/usetoast';
     import { computed, onMounted, ref } from 'vue';
+    import FilePreviewModal, { suggestedPreviewWidth } from '@lvntr/components/ui/FilePreviewModal.vue';
     import Breadcrumb from './components/Breadcrumb.vue';
     import FileGrid from './components/FileGrid.vue';
     import FolderTree from './components/FolderTree.vue';
@@ -44,7 +47,7 @@
     }
 
     function isAnyDialogOpen(): boolean {
-        return showNewFolder.value || showRename.value || showMove.value || showPreview.value;
+        return showNewFolder.value || showRename.value || showMove.value;
     }
 
     function onKeyDown(event: KeyboardEvent): void {
@@ -275,31 +278,30 @@
     }
 
     // ── Preview modal ────────────────────────────────────────────
-    const showPreview = ref(false);
-    const previewFile = ref<FileItem | null>(null);
+    const dialog = useDialog();
+    const lightbox = useImageLightbox();
 
     function openPreview(file: FileItem): void {
-        previewFile.value = file;
-        showPreview.value = true;
-    }
-
-    function isImage(mime: string): boolean {
-        return mime.startsWith('image/');
-    }
-    function isVideo(mime: string): boolean {
-        return mime.startsWith('video/');
-    }
-    function isAudio(mime: string): boolean {
-        return mime.startsWith('audio/');
-    }
-    function isPdf(mime: string): boolean {
-        return mime === 'application/pdf';
-    }
-    function isText(mime: string): boolean {
-        return mime.startsWith('text/');
-    }
-    function hasPreview(mime: string): boolean {
-        return isImage(mime) || isVideo(mime) || isAudio(mime) || isPdf(mime) || isText(mime);
+        if (file.mime_type.startsWith('image/')) {
+            lightbox.open(file.url, file.file_name);
+            return;
+        }
+        const width = suggestedPreviewWidth(file.mime_type);
+        dialog.open(
+            FilePreviewModal,
+            {
+                file: {
+                    url: file.url,
+                    name: file.file_name,
+                    mimeType: file.mime_type,
+                    size: file.size,
+                },
+                onDownload: () => downloadFile(file),
+                showExternalOpen: true,
+            },
+            file.file_name,
+            width ? { width } : {},
+        );
     }
 
     function openRename(folder: FolderSummary): void {
@@ -641,10 +643,6 @@
         isDropping.value = false;
     }
 
-    function openFileExternal(file: FileItem): void {
-        window.open(file.url, '_blank');
-    }
-
     function openFileFromGrid(file: FileItem): void {
         openPreview(file);
     }
@@ -926,61 +924,6 @@
             </template>
         </Dialog>
 
-        <Dialog
-            v-model:visible="showPreview"
-            :header="previewFile?.file_name ?? trans('sk-file-manager.labels.preview')"
-            modal
-            dismissable-mask
-            :pt="{ content: { class: 'fm-preview-content' } }"
-            :style="{ width: '90vw', maxWidth: '1100px' }"
-        >
-            <div v-if="previewFile" class="fm-preview-body flex items-center justify-center">
-                <img
-                    v-if="isImage(previewFile.mime_type)"
-                    :src="previewFile.url"
-                    :alt="previewFile.file_name"
-                    class="mx-auto max-h-[75vh] w-auto object-contain"
-                >
-                <video
-                    v-else-if="isVideo(previewFile.mime_type)"
-                    :src="previewFile.url"
-                    controls
-                    autoplay
-                    class="max-h-[75vh] w-full"
-                />
-                <audio v-else-if="isAudio(previewFile.mime_type)" :src="previewFile.url" controls class="w-full" />
-                <iframe
-                    v-else-if="isPdf(previewFile.mime_type) || isText(previewFile.mime_type)"
-                    :src="previewFile.url"
-                    class="h-[75vh] w-full border-0"
-                />
-                <div
-                    v-else
-                    class="flex flex-col items-center gap-4 p-10 text-center text-surface-600 dark:text-surface-300"
-                >
-                    <i class="pi pi-file text-surface-400" style="font-size: 3rem" />
-                    <p>{{ trans('sk-file-manager.labels.no_preview') }}</p>
-                </div>
-            </div>
-            <template #footer>
-                <Button
-                    v-if="previewFile && !hasPreview(previewFile.mime_type)"
-                    severity="secondary"
-                    text
-                    icon="pi pi-external-link"
-                    :label="trans('sk-file-manager.labels.open_in_new_tab')"
-                    @click="previewFile && openFileExternal(previewFile)"
-                />
-                <Button
-                    v-if="previewFile"
-                    severity="secondary"
-                    icon="pi pi-download"
-                    :label="trans('sk-file-manager.labels.download')"
-                    @click="previewFile && downloadFile(previewFile)"
-                />
-                <Button :label="trans('sk-file-manager.labels.close')" @click="showPreview = false" />
-            </template>
-        </Dialog>
     </div>
 </template>
 

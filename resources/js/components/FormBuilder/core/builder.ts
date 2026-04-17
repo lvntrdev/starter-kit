@@ -50,6 +50,20 @@ abstract class BaseFieldBuilder<T extends FieldConfig> {
         return this;
     }
 
+    /**
+     * Whether the label is a translation key (default) or a pre-resolved raw string.
+     * Pass `false` when supplying an already-translated value like `$t('admin.example')`
+     * so the form template skips `$t()` on it.
+     *
+     * @example
+     *   FB.inputText().key('last_name')                                  // default → $t('sk-attribute.attributes.last_name')
+     *   FB.inputText().key('x').label($t('admin.example')).trans(false)  // raw render
+     */
+    trans(shouldTranslate = true): this {
+        this.config.translateLabel = shouldTranslate;
+        return this;
+    }
+
     required(required = true): this {
         this.config.required = required;
         return this;
@@ -128,6 +142,9 @@ abstract class BaseFieldBuilder<T extends FieldConfig> {
         }
         if (!this.config.label) {
             this.config.label = `sk-attribute.attributes.${this.config.key}`;
+        }
+        if (this.config.translateLabel === undefined) {
+            this.config.translateLabel = true;
         }
         if (this.config.required === undefined) {
             this.config.required = true;
@@ -496,6 +513,9 @@ export class TitleBuilder extends BaseFieldBuilder<TitleFieldConfig> {
     }
 
     build(): TitleFieldConfig {
+        if (this.config.translateLabel === undefined) {
+            this.config.translateLabel = true;
+        }
         return this.config as TitleFieldConfig;
     }
 
@@ -575,6 +595,9 @@ export class SlotBuilder extends BaseFieldBuilder<SlotFieldConfig> {
     build(): SlotFieldConfig {
         if (!this.config.key) {
             throw new Error('Slot field must have a key');
+        }
+        if (this.config.translateLabel === undefined) {
+            this.config.translateLabel = true;
         }
         return this.config as SlotFieldConfig;
     }
