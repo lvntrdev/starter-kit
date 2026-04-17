@@ -5,29 +5,11 @@ All notable changes to `lvntr/laravel-starter-kit` will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [13.3.2] - 2026-04-17
-
-### Removed
-
-- **Legacy unprefixed translation stubs** — `stubs/lang/{en,tr}/{admin,auth,button,common,datatable,enums,file-manager,message,pagination,passwords,validation}.php` (21 files) were carried over from the pre-13.3 layout and shipped alongside the new `sk-*` files. In a fresh install they showed up next to the `sk-*.php` files and caused confusion, and no code path in the kit references them any more — the application-side code (Vue pages, FormRequests, `SkAttributeTranslationLoader`) has fully moved to the `sk-*` keys. Removing them makes fresh installs match the actual layout of the development project one-for-one.
-- **Note for upgrading consumers:** `sk:update` does **not** touch `lang/` files, so if an earlier 13.x `sk:install` already copied these legacy files into your `lang/` directory they will stay there. If you do not use `__('admin.x')` / `__('validation.x')` / … from your own code, you can delete them manually — they are now orphaned. If you do, keep them; they will keep working until you migrate the calls to `sk-*`.
-- **Legacy package-level `starter-kit::` translation namespace is unaffected.** `resources/lang/` inside the package is still present and loaded under the `starter-kit::` namespace; `__('starter-kit::admin.menu')` calls keep working. Only the `stubs/` copies (which would land in the consumer's `lang/` directory on a fresh install) were removed.
-
----
-
-## [13.3.1] - 2026-04-17
-
-### Fixed
-
-- **`npm run build` failed on fresh installs with `Could not load resources/js/components/Auth/TurnstileWidget.vue`** — the 13.3.0 release shipped the new Turnstile-aware `Login.vue`, `Register.vue` and `ForgotPassword.vue` pages but the `TurnstileWidget.vue` they import was missing from `stubs/`. The internal `sk:sync` tool only synced `resources/js/components/Lvntr-Starter-Kit` into the package, not the application-owned `resources/js/components/Auth` directory, so the widget never made it into the stubs tree. Fresh installs got the pages without the component and the Vite build aborted before emitting any chunks. Added the widget to `stubs/resources/js/components/Auth/TurnstileWidget.vue` and broadened the sync config to cover the full `resources/js/components` tree (excluding `Lvntr-Starter-Kit`, which stays on its dedicated path) so future application-side components are not silently dropped.
-
----
-
 ## [13.3.0] - 2026-04-17
 
 ### Added
 
-- **Cloudflare Turnstile captcha** — login, register and password-reset flows can now be protected by Turnstile. Ships with a `turnstile` middleware alias (`ValidateTurnstile`), a `TurnstileRule` for FormRequest validation, `TurnstileSettingsDTO`, and a **Settings → Turnstile** admin tab. Site key / secret key are managed from the UI.
+- **Cloudflare Turnstile captcha** — login, register and password-reset flows can now be protected by Turnstile. Ships with a `turnstile` middleware alias (`ValidateTurnstile`), a `TurnstileRule` for FormRequest validation, `TurnstileSettingsDTO`, a `TurnstileWidget.vue` (mounted by the auth pages), and a **Settings → Turnstile** admin tab. Site key / secret key are managed from the UI.
 
 - **Last login tracking** — `UpdateLastLogin` listener on the `Illuminate\Auth\Events\Login` event writes `last_login_at` and `last_login_ip` to the user. Surfaced on user detail pages and in the users datatable.
 
@@ -49,20 +31,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`SettingsDefaultsQuery`** — now returns Turnstile defaults alongside existing sections.
 
+### Removed
+
+- **Legacy unprefixed translation stubs** — `stubs/lang/{en,tr}/{admin,auth,button,common,datatable,enums,file-manager,message,pagination,passwords,validation}.php` (21 files) are no longer shipped. The application-side code (Vue pages, FormRequests, `SkAttributeTranslationLoader`) has fully moved to the `sk-*` keys, so these files were orphans in fresh installs. The legacy **package-level `starter-kit::` namespace is untouched** — `resources/lang/` inside the package still loads the original files, so `__('starter-kit::admin.menu')` calls keep resolving.
+
 ### Compatibility
 
-- The **legacy `starter-kit::` translation namespace is untouched.** `resources/lang/` inside the package still ships the original `admin.php`, `button.php`, `validation.php`, … files. Existing `__('starter-kit::admin.menu')` calls and any `lang/vendor/starter-kit/` publishes keep resolving — nothing to migrate unless you want to.
+- The **legacy `starter-kit::` translation namespace keeps working.** `__('starter-kit::admin.menu')` and any `lang/vendor/starter-kit/` publishes continue to resolve.
 
-- The **legacy unprefixed stubs** (`stubs/lang/en/admin.php`, `button.php`, …) are still shipped next to the new `sk-*` files, so if your application calls `__('admin.menu')` from your own code (because a previous install copied those files into `lang/en/`), nothing breaks. The legacy stubs will be removed in a future major release.
+- **If you are upgrading from 13.2.x, manual steps are required.** `sk:update` uses hash-aware merging: files you have not modified are overwritten with the new version; files you have modified are skipped with a warning. Several 13.3 feature files (`SettingsController`, `SettingsDefaultsQuery`, `FortifyServiceProvider`, `HandleInertiaRequests`, `AppServiceProvider`, and the new FormRequests) may be reported as `skipped` or `untracked` in the update summary. Review each and copy the package version over, or run:
 
-- **`sk:update` does not overwrite `lang/` files** (translations are not in `SAFE_UPDATE_PATHS`). The new `sk-*.php` files ship via `stubs/lang/` and are **not** picked up automatically by `composer update` or `sk:update`. To pull them into an existing installation, copy them manually from the vendor directory:
+  ```bash
+  php artisan sk:update --force
+  ```
+
+  to accept the package version for every file at once. Use `--force` only if you have not customised your app/ layer.
+
+- **Lang files are never overwritten by `sk:update`** (lang paths are not in `SAFE_UPDATE_PATHS`). Pull the new `sk-*.php` files manually:
 
   ```bash
   cp vendor/lvntr/laravel-starter-kit/stubs/lang/en/sk-*.php lang/en/
   cp vendor/lvntr/laravel-starter-kit/stubs/lang/tr/sk-*.php lang/tr/
   ```
 
-  Then migrate your own Vue / PHP code to the new keys at your own pace. If you do not use the new `sk-*` keys anywhere, you can simply ignore this change — the legacy behaviour is untouched.
+  If your `lang/en/` contains `admin.php`, `auth.php`, … from a prior `sk:install` (they were stubs in 13.2.x), they will remain as orphans. The package no longer ships or references them; safe to delete once you have migrated your own `__('admin.x')` calls to `__('sk-admin.x')`.
+
+- **New Vue component location.** `resources/js/components/Auth/TurnstileWidget.vue` is shipped as a stub; it is imported by `Login.vue`, `Register.vue` and `ForgotPassword.vue`. Fresh installs get it automatically; existing installs missing it will fail `npm run build` — copy it from `vendor/lvntr/laravel-starter-kit/stubs/resources/js/components/Auth/TurnstileWidget.vue`.
 
 ---
 
