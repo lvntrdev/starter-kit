@@ -553,7 +553,7 @@
     // ── Filter Panel ──────────────────────────────────────────────────────────────
 
     function resolveFilterLabel(filter: { key: string; label?: string }): string {
-        return filter.label ? trans(filter.label) : trans('validation.attributes.' + filter.key);
+        return filter.label ? trans(filter.label) : trans('sk-attribute.attributes.' + filter.key);
     }
 
     const inlineFilters = computed(() => props.config.filters.filter((f) => f.placement === 'inline'));
@@ -710,7 +710,7 @@
                         <InputIcon class="pi pi-search" />
                         <InputText
                             v-model="search"
-                            :placeholder="$t('common.search')"
+                            :placeholder="$t('sk-common.search')"
                             class="w-full"
                             autocomplete="one-time-code"
                         />
@@ -884,7 +884,7 @@
                         <InputIcon class="pi pi-search" />
                         <InputText
                             v-model="search"
-                            :placeholder="$t('common.search')"
+                            :placeholder="$t('sk-common.search')"
                             class="w-full"
                             autofocus
                             autocomplete="one-time-code"
@@ -902,7 +902,7 @@
                     <i class="pi pi-times sk-dt-tags__tag-remove" @click="clearFilter(tag.key)" />
                 </span>
                 <button class="sk-dt-tags__clear-all" @click="clearAllFilters">
-                    {{ $t('button.clear_all') }}
+                    {{ $t('sk-button.clear_all') }}
                 </button>
             </div>
 
@@ -920,7 +920,7 @@
                                     @click="config.sortable ? handleSort(idKey) : undefined"
                                 >
                                     <span class="sk-dt__sort-label">
-                                        {{ $t('common.id') }}
+                                        {{ $t('sk-common.id') }}
                                         <i v-if="config.sortable" :class="sortIcon(idKey)" class="sk-dt__sort-icon" />
                                     </span>
                                 </th>
@@ -937,7 +937,9 @@
                                 >
                                     <span class="sk-dt__sort-label">
                                         {{
-                                            column.label ? $t(column.label) : $t('validation.attributes.' + column.key)
+                                            column.label
+                                                ? $t(column.label)
+                                                : $t('sk-attribute.attributes.' + column.key)
                                         }}
 
                                         <i
@@ -957,7 +959,7 @@
                                 <td :colspan="colspan" class="sk-dt__loading">
                                     <div class="sk-dt__loading-spinner">
                                         <i class="pi pi-spinner sk-dt__loading-icon" />
-                                        <span class="sk-dt__loading-text">{{ $t('datatable.loading') }}</span>
+                                        <span class="sk-dt__loading-text">{{ $t('sk-datatable.loading') }}</span>
                                     </div>
                                 </td>
                             </tr>
@@ -1075,7 +1077,7 @@
                                                 <i class="pi pi-inbox" />
                                             </div>
                                             <p class="sk-dt__empty-text">
-                                                {{ $t('datatable.no_records') }}
+                                                {{ $t('sk-datatable.no_records') }}
                                             </p>
                                         </div>
                                     </td>
@@ -1090,7 +1092,7 @@
                     <!-- Left: record info + per-page selector -->
                     <div class="sk-dt-pagination__info">
                         <span>{{
-                            $t('datatable.records_info', {
+                            $t('sk-datatable.records_info', {
                                 from: String(meta.from ?? 0),
                                 to: String(meta.to ?? 0),
                                 total: String(meta.total),
@@ -1111,7 +1113,7 @@
                             severity="secondary"
                             text
                             size="small"
-                            :aria-label="$t('datatable.first_page')"
+                            :aria-label="$t('sk-datatable.first_page')"
                             :disabled="meta.current_page === 1"
                             @click="goToPage(1)"
                         />
@@ -1120,7 +1122,7 @@
                             severity="secondary"
                             text
                             size="small"
-                            :aria-label="$t('datatable.previous_page')"
+                            :aria-label="$t('sk-datatable.previous_page')"
                             :disabled="meta.current_page === 1"
                             @click="goToPage(meta.current_page - 1)"
                         />
@@ -1138,7 +1140,7 @@
                             severity="secondary"
                             text
                             size="small"
-                            :aria-label="$t('datatable.next_page')"
+                            :aria-label="$t('sk-datatable.next_page')"
                             :disabled="meta.current_page === meta.last_page"
                             @click="goToPage(meta.current_page + 1)"
                         />
@@ -1147,7 +1149,7 @@
                             severity="secondary"
                             text
                             size="small"
-                            :aria-label="$t('datatable.last_page')"
+                            :aria-label="$t('sk-datatable.last_page')"
                             :disabled="meta.current_page === meta.last_page"
                             @click="goToPage(meta.last_page)"
                         />

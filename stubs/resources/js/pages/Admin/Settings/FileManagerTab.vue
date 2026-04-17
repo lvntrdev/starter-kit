@@ -41,8 +41,8 @@
         FB.form()
             .layout('vertical')
             .cols(2)
-            .cardTitle('admin.settings.file_manager.title')
-            .cardSubtitle('admin.settings.file_manager.subtitle')
+            .cardTitle('sk-setting.file_manager.title')
+            .cardSubtitle('sk-setting.file_manager.subtitle')
             .initialData({
                 max_size_kb: props.settings.max_size_kb,
                 accepted_mimes: props.settings.accepted_mimes,

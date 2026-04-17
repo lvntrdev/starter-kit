@@ -3,15 +3,17 @@
 namespace App\Http\Requests\Admin\Role;
 
 use App\Enums\RoleEnum;
+use App\Http\Requests\BaseFormRequest;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
  * Validation rules for updating an existing role in admin panel.
  */
-class UpdateRoleRequest extends FormRequest
+class UpdateRoleRequest extends BaseFormRequest
 {
+    protected string $attributeNamespace = 'sk-role';
+
     /**
      * Users can only update roles below their own hierarchy level (higher sort_order).
      * system_admin bypasses this check via Gate::before.

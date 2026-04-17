@@ -2,16 +2,18 @@
 
 namespace App\Http\Requests\Api\User;
 
+use App\Http\Requests\BaseFormRequest;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
 /**
  * Validation rules for updating a user via API.
  */
-class UpdateUserRequest extends FormRequest
+class UpdateUserRequest extends BaseFormRequest
 {
+    protected string $attributeNamespace = 'sk-user';
+
     /**
      * Determine if the user is authorized to make this request.
      */

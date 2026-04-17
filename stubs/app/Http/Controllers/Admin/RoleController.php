@@ -76,7 +76,7 @@ class RoleController extends Controller
 
         return redirect()
             ->route('roles.index')
-            ->with('success', __('message.created', ['entity' => __('admin.roles.role')]));
+            ->with('success', __('sk-message.created', ['entity' => __('sk-role.role')]));
     }
 
     /**
@@ -127,7 +127,7 @@ class RoleController extends Controller
 
         return redirect()
             ->route('roles.index')
-            ->with('success', __('message.updated', ['entity' => __('admin.roles.role')]));
+            ->with('success', __('sk-message.updated', ['entity' => __('sk-role.role')]));
     }
 
     /**
@@ -144,7 +144,7 @@ class RoleController extends Controller
 
         return redirect()
             ->route('roles.index')
-            ->with('success', __('message.permissions_synced'));
+            ->with('success', __('sk-message.permissions_synced'));
     }
 
     /**
@@ -160,6 +160,6 @@ class RoleController extends Controller
 
         return redirect()
             ->route('roles.index')
-            ->with('success', __('message.deleted', ['entity' => __('admin.roles.role')]));
+            ->with('success', __('sk-message.deleted', ['entity' => __('sk-role.role')]));
     }
 }

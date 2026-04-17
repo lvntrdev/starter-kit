@@ -22,8 +22,8 @@
         FB.form()
             .layout('vertical')
             .cols(1)
-            .cardTitle('admin.settings.auth.title')
-            .cardSubtitle('admin.settings.auth.subtitle')
+            .cardTitle('sk-setting.auth.title')
+            .cardSubtitle('sk-setting.auth.subtitle')
             .initialData(props.settings)
             .submit({
                 url: adminSettings.update.auth.url(),
@@ -31,10 +31,10 @@
                 preserveScroll: true,
             })
             .addFields(
-                FB.toggleSwitch().key('registration').hint(trans('admin.settings.auth.registration_hint')),
-                FB.toggleSwitch().key('email_verification').hint(trans('admin.settings.auth.email_verification_hint')),
-                FB.toggleSwitch().key('two_factor').hint(trans('admin.settings.auth.two_factor_hint')),
-                FB.toggleSwitch().key('password_reset').hint(trans('admin.settings.auth.password_reset_hint')),
+                FB.toggleSwitch().key('registration').hint(trans('sk-setting.auth.registration_hint')),
+                FB.toggleSwitch().key('email_verification').hint(trans('sk-setting.auth.email_verification_hint')),
+                FB.toggleSwitch().key('two_factor').hint(trans('sk-setting.auth.two_factor_hint')),
+                FB.toggleSwitch().key('password_reset').hint(trans('sk-setting.auth.password_reset_hint')),
             )
             .build(),
     );
@@ -48,10 +48,10 @@
         (newVal, oldVal) => {
             if (oldVal === true && newVal === false) {
                 confirmAction({
-                    message: trans('admin.settings.auth.two_factor_disable_warning'),
-                    header: trans('admin.settings.auth.two_factor_disable_title'),
+                    message: trans('sk-setting.auth.two_factor_disable_warning'),
+                    header: trans('sk-setting.auth.two_factor_disable_title'),
                     icon: 'pi pi-exclamation-triangle',
-                    acceptLabel: trans('button.confirm'),
+                    acceptLabel: trans('sk-button.confirm'),
                     acceptClass: 'p-button-danger',
                     onAccept: () => {
                         // User confirmed — value stays false, they can submit normally

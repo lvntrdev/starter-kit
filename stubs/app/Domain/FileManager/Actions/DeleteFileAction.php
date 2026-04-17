@@ -16,7 +16,7 @@ class DeleteFileAction extends BaseAction
             || $media->model_type !== $context->ownerType
             || (string) $media->model_id !== $context->ownerId
         ) {
-            throw new LogicException(__('file-manager.errors.file_out_of_context'));
+            throw new LogicException(__('sk-file-manager.errors.file_out_of_context'));
         }
 
         $media->delete();

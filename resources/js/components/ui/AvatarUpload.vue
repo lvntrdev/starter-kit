@@ -126,7 +126,7 @@
             } finally {
                 uploading.value = false;
             }
-        }, trans('admin.avatar.remove_confirm'));
+        }, trans('sk-avatar.remove_confirm'));
     }
 </script>
 
@@ -157,7 +157,7 @@
                     <div class="flex gap-2">
                         <Button
                             type="button"
-                            :label="$t('admin.avatar.change')"
+                            :label="$t('sk-avatar.change')"
                             icon="pi pi-upload"
                             size="small"
                             outlined
@@ -167,7 +167,7 @@
                         <Button
                             v-if="currentUrl"
                             type="button"
-                            :label="$t('admin.avatar.remove')"
+                            :label="$t('sk-avatar.remove')"
                             icon="pi pi-trash"
                             size="small"
                             severity="danger"
@@ -176,7 +176,7 @@
                             @click="removeAvatar"
                         />
                     </div>
-                    <small class="text-surface-400">{{ $t('admin.avatar.hint') }}</small>
+                    <small class="text-surface-400">{{ $t('sk-avatar.hint') }}</small>
                 </div>
                 <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onFileSelected">
             </div>

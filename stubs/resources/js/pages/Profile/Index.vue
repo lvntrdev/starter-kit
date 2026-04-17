@@ -28,7 +28,7 @@
 </script>
 
 <template>
-    <AdminLayout :title="$t('admin.profile.title')" :subtitle="$t('admin.profile.subtitle')">
+    <AdminLayout :title="$t('sk-profile.title')" :subtitle="$t('sk-profile.subtitle')">
         <SkTabs :config="tabConfig">
             <template #general>
                 <ProfileInfoTab />

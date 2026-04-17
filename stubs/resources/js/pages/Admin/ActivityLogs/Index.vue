@@ -48,9 +48,9 @@
 
     function eventBadge(event: string | null): string {
         const map: Record<string, string> = {
-            created: `<span class="inline-flex items-center gap-1 text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-900/30 px-2 py-0.5 rounded">● ${trans('admin.activity_logs.event_created')}</span>`,
-            updated: `<span class="inline-flex items-center gap-1  text-blue-700 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30 px-2 py-0.5 rounded">● ${trans('admin.activity_logs.event_updated')}</span>`,
-            deleted: `<span class="inline-flex items-center gap-1  text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-900/30 px-2 py-0.5 rounded">● ${trans('admin.activity_logs.event_deleted')}</span>`,
+            created: `<span class="inline-flex items-center gap-1 text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-900/30 px-2 py-0.5 rounded">● ${trans('sk-activity-log.event_created')}</span>`,
+            updated: `<span class="inline-flex items-center gap-1  text-blue-700 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30 px-2 py-0.5 rounded">● ${trans('sk-activity-log.event_updated')}</span>`,
+            deleted: `<span class="inline-flex items-center gap-1  text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-900/30 px-2 py-0.5 rounded">● ${trans('sk-activity-log.event_deleted')}</span>`,
         };
         const label = event ? escapeHtml(event) : '—';
         return (
@@ -65,7 +65,7 @@
         dialog.openAsync<ActivityLog>(
             ActivityLogDetail,
             activityLogs.show.url(activity.id),
-            trans('admin.activity_logs.detail_title'),
+            trans('sk-activity-log.detail_title'),
             {
                 mapResponse: (data) => ({ data }),
             },
@@ -79,18 +79,18 @@
         .route(activityLogs.dtApi.url())
         .addColumns(
             DB.column<ActivityLog>()
-                .label(trans('admin.activity_logs.event'))
+                .label(trans('sk-activity-log.event'))
                 .key('event')
                 .render((row) => eventBadge(row.event)),
-            // DB.column<ActivityLog>().label(trans('admin.activity_logs.description')).key('description'),
-            DB.column<ActivityLog>().label(trans('admin.activity_logs.model_id')).key('subject_id').sortable(false),
+            // DB.column<ActivityLog>().label(trans('sk-activity-log.description')).key('description'),
+            DB.column<ActivityLog>().label(trans('sk-activity-log.model_id')).key('subject_id').sortable(false),
             DB.column<ActivityLog>()
-                .label(trans('admin.activity_logs.model'))
+                .label(trans('sk-activity-log.model'))
                 .key('subject_type')
                 .sortable(false)
                 .render((row) => modelShortName(row.subject_type)),
             DB.column<ActivityLog>()
-                .label(trans('admin.activity_logs.causer'))
+                .label(trans('sk-activity-log.causer'))
                 .key('causer')
                 .sortable(false)
                 .render((row) => {
@@ -98,7 +98,7 @@
                     return row.causer.name ?? row.causer.email ?? String(row.causer_id);
                 }),
             DB.column<ActivityLog>()
-                .label(trans('admin.activity_logs.date'))
+                .label(trans('sk-activity-log.date'))
                 .key('created_at')
                 .render((row) =>
                     new Date(row.created_at).toLocaleDateString('tr-TR', {
@@ -113,33 +113,29 @@
         .addFilters(
             DB.filter()
                 .key('event')
-                .label(trans('admin.activity_logs.event'))
+                .label(trans('sk-activity-log.event'))
                 .type('select')
                 .inline()
                 .options([
-                    { label: trans('admin.activity_logs.event_created'), value: 'created' },
-                    { label: trans('admin.activity_logs.event_updated'), value: 'updated' },
-                    { label: trans('admin.activity_logs.event_deleted'), value: 'deleted' },
+                    { label: trans('sk-activity-log.event_created'), value: 'created' },
+                    { label: trans('sk-activity-log.event_updated'), value: 'updated' },
+                    { label: trans('sk-activity-log.event_deleted'), value: 'deleted' },
                 ]),
-            DB.filter()
-                .key('subject_type')
-                .label(trans('admin.activity_logs.model'))
-                .type('select')
-                .options(subjectTypes),
-            DB.filter().key('created_at').label(trans('admin.activity_logs.date')).type('daterange'),
+            DB.filter().key('subject_type').label(trans('sk-activity-log.model')).type('select').options(subjectTypes),
+            DB.filter().key('created_at').label(trans('sk-activity-log.date')).type('daterange'),
         )
         .addActions(
             DB.action<ActivityLog>()
                 .icon('pi pi-eye')
                 .severity('info')
-                .tooltip(trans('admin.activity_logs.detail'))
+                .tooltip(trans('sk-activity-log.detail'))
                 .handle((row) => openDetailDialog(row)),
         )
         .build();
 </script>
 
 <template>
-    <AdminLayout :title="$t('admin.activity_logs.title')" :subtitle="$t('admin.activity_logs.subtitle')">
+    <AdminLayout :title="$t('sk-activity-log.title')" :subtitle="$t('sk-activity-log.subtitle')">
         <SkDatatable :config="tableConfig" refresh-key="activity-logs-table" />
     </AdminLayout>
 </template>

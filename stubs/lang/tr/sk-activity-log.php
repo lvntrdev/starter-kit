@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'title' => 'Etkinlik Kayıtları',
+    'subtitle' => 'Model değişikliklerini ve kullanıcı işlemlerini görüntüleyin.',
+    'detail_title' => 'Etkinlik Kaydı Detayı',
+    'event' => 'Olay',
+    'description' => 'Açıklama',
+    'model' => 'Model',
+    'model_id' => 'Model ID',
+    'causer' => 'İşlemi Yapan',
+    'date' => 'Tarih',
+    'log_name' => 'Kayıt Adı',
+    'detail' => 'Detay',
+    'changes' => 'Değişiklikler',
+    'field' => 'Alan',
+    'old' => 'Eski',
+    'new' => 'Yeni',
+    'properties' => 'Özellikler',
+    'event_created' => 'Oluşturuldu',
+    'event_updated' => 'Güncellendi',
+    'event_deleted' => 'Silindi',
+    'filter_user' => 'Kullanıcı',
+    'filter_role' => 'Rol',
+    'filter_permission' => 'İzin',
+];

@@ -81,6 +81,10 @@ class HandleInertiaRequests extends Middleware
                 'two_factor' => Features::enabled(Features::twoFactorAuthentication()),
                 'password_reset' => Features::enabled(Features::resetPasswords()),
             ],
+            'turnstile' => [
+                'enabled' => (bool) config('services.turnstile.enabled'),
+                'site_key' => config('services.turnstile.enabled') ? config('services.turnstile.site_key') : null,
+            ],
         ];
     }
 }

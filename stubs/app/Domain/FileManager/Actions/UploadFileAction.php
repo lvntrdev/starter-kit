@@ -30,7 +30,7 @@ class UploadFileAction extends BaseAction
         }
 
         if ($files === []) {
-            throw new LogicException(__('file-manager.errors.no_files'));
+            throw new LogicException(__('sk-file-manager.errors.no_files'));
         }
 
         $uploaded = [];

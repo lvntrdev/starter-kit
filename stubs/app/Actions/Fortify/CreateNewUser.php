@@ -4,6 +4,7 @@ namespace App\Actions\Fortify;
 
 use App\Enums\RoleEnum;
 use App\Models\User;
+use App\Rules\TurnstileRule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -33,6 +34,7 @@ class CreateNewUser implements CreatesNewUsers
                 Rule::unique(User::class),
             ],
             'password' => $this->passwordRules(),
+            'cf_turnstile_response' => [new TurnstileRule],
         ])->validate();
 
         $user = User::create([

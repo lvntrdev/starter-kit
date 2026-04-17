@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'title' => 'Activity Logs',
+    'subtitle' => 'View model changes and user actions.',
+    'detail_title' => 'Activity Log Detail',
+    'event' => 'Event',
+    'description' => 'Description',
+    'model' => 'Model',
+    'model_id' => 'Model ID',
+    'causer' => 'Causer',
+    'date' => 'Date',
+    'log_name' => 'Log Name',
+    'detail' => 'Detail',
+    'changes' => 'Changes',
+    'field' => 'Field',
+    'old' => 'Old',
+    'new' => 'New',
+    'properties' => 'Properties',
+    'event_created' => 'Created',
+    'event_updated' => 'Updated',
+    'event_deleted' => 'Deleted',
+    'filter_user' => 'User',
+    'filter_role' => 'Role',
+    'filter_permission' => 'Permission',
+];

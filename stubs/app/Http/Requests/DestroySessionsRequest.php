@@ -3,13 +3,14 @@
 namespace App\Http\Requests;
 
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Validation rules for purging other browser sessions.
  */
-class DestroySessionsRequest extends FormRequest
+class DestroySessionsRequest extends BaseFormRequest
 {
+    protected string $attributeNamespace = 'sk-profile';
+
     /**
      * Determine if the user is authorized to make this request.
      */

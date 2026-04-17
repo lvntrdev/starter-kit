@@ -54,7 +54,7 @@
     });
 
     const cancelLabel = computed(() => {
-        const key = props.config.actionLabels?.cancel ?? (isDialogMode.value ? 'button.cancel' : 'button.back');
+        const key = props.config.actionLabels?.cancel ?? (isDialogMode.value ? 'sk-button.cancel' : 'sk-button.back');
         return trans(key);
     });
 
@@ -519,8 +519,8 @@
                                 config.actionLabels?.submit
                                     ? $t(config.actionLabels.submit)
                                     : isEditMode
-                                        ? $t('button.update')
-                                        : $t('button.save')
+                                        ? $t('sk-button.update')
+                                        : $t('sk-button.save')
                             "
                             :icon="config.actionLabels?.submitIcon ?? (isEditMode ? 'pi pi-check' : 'pi pi-plus')"
                             type="submit"
@@ -750,8 +750,8 @@
                                 config.actionLabels?.submit
                                     ? $t(config.actionLabels.submit)
                                     : isEditMode
-                                        ? $t('button.update')
-                                        : $t('button.save')
+                                        ? $t('sk-button.update')
+                                        : $t('sk-button.save')
                             "
                             :icon="config.actionLabels?.submitIcon ?? (isEditMode ? 'pi pi-save' : 'pi pi-save')"
                             type="submit"

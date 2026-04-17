@@ -4,7 +4,7 @@
 </script>
 
 <template>
-    <AdminLayout :title="$t('admin.files.title')" :subtitle="$t('admin.files.subtitle')">
+    <AdminLayout :title="$t('sk-file.title')" :subtitle="$t('sk-file.subtitle')">
         <div class="flex min-h-0 flex-1">
             <FileManager context="global" height="100%" class="flex-1" />
         </div>

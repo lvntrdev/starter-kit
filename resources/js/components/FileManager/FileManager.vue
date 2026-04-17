@@ -78,9 +78,9 @@
 
     // ── Sort ─────────────────────────────────────────────────────
     const sortOptions = computed(() => [
-        { label: trans('file-manager.labels.sort_name'), value: 'name' as SortKey },
-        { label: trans('file-manager.labels.sort_size'), value: 'size' as SortKey },
-        { label: trans('file-manager.labels.sort_date'), value: 'date' as SortKey },
+        { label: trans('sk-file-manager.labels.sort_name'), value: 'name' as SortKey },
+        { label: trans('sk-file-manager.labels.sort_size'), value: 'size' as SortKey },
+        { label: trans('sk-file-manager.labels.sort_date'), value: 'date' as SortKey },
     ]);
 
     function onSortChange(value: SortKey): void {
@@ -93,8 +93,8 @@
 
     const sortDirectionTooltip = computed(() =>
         fm.direction.value === 'asc'
-            ? trans('file-manager.labels.sort_asc_tooltip')
-            : trans('file-manager.labels.sort_desc_tooltip'),
+            ? trans('sk-file-manager.labels.sort_asc_tooltip')
+            : trans('sk-file-manager.labels.sort_desc_tooltip'),
     );
 
     // ── Stats ────────────────────────────────────────────────────
@@ -125,7 +125,7 @@
                 severity: 'success',
                 summary: '',
                 group: 'bc',
-                detail: trans('file-manager.folder_created'),
+                detail: trans('sk-file-manager.folder_created'),
                 life: 2500,
             });
         } catch {
@@ -151,7 +151,7 @@
     const moveHeaderLabel = computed(() => {
         if (moveSources.value.length === 0) return '';
         if (moveSources.value.length === 1) return moveSources.value[0].name;
-        return trans('file-manager.labels.selected_count', { count: String(moveSources.value.length) });
+        return trans('sk-file-manager.labels.selected_count', { count: String(moveSources.value.length) });
     });
 
     function folderSummaryById(id: string): FolderSummary | null {
@@ -204,7 +204,7 @@
         let cancelled = false;
         busy.value = {
             title,
-            description: trans('file-manager.labels.bulk_remaining', { count: String(items.length) }),
+            description: trans('sk-file-manager.labels.bulk_remaining', { count: String(items.length) }),
             onCancel: items.length > 1 ? () => (cancelled = true) : null,
         };
         try {
@@ -213,12 +213,12 @@
                 if (cancelled) break;
                 if (item.type === 'folder' && item.id === target) {
                     remaining--;
-                    setBusyDescription(trans('file-manager.labels.bulk_remaining', { count: String(remaining) }));
+                    setBusyDescription(trans('sk-file-manager.labels.bulk_remaining', { count: String(remaining) }));
                     continue;
                 }
                 await op(item);
                 remaining--;
-                setBusyDescription(trans('file-manager.labels.bulk_remaining', { count: String(remaining) }));
+                setBusyDescription(trans('sk-file-manager.labels.bulk_remaining', { count: String(remaining) }));
             }
         } finally {
             busy.value = null;
@@ -231,14 +231,14 @@
         const target = moveTargetId.value;
         showMove.value = false;
         try {
-            await runCancellableBulk(trans('file-manager.labels.moving'), sources, target, (source) =>
+            await runCancellableBulk(trans('sk-file-manager.labels.moving'), sources, target, (source) =>
                 fm.moveItem(source.type, source.id, target),
             );
             toast.add({
                 severity: 'success',
                 summary: '',
                 group: 'bc',
-                detail: trans('file-manager.item_moved'),
+                detail: trans('sk-file-manager.item_moved'),
                 life: 2500,
             });
             fm.clearSelection();
@@ -251,14 +251,14 @@
         const items = fm.selectedItems.value.length > 0 ? [...fm.selectedItems.value] : [];
         if (items.length === 0) return;
         try {
-            await runCancellableBulk(trans('file-manager.labels.moving'), items, targetFolderId, (item) =>
+            await runCancellableBulk(trans('sk-file-manager.labels.moving'), items, targetFolderId, (item) =>
                 fm.moveItem(item.type, item.id, targetFolderId),
             );
             toast.add({
                 severity: 'success',
                 summary: '',
                 group: 'bc',
-                detail: trans('file-manager.item_moved'),
+                detail: trans('sk-file-manager.item_moved'),
                 life: 2500,
             });
             fm.clearSelection();
@@ -317,12 +317,14 @@
         }
         try {
             showRename.value = false;
-            await runBusy(trans('file-manager.labels.renaming'), () => fm.renameFolder(renameTarget.value!.id, name));
+            await runBusy(trans('sk-file-manager.labels.renaming'), () =>
+                fm.renameFolder(renameTarget.value!.id, name),
+            );
             toast.add({
                 severity: 'success',
                 summary: '',
                 group: 'bc',
-                detail: trans('file-manager.folder_renamed'),
+                detail: trans('sk-file-manager.folder_renamed'),
                 life: 2500,
             });
         } catch {
@@ -345,21 +347,21 @@
         );
         return [
             {
-                label: trans('file-manager.labels.open'),
+                label: trans('sk-file-manager.labels.open'),
                 icon: 'pi pi-folder-open',
                 disabled: multi,
                 command: () => contextFolder.value && fm.loadContents(contextFolder.value.id),
             },
             {
-                label: trans('file-manager.labels.rename'),
+                label: trans('sk-file-manager.labels.rename'),
                 icon: 'pi pi-pencil',
                 disabled: props.readonly || multi,
                 command: () => contextFolder.value && openRename(contextFolder.value),
             },
             {
                 label: multi
-                    ? trans('file-manager.labels.move') + ` (${fm.selectionCount.value})`
-                    : trans('file-manager.labels.move'),
+                    ? trans('sk-file-manager.labels.move') + ` (${fm.selectionCount.value})`
+                    : trans('sk-file-manager.labels.move'),
                 icon: 'pi pi-arrow-right-arrow-left',
                 disabled: props.readonly,
                 command: () => contextFolder.value && openMoveFolder(contextFolder.value),
@@ -367,8 +369,8 @@
             { separator: true },
             {
                 label: multi
-                    ? trans('file-manager.labels.delete_selected') + ` (${fm.selectionCount.value})`
-                    : trans('file-manager.labels.delete'),
+                    ? trans('sk-file-manager.labels.delete_selected') + ` (${fm.selectionCount.value})`
+                    : trans('sk-file-manager.labels.delete'),
                 icon: 'pi pi-trash',
                 disabled: props.readonly,
                 command: () => {
@@ -386,21 +388,21 @@
         const multi = Boolean(bulkActive.value && contextFile.value && fm.isSelected('file', contextFile.value.id));
         return [
             {
-                label: trans('file-manager.labels.open'),
+                label: trans('sk-file-manager.labels.open'),
                 icon: 'pi pi-eye',
                 disabled: multi,
                 command: () => contextFile.value && openPreview(contextFile.value),
             },
             {
-                label: trans('file-manager.labels.download'),
+                label: trans('sk-file-manager.labels.download'),
                 icon: 'pi pi-download',
                 disabled: multi,
                 command: () => contextFile.value && downloadFile(contextFile.value),
             },
             {
                 label: multi
-                    ? trans('file-manager.labels.move') + ` (${fm.selectionCount.value})`
-                    : trans('file-manager.labels.move'),
+                    ? trans('sk-file-manager.labels.move') + ` (${fm.selectionCount.value})`
+                    : trans('sk-file-manager.labels.move'),
                 icon: 'pi pi-arrow-right-arrow-left',
                 disabled: props.readonly,
                 command: () => contextFile.value && openMoveFile(contextFile.value),
@@ -408,8 +410,8 @@
             { separator: true },
             {
                 label: multi
-                    ? trans('file-manager.labels.delete_selected') + ` (${fm.selectionCount.value})`
-                    : trans('file-manager.labels.delete'),
+                    ? trans('sk-file-manager.labels.delete_selected') + ` (${fm.selectionCount.value})`
+                    : trans('sk-file-manager.labels.delete'),
                 icon: 'pi pi-trash',
                 disabled: props.readonly,
                 command: () => {
@@ -435,26 +437,26 @@
 
     const emptyMenuItems = computed(() => [
         {
-            label: trans('file-manager.labels.new_folder'),
+            label: trans('sk-file-manager.labels.new_folder'),
             icon: 'pi pi-folder-plus',
             disabled: props.readonly,
             command: () => openNewFolder(),
         },
         {
-            label: trans('file-manager.labels.upload'),
+            label: trans('sk-file-manager.labels.upload'),
             icon: 'pi pi-upload',
             disabled: props.readonly || uploading.value,
             command: () => triggerUpload(),
         },
         { separator: true },
         {
-            label: trans('file-manager.labels.select_all'),
+            label: trans('sk-file-manager.labels.select_all'),
             icon: 'pi pi-check-square',
             disabled: fm.contents.folders.length + fm.contents.files.length === 0,
             command: () => fm.selectAll(),
         },
         {
-            label: trans('file-manager.labels.refresh'),
+            label: trans('sk-file-manager.labels.refresh'),
             icon: 'pi pi-refresh',
             command: () => fm.refresh(),
         },
@@ -466,12 +468,12 @@
 
     function confirmDeleteFolder(folder: FolderSummary): void {
         confirmDelete(async () => {
-            await runBusy(trans('file-manager.labels.deleting'), () => fm.deleteFolder(folder.id));
+            await runBusy(trans('sk-file-manager.labels.deleting'), () => fm.deleteFolder(folder.id));
             toast.add({
                 severity: 'success',
                 summary: '',
                 group: 'bc',
-                detail: trans('file-manager.folder_deleted'),
+                detail: trans('sk-file-manager.folder_deleted'),
                 life: 2500,
             });
         });
@@ -479,12 +481,12 @@
 
     function confirmDeleteFile(file: FileItem): void {
         confirmDelete(async () => {
-            await runBusy(trans('file-manager.labels.deleting'), () => fm.deleteFile(file.id));
+            await runBusy(trans('sk-file-manager.labels.deleting'), () => fm.deleteFile(file.id));
             toast.add({
                 severity: 'success',
                 summary: '',
                 group: 'bc',
-                detail: trans('file-manager.file_deleted'),
+                detail: trans('sk-file-manager.file_deleted'),
                 life: 2500,
             });
         });
@@ -493,12 +495,12 @@
     function confirmBulkDelete(): void {
         if (fm.selectionCount.value === 0) return;
         confirmDelete(async () => {
-            await runBusy(trans('file-manager.labels.deleting'), () => fm.bulkDelete());
+            await runBusy(trans('sk-file-manager.labels.deleting'), () => fm.bulkDelete());
             toast.add({
                 severity: 'success',
                 summary: '',
                 group: 'bc',
-                detail: trans('file-manager.bulk_deleted'),
+                detail: trans('sk-file-manager.bulk_deleted'),
                 life: 2500,
             });
         });
@@ -570,12 +572,12 @@
         const maxBytes = props.maxSizeKb ? props.maxSizeKb * 1024 : null;
         for (const file of list) {
             if (!isMimeAllowed(file)) {
-                rejections.push(trans('file-manager.errors.invalid_type', { name: file.name }));
+                rejections.push(trans('sk-file-manager.errors.invalid_type', { name: file.name }));
                 continue;
             }
             if (maxBytes !== null && file.size > maxBytes) {
                 rejections.push(
-                    trans('file-manager.errors.file_too_large', {
+                    trans('sk-file-manager.errors.file_too_large', {
                         name: file.name,
                         max: humanSize(maxBytes),
                     }),
@@ -605,7 +607,7 @@
                     severity: 'success',
                     summary: '',
                     group: 'bc',
-                    detail: trans('file-manager.files_uploaded'),
+                    detail: trans('sk-file-manager.files_uploaded'),
                     life: 2500,
                 });
             }
@@ -648,7 +650,7 @@
     }
 
     const bulkLabel = computed(() =>
-        trans('file-manager.labels.selected_count', { count: String(fm.selectionCount.value) }),
+        trans('sk-file-manager.labels.selected_count', { count: String(fm.selectionCount.value) }),
     );
 
     const visiblePending = computed(() =>
@@ -657,7 +659,7 @@
 
     const currentFolderName = computed(() => {
         const trail = fm.breadcrumb.value;
-        if (trail.length === 0) return trans('file-manager.labels.root');
+        if (trail.length === 0) return trans('sk-file-manager.labels.root');
         return trail[trail.length - 1].name;
     });
 
@@ -694,7 +696,7 @@
                         text
                         rounded
                         icon="pi pi-arrow-left"
-                        :aria-label="trans('file-manager.labels.back')"
+                        :aria-label="trans('sk-file-manager.labels.back')"
                         @click="goBack"
                     />
                     <i class="pi pi-folder-open text-primary-500" style="font-size: 1.6rem" />
@@ -725,14 +727,14 @@
                 <Button
                     severity="secondary"
                     icon="pi pi-folder-plus"
-                    :label="trans('file-manager.labels.new_folder')"
+                    :label="trans('sk-file-manager.labels.new_folder')"
                     :disabled="readonly"
                     @click="openNewFolder"
                 />
 
                 <Button
                     :icon="uploading ? 'pi pi-spin pi-spinner' : 'pi pi-upload'"
-                    :label="trans('file-manager.labels.upload')"
+                    :label="trans('sk-file-manager.labels.upload')"
                     :disabled="readonly || uploading"
                     @click="triggerUpload"
                 />
@@ -753,11 +755,17 @@
                 <div class="flex items-center gap-4">
                     <span class="inline-flex items-center gap-1.5">
                         <i class="pi pi-file text-surface-400" style="font-size: 0.85rem" />
-                        {{ trans('file-manager.labels.total_files', { count: String(fm.contents.stats.file_count) }) }}
+                        {{
+                            trans('sk-file-manager.labels.total_files', { count: String(fm.contents.stats.file_count) })
+                        }}
                     </span>
                     <span class="inline-flex items-center gap-1.5">
                         <i class="pi pi-database text-surface-400" style="font-size: 0.85rem" />
-                        {{ trans('file-manager.labels.total_size', { size: humanSize(fm.contents.stats.total_size) }) }}
+                        {{
+                            trans('sk-file-manager.labels.total_size', {
+                                size: humanSize(fm.contents.stats.total_size),
+                            })
+                        }}
                     </span>
                 </div>
 
@@ -775,7 +783,7 @@
                         size="small"
                         severity="danger"
                         icon="pi pi-trash"
-                        :label="trans('file-manager.labels.delete_selected')"
+                        :label="trans('sk-file-manager.labels.delete_selected')"
                         :disabled="readonly"
                         @click="confirmBulkDelete"
                     />
@@ -787,7 +795,7 @@
             >
                 <Breadcrumb
                     :trail="fm.breadcrumb.value"
-                    :root-label="trans('file-manager.labels.root')"
+                    :root-label="trans('sk-file-manager.labels.root')"
                     @navigate="(id) => fm.loadContents(id)"
                 />
             </div>
@@ -798,7 +806,7 @@
                     :files="fm.contents.files"
                     :pending="visiblePending"
                     :loading="fm.loading.contents"
-                    :empty-label="trans('file-manager.labels.empty_folder')"
+                    :empty-label="trans('sk-file-manager.labels.empty_folder')"
                     :is-selected="fm.isSelected"
                     @open-folder="(id) => fm.loadContents(id)"
                     @open-file="openFileFromGrid"
@@ -833,7 +841,7 @@
                 class="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-primary-400 bg-surface-0/95 px-10 py-8 text-primary-700 shadow-xl dark:border-primary-500 dark:bg-surface-900/95 dark:text-primary-200"
             >
                 <i class="pi pi-cloud-upload" style="font-size: 3.5rem" />
-                <span class="text-lg font-semibold">{{ trans('file-manager.labels.drop_files_here') }}</span>
+                <span class="text-lg font-semibold">{{ trans('sk-file-manager.labels.drop_files_here') }}</span>
             </div>
         </div>
 
@@ -855,7 +863,7 @@
                     {{ busy.description }}
                 </p>
                 <div v-if="busy.onCancel" class="mt-2 flex justify-end">
-                    <Button rounded :label="trans('file-manager.labels.stop')" @click="busy.onCancel" />
+                    <Button rounded :label="trans('sk-file-manager.labels.stop')" @click="busy.onCancel" />
                 </div>
             </div>
         </div>
@@ -866,7 +874,7 @@
 
         <Dialog
             v-model:visible="showNewFolder"
-            :header="trans('file-manager.labels.new_folder')"
+            :header="trans('sk-file-manager.labels.new_folder')"
             modal
             :style="{ width: '24rem' }"
         >
@@ -879,7 +887,7 @@
 
         <Dialog
             v-model:visible="showRename"
-            :header="trans('file-manager.labels.rename')"
+            :header="trans('sk-file-manager.labels.rename')"
             modal
             :style="{ width: '24rem' }"
         >
@@ -892,18 +900,18 @@
 
         <Dialog
             v-model:visible="showMove"
-            :header="trans('file-manager.labels.move_header', { name: moveHeaderLabel })"
+            :header="trans('sk-file-manager.labels.move_header', { name: moveHeaderLabel })"
             modal
             :style="{ width: '28rem' }"
         >
             <div class="mb-3 text-surface-600 dark:text-surface-300">
-                {{ trans('file-manager.labels.move_hint') }}
+                {{ trans('sk-file-manager.labels.move_hint') }}
             </div>
             <div class="max-h-80 overflow-auto rounded-lg border border-surface-200 dark:border-surface-700">
                 <FolderTree
                     :tree="fm.tree.value"
                     :selected-id="moveTargetId"
-                    :root-label="trans('file-manager.labels.root')"
+                    :root-label="trans('sk-file-manager.labels.root')"
                     @select="(id) => (moveTargetId = id)"
                 />
             </div>
@@ -911,16 +919,16 @@
                 <Button
                     severity="secondary"
                     text
-                    :label="trans('file-manager.labels.close')"
+                    :label="trans('sk-file-manager.labels.close')"
                     @click="showMove = false"
                 />
-                <Button icon="pi pi-check" :label="trans('file-manager.labels.move')" @click="submitMove" />
+                <Button icon="pi pi-check" :label="trans('sk-file-manager.labels.move')" @click="submitMove" />
             </template>
         </Dialog>
 
         <Dialog
             v-model:visible="showPreview"
-            :header="previewFile?.file_name ?? trans('file-manager.labels.preview')"
+            :header="previewFile?.file_name ?? trans('sk-file-manager.labels.preview')"
             modal
             dismissable-mask
             :pt="{ content: { class: 'fm-preview-content' } }"
@@ -951,7 +959,7 @@
                     class="flex flex-col items-center gap-4 p-10 text-center text-surface-600 dark:text-surface-300"
                 >
                     <i class="pi pi-file text-surface-400" style="font-size: 3rem" />
-                    <p>{{ trans('file-manager.labels.no_preview') }}</p>
+                    <p>{{ trans('sk-file-manager.labels.no_preview') }}</p>
                 </div>
             </div>
             <template #footer>
@@ -960,17 +968,17 @@
                     severity="secondary"
                     text
                     icon="pi pi-external-link"
-                    :label="trans('file-manager.labels.open_in_new_tab')"
+                    :label="trans('sk-file-manager.labels.open_in_new_tab')"
                     @click="previewFile && openFileExternal(previewFile)"
                 />
                 <Button
                     v-if="previewFile"
                     severity="secondary"
                     icon="pi pi-download"
-                    :label="trans('file-manager.labels.download')"
+                    :label="trans('sk-file-manager.labels.download')"
                     @click="previewFile && downloadFile(previewFile)"
                 />
-                <Button :label="trans('file-manager.labels.close')" @click="showPreview = false" />
+                <Button :label="trans('sk-file-manager.labels.close')" @click="showPreview = false" />
             </template>
         </Dialog>
     </div>

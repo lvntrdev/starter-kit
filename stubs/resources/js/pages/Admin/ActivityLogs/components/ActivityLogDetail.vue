@@ -65,7 +65,7 @@
         <div class="grid grid-cols-2 gap-4">
             <div>
                 <span class="block text-xs font-medium uppercase text-surface-400 dark:text-surface-500">{{
-                    $t('admin.activity_logs.event')
+                    $t('sk-activity-log.event')
                 }}</span>
                 <span
                     class="mt-1 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold"
@@ -76,13 +76,13 @@
             </div>
             <div>
                 <span class="block text-xs font-medium uppercase text-surface-400 dark:text-surface-500">{{
-                    $t('admin.activity_logs.log_name')
+                    $t('sk-activity-log.log_name')
                 }}</span>
                 <span class="mt-1 block text-sm text-surface-800 dark:text-surface-200">{{ data.log_name }}</span>
             </div>
             <div>
                 <span class="block text-xs font-medium uppercase text-surface-400 dark:text-surface-500">{{
-                    $t('admin.activity_logs.model')
+                    $t('sk-activity-log.model')
                 }}</span>
                 <span class="mt-1 block text-sm text-surface-800 dark:text-surface-200">
                     {{ modelShortName(data.subject_type) }}
@@ -91,7 +91,7 @@
             </div>
             <div>
                 <span class="block text-xs font-medium uppercase text-surface-400 dark:text-surface-500">{{
-                    $t('admin.activity_logs.causer')
+                    $t('sk-activity-log.causer')
                 }}</span>
                 <span class="mt-1 block text-sm text-surface-800 dark:text-surface-200">
                     <template v-if="data.causer">
@@ -104,7 +104,7 @@
             </div>
             <div>
                 <span class="block text-xs font-medium uppercase text-surface-400 dark:text-surface-500">{{
-                    $t('admin.activity_logs.date')
+                    $t('sk-activity-log.date')
                 }}</span>
                 <span class="mt-1 block text-sm text-surface-800 dark:text-surface-200">
                     {{
@@ -121,7 +121,7 @@
             </div>
             <div>
                 <span class="block text-xs font-medium uppercase text-surface-400 dark:text-surface-500">
-                    {{ $t('admin.activity_logs.description') }}
+                    {{ $t('sk-activity-log.description') }}
                 </span>
                 <span class="mt-1 block text-sm text-surface-800 dark:text-surface-200">{{ data.description }}</span>
             </div>
@@ -130,20 +130,20 @@
         <!-- Changes table -->
         <div v-if="changedKeys.length > 0">
             <h3 class="mb-2 text-sm font-semibold text-surface-700 dark:text-surface-300">
-                {{ $t('admin.activity_logs.changes') }}
+                {{ $t('sk-activity-log.changes') }}
             </h3>
             <div class="overflow-hidden rounded-lg border border-surface-200 dark:border-surface-700">
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="bg-surface-50 dark:bg-surface-800">
                             <th class="px-3 py-2 text-left text-xs font-medium uppercase text-surface-500">
-                                {{ $t('admin.activity_logs.field') }}
+                                {{ $t('sk-activity-log.field') }}
                             </th>
                             <th class="px-3 py-2 text-left text-xs font-medium uppercase text-surface-500">
-                                {{ $t('admin.activity_logs.old') }}
+                                {{ $t('sk-activity-log.old') }}
                             </th>
                             <th class="px-3 py-2 text-left text-xs font-medium uppercase text-surface-500">
-                                {{ $t('admin.activity_logs.new') }}
+                                {{ $t('sk-activity-log.new') }}
                             </th>
                         </tr>
                     </thead>
@@ -171,7 +171,7 @@
         <!-- Custom properties (withProperties user data) -->
         <div v-if="data.properties && Object.keys(data.properties).length > 0">
             <h3 class="mb-2 text-sm font-semibold text-surface-700 dark:text-surface-300">
-                {{ $t('admin.activity_logs.properties') }}
+                {{ $t('sk-activity-log.properties') }}
             </h3>
             <pre
                 class="overflow-auto rounded bg-surface-50 p-3 text-xs text-surface-700 dark:bg-surface-800 dark:text-surface-300"
@@ -181,7 +181,7 @@
         <!-- Close button -->
         <div class="flex justify-end pt-2">
             <Button
-                :label="$t('button.close')"
+                :label="$t('sk-button.close')"
                 icon="pi pi-times"
                 severity="secondary"
                 outlined

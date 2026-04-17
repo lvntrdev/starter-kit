@@ -67,8 +67,8 @@
         FB.form()
             .layout('vertical')
             .cols(2)
-            .cardTitle('admin.settings.storage.title')
-            .cardSubtitle('admin.settings.storage.subtitle')
+            .cardTitle('sk-setting.storage.title')
+            .cardSubtitle('sk-setting.storage.subtitle')
             .initialData({
                 media_disk: props.settings.media_disk ?? 'local',
                 spaces_key: props.settings.spaces_key ?? '',
@@ -93,7 +93,7 @@
                 FB.select().key('media_disk').options(diskOptions).class('col-span-full'),
 
                 // ── DO Spaces ──
-                FB.title('admin.settings.storage.spaces_title').class('col-span-full').visible(isDo),
+                FB.title('sk-setting.storage.spaces_title').class('col-span-full').visible(isDo),
                 FB.inputText().key('spaces_key').visible(isDo).optional(),
                 FB.password().key('spaces_secret').toggleMask().visible(isDo).optional(),
                 FB.select().key('spaces_region').options(doRegionOptions).visible(isDo).optional(),
@@ -110,7 +110,7 @@
                     .optional(),
 
                 // ── AWS S3 ──
-                FB.title('admin.settings.storage.s3_title').class('col-span-full').visible(isS3),
+                FB.title('sk-setting.storage.s3_title').class('col-span-full').visible(isS3),
                 FB.inputText().key('aws_key').visible(isS3).optional(),
                 FB.password().key('aws_secret').toggleMask().visible(isS3).optional(),
                 FB.select().key('aws_region').options(awsRegionOptions).visible(isS3).optional(),

@@ -4,7 +4,7 @@ namespace App\Http\Requests\FileManager;
 
 use App\Domain\FileManager\DTOs\FileManagerContextDTO;
 use App\Domain\FileManager\Support\ContextRegistry;
-use Illuminate\Foundation\Http\FormRequest;
+use App\Http\Requests\BaseFormRequest;
 use Throwable;
 
 /**
@@ -14,8 +14,10 @@ use Throwable;
  * resolve — explicit registration, morph-map alias or `App\Models\{Studly}`
  * convention — is accepted without touching this class.
  */
-abstract class FileManagerRequest extends FormRequest
+abstract class FileManagerRequest extends BaseFormRequest
 {
+    protected string $attributeNamespace = 'sk-file-manager';
+
     public function authorize(): bool
     {
         return true;

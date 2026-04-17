@@ -18,7 +18,7 @@
 </script>
 
 <template>
-    <AdminLayout :title="trans('admin.roles.create')" :back-url="true">
+    <AdminLayout :title="trans('sk-role.create')" :back-url="true">
         <RoleForm
             :permissions-by-group="permissionsByGroup"
             :available-locales="availableLocales"

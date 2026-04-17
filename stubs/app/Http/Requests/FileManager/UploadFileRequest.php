@@ -77,12 +77,12 @@ class UploadFileRequest extends FileManagerRequest
         $extList = $this->mimeExtensionList();
 
         return [
-            'files.*.mimetypes' => trans('file-manager.errors.upload_invalid_type', ['types' => $extList]),
-            'files.*.max' => trans('file-manager.errors.upload_too_large', [
+            'files.*.mimetypes' => trans('sk-file-manager.errors.upload_invalid_type', ['types' => $extList]),
+            'files.*.max' => trans('sk-file-manager.errors.upload_too_large', [
                 'max' => $this->humanMaxSize(),
             ]),
-            'files.*.file' => trans('file-manager.errors.upload_invalid_file'),
-            'files.*.required' => trans('file-manager.errors.upload_invalid_file'),
+            'files.*.file' => trans('sk-file-manager.errors.upload_invalid_file'),
+            'files.*.required' => trans('sk-file-manager.errors.upload_invalid_file'),
         ];
     }
 

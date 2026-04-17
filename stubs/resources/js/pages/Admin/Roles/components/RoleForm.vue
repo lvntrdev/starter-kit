@@ -250,12 +250,12 @@
                 <!-- Role Name -->
                 <div>
                     <label for="role-name" class="block font-bold text-surface-700 dark:text-surface-300 mb-2">
-                        {{ trans('validation.attributes.role_name') }}
+                        {{ trans('sk-attribute.attributes.role_name') }}
                     </label>
                     <InputText
                         id="role-name"
                         v-model="form.name"
-                        :placeholder="trans('admin.roles.role_name_placeholder')"
+                        :placeholder="trans('sk-role.role_name_placeholder')"
                         class="w-full"
                         :invalid="!!form.errors.name"
                     />
@@ -265,7 +265,7 @@
                 <!-- Display Names per Locale -->
                 <div v-if="Object.keys(availableLocales).length > 0" class="mt-6">
                     <label class="block font-bold text-surface-700 dark:text-surface-300 mb-2">
-                        {{ trans('validation.attributes.display_name') }}
+                        {{ trans('sk-attribute.attributes.display_name') }}
                     </label>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div v-for="(label, locale) in availableLocales" :key="locale">
@@ -278,7 +278,7 @@
                             <InputText
                                 :id="`display-name-${locale}`"
                                 v-model="form.display_name[locale]"
-                                :placeholder="`${trans('admin.roles.display_name')} (${label})`"
+                                :placeholder="`${trans('sk-role.display_name')} (${label})`"
                                 class="w-full"
                                 :invalid="!!form.errors[`display_name.${locale}`]"
                             />
@@ -293,7 +293,7 @@
 
         <Card>
             <template #title>
-                {{ trans('admin.roles.permissions') }}
+                {{ trans('sk-role.permissions') }}
             </template>
             <template #content>
                 <!-- Permissions Table -->
@@ -303,7 +303,7 @@
                             <thead>
                                 <tr class="bg-surface-50 dark:bg-surface-800">
                                     <th class="px-4 py-3 text-left font-semibold uppercase text-surface-500 min-w-40">
-                                        {{ trans('admin.roles.resource') }}
+                                        {{ trans('sk-role.resource') }}
                                     </th>
                                     <th class="px-2 py-3 text-center min-w-15">
                                         <Checkbox
@@ -431,7 +431,7 @@
                 </div>
 
                 <Message v-else severity="info" :closable="false">
-                    {{ trans('admin.roles.no_permissions_available') }}
+                    {{ trans('sk-role.no_permissions_available') }}
                 </Message>
 
                 <!-- Actions -->
@@ -439,7 +439,7 @@
                     <Button
                         v-if="showCancelButton"
                         type="button"
-                        :label="inDialog ? trans('button.cancel') : trans('button.back')"
+                        :label="inDialog ? trans('sk-button.cancel') : trans('sk-button.back')"
                         :icon="inDialog ? undefined : 'pi pi-arrow-left'"
                         severity="secondary"
                         outlined
@@ -447,7 +447,7 @@
                     />
                     <Button
                         type="submit"
-                        :label="isEdit ? trans('button.update') : trans('button.save')"
+                        :label="isEdit ? trans('sk-button.update') : trans('sk-button.save')"
                         :icon="isEdit ? 'pi pi-save' : 'pi pi-save'"
                         :loading="form.processing"
                     />

@@ -34,7 +34,7 @@
         if (flash.value.success) {
             toast.add({
                 severity: 'success',
-                summary: trans('admin.layout.success'),
+                summary: trans('sk-layout.success'),
                 detail: flash.value.success,
                 group: 'bc',
                 life: 4000,
@@ -43,7 +43,7 @@
         if (flash.value.error) {
             toast.add({
                 severity: 'error',
-                summary: trans('admin.layout.error'),
+                summary: trans('sk-layout.error'),
                 detail: flash.value.error,
                 group: 'bc',
                 life: 6000,
@@ -52,7 +52,7 @@
         if (flash.value.warning) {
             toast.add({
                 severity: 'warn',
-                summary: trans('admin.layout.warning'),
+                summary: trans('sk-layout.warning'),
                 detail: flash.value.warning,
                 group: 'bc',
                 life: 5000,
@@ -61,7 +61,7 @@
         if (flash.value.info) {
             toast.add({
                 severity: 'info',
-                summary: trans('admin.layout.info'),
+                summary: trans('sk-layout.info'),
                 detail: flash.value.info,
                 group: 'bc',
                 life: 4000,

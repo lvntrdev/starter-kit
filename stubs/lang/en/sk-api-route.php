@@ -1,0 +1,19 @@
+<?php
+
+return [
+    'title' => 'API & Service Routes',
+    'subtitle' => 'Overview of all registered API and internal service endpoints.',
+    'api_endpoints' => 'API Endpoints',
+    'api_endpoints_subtitle' => 'Public and authenticated REST API routes.',
+    'service_endpoints' => 'Service Endpoints',
+    'service_endpoints_subtitle' => 'Internal service routes consumed by frontend components.',
+    'method' => 'Method',
+    'uri' => 'URI',
+    'name' => 'Name',
+    'action' => 'Action',
+    'middleware' => 'Middleware',
+    'no_routes' => 'No routes found.',
+    'open_api_docs' => 'Open API Docs',
+    'regenerate_docs' => 'Regenerate Docs',
+    'regenerate_docs_success' => 'API documentation regenerated successfully.',
+];

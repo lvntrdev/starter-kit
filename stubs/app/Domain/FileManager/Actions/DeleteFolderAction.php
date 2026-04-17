@@ -19,7 +19,7 @@ class DeleteFolderAction extends BaseAction
     public function execute(FileManagerContextDTO $context, FileFolder $folder): void
     {
         if ($folder->owner_type !== $context->ownerType || (string) $folder->owner_id !== $context->ownerId) {
-            throw new LogicException(__('file-manager.errors.folder_out_of_context'));
+            throw new LogicException(__('sk-file-manager.errors.folder_out_of_context'));
         }
 
         DB::transaction(function () use ($context, $folder) {

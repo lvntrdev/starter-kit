@@ -21,7 +21,7 @@
     const mailerOptions = [{ label: 'SMTP', value: 'smtp' }];
 
     const encryptionOptions = [
-        { label: 'admin.settings.mail.encryption_none', value: 'none' },
+        { label: 'sk-setting.mail.encryption_none', value: 'none' },
         { label: 'TLS', value: 'tls' },
         { label: 'SSL', value: 'ssl' },
     ];
@@ -32,8 +32,8 @@
         FB.form()
             .layout('vertical')
             .cols(2)
-            .cardTitle('admin.settings.mail.title')
-            .cardSubtitle('admin.settings.mail.subtitle')
+            .cardTitle('sk-setting.mail.title')
+            .cardSubtitle('sk-setting.mail.subtitle')
             .initialData({
                 ...props.settings,
                 host: props.settings.host ?? '',
@@ -66,15 +66,15 @@
         FB.form()
             .layout('vertical')
             .cols(1)
-            .cardTitle('admin.settings.mail.test_title')
-            .cardSubtitle('admin.settings.mail.test_subtitle')
+            .cardTitle('sk-setting.mail.test_title')
+            .cardSubtitle('sk-setting.mail.test_subtitle')
             .initialData({ test_email: '' })
             .submit({
                 url: adminSettings.testMail.url(),
                 method: 'post',
                 preserveScroll: true,
             })
-            .actionLabels({ submit: 'admin.settings.mail.test_send', submitIcon: 'pi pi-send' })
+            .actionLabels({ submit: 'sk-setting.mail.test_send', submitIcon: 'pi pi-send' })
             .hideCancel()
             .addFields(FB.inputText().key('test_email').label(false).inputType('email').placeholder('test@example.com'))
             .build(),

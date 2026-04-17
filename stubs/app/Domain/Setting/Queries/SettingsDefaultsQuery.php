@@ -23,6 +23,21 @@ class SettingsDefaultsQuery
             'mail' => $this->mail(),
             'storage' => $this->storage(),
             'file_manager' => $this->fileManager(),
+            'turnstile' => $this->turnstile(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function turnstile(): array
+    {
+        $stored = Setting::getGroup('turnstile');
+
+        return [
+            'enabled' => ($stored['enabled'] ?? '0') === '1',
+            'site_key' => $stored['site_key'] ?? config('services.turnstile.site_key'),
+            'secret_key' => $stored['secret_key'] ?? config('services.turnstile.secret_key'),
         ];
     }
 

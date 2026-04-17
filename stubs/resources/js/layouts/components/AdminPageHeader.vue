@@ -43,7 +43,7 @@
             <Button
                 v-if="resolvedBackUrl"
                 icon="pi pi-arrow-left"
-                :label="$t('button.back')"
+                :label="$t('sk-button.back')"
                 severity="secondary"
                 variant="outlined"
                 @click="goBack"

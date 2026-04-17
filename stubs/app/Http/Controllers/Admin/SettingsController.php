@@ -10,6 +10,7 @@ use App\Domain\Setting\DTOs\FileManagerSettingsDTO;
 use App\Domain\Setting\DTOs\GeneralSettingsDTO;
 use App\Domain\Setting\DTOs\MailSettingsDTO;
 use App\Domain\Setting\DTOs\StorageSettingsDTO;
+use App\Domain\Setting\DTOs\TurnstileSettingsDTO;
 use App\Domain\Setting\Queries\SettingsDefaultsQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Settings\SendTestMailRequest;
@@ -18,6 +19,7 @@ use App\Http\Requests\Admin\Settings\UpdateFileManagerSettingsRequest;
 use App\Http\Requests\Admin\Settings\UpdateGeneralSettingsRequest;
 use App\Http\Requests\Admin\Settings\UpdateMailSettingsRequest;
 use App\Http\Requests\Admin\Settings\UpdateStorageSettingsRequest;
+use App\Http\Requests\Admin\Settings\UpdateTurnstileSettingsRequest;
 use App\Models\Setting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -97,6 +99,16 @@ class SettingsController extends Controller
         $action->execute('file_manager', FileManagerSettingsDTO::fromArray($request->validated()));
 
         return back()->with('success', 'File manager settings updated.');
+    }
+
+    /**
+     * Update turnstile settings.
+     */
+    public function updateTurnstile(UpdateTurnstileSettingsRequest $request, UpdateSettingsAction $action): RedirectResponse
+    {
+        $action->execute('turnstile', TurnstileSettingsDTO::fromArray($request->validated()));
+
+        return back()->with('success', 'Turnstile settings updated.');
     }
 
     /**

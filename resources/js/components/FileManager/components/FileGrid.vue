@@ -350,10 +350,10 @@
                 class="grid max-w-md grid-cols-[auto_1fr] items-start gap-x-3 gap-y-2.5 text-left text-surface-500 dark:text-surface-400"
             >
                 <i class="pi pi-cloud-upload mt-0.5 text-surface-400" style="font-size: 1.05rem" />
-                <span>{{ trans('file-manager.labels.empty_hint_upload') }}</span>
+                <span>{{ trans('sk-file-manager.labels.empty_hint_upload') }}</span>
 
                 <i class="pi pi-folder-plus mt-0.5 text-surface-400" style="font-size: 1.05rem" />
-                <span>{{ trans('file-manager.labels.empty_hint_new_folder') }}</span>
+                <span>{{ trans('sk-file-manager.labels.empty_hint_new_folder') }}</span>
             </ul>
         </div>
 
@@ -570,7 +570,7 @@
                                     {{ item.error }}
                                 </template>
                                 <template v-else>
-                                    {{ trans('file-manager.labels.uploading') }} · {{ item.progress }}%
+                                    {{ trans('sk-file-manager.labels.uploading') }} · {{ item.progress }}%
                                 </template>
                             </div>
                         </div>
@@ -578,7 +578,7 @@
                             v-if="item.error"
                             type="button"
                             class="shrink-0 rounded p-1 text-surface-400 transition-opacity hover:bg-surface-100 hover:text-surface-700 dark:hover:bg-surface-800 dark:hover:text-surface-200"
-                            :title="trans('file-manager.labels.dismiss')"
+                            :title="trans('sk-file-manager.labels.dismiss')"
                             @click.stop="emit('dismiss-pending', item.tempId)"
                         >
                             <i class="pi pi-times" style="font-size: 0.9rem" />

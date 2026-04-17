@@ -15,11 +15,11 @@
                 preserveScroll: true,
             })
             .addFields(
-                FB.password().key('current_password').label(trans('admin.profile.current_password')).toggleMask(),
-                FB.password().key('password').label(trans('admin.profile.new_password')).toggleMask().feedback(true),
-                FB.password().key('password_confirmation').label(trans('admin.common.confirm_password')).toggleMask(),
+                FB.password().key('current_password').label(trans('sk-profile.current_password')).toggleMask(),
+                FB.password().key('password').label(trans('sk-profile.new_password')).toggleMask().feedback(true),
+                FB.password().key('password_confirmation').label(trans('sk-common.confirm_password')).toggleMask(),
             )
-            .actionLabels({ submit: trans('admin.profile.update_password') })
+            .actionLabels({ submit: trans('sk-profile.update_password') })
             .build(),
     );
 </script>
@@ -27,10 +27,10 @@
 <template>
     <Card>
         <template #title>
-            {{ $t('admin.profile.password_title') }}
+            {{ $t('sk-profile.password_title') }}
         </template>
         <template #subtitle>
-            {{ $t('admin.profile.password_subtitle') }}
+            {{ $t('sk-profile.password_subtitle') }}
         </template>
         <template #content>
             <SkForm :config="formConfig" />

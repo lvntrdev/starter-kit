@@ -2,11 +2,13 @@
 
 namespace App\Http\Requests\Admin\Settings;
 
+use App\Http\Requests\BaseFormRequest;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Foundation\Http\FormRequest;
 
-class UpdateGeneralSettingsRequest extends FormRequest
+class UpdateGeneralSettingsRequest extends BaseFormRequest
 {
+    protected string $attributeNamespace = 'sk-setting';
+
     public function authorize(): bool
     {
         return true;

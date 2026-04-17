@@ -72,7 +72,7 @@ class FileManagerController extends Controller
             return to_api(null, $e->getMessage(), 422);
         }
 
-        return to_api($result, __('file-manager.bulk_deleted'));
+        return to_api($result, __('sk-file-manager.bulk_deleted'));
     }
 
     public function createFolder(StoreFolderRequest $request, CreateFolderAction $action): ApiResponse
@@ -94,7 +94,7 @@ class FileManagerController extends Controller
             'id' => (string) $folder->id,
             'parent_id' => $folder->parent_id,
             'name' => $folder->name,
-        ]], __('file-manager.folder_created'), 201);
+        ]], __('sk-file-manager.folder_created'), 201);
     }
 
     public function renameFolder(UpdateFolderRequest $request, FileFolder $folder, RenameFolderAction $action): ApiResponse
@@ -112,7 +112,7 @@ class FileManagerController extends Controller
             'id' => (string) $folder->id,
             'parent_id' => $folder->parent_id,
             'name' => $folder->name,
-        ]], __('file-manager.folder_renamed'));
+        ]], __('sk-file-manager.folder_renamed'));
     }
 
     public function moveItem(MoveItemRequest $request, MoveItemAction $action): ApiResponse
@@ -131,7 +131,7 @@ class FileManagerController extends Controller
             return to_api(null, $e->getMessage(), 422);
         }
 
-        return to_api(message: __('file-manager.item_moved'));
+        return to_api(message: __('sk-file-manager.item_moved'));
     }
 
     public function deleteFolder(Request $request, FileFolder $folder, DeleteFolderAction $action): ApiResponse
@@ -145,7 +145,7 @@ class FileManagerController extends Controller
             return to_api(null, $e->getMessage(), 422);
         }
 
-        return to_api(message: __('file-manager.folder_deleted'));
+        return to_api(message: __('sk-file-manager.folder_deleted'));
     }
 
     public function upload(UploadFileRequest $request, UploadFileAction $action): ApiResponse
@@ -163,7 +163,7 @@ class FileManagerController extends Controller
             return to_api(null, $e->getMessage(), 422);
         }
 
-        return to_api(['files' => $uploaded], __('file-manager.files_uploaded'), 201);
+        return to_api(['files' => $uploaded], __('sk-file-manager.files_uploaded'), 201);
     }
 
     public function deleteFile(Request $request, Media $media, DeleteFileAction $action): ApiResponse
@@ -177,7 +177,7 @@ class FileManagerController extends Controller
             return to_api(null, $e->getMessage(), 422);
         }
 
-        return to_api(message: __('file-manager.file_deleted'));
+        return to_api(message: __('sk-file-manager.file_deleted'));
     }
 
     public function download(Request $request, Media $media, DownloadFileAction $action): BinaryFileResponse|StreamedResponse

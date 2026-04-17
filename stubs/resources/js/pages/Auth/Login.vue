@@ -1,6 +1,8 @@
 <script setup lang="ts">
+    import { ref } from 'vue';
     import { Link, useForm, usePage } from '@inertiajs/vue3';
     import AuthLayout from '@/layouts/AuthLayout.vue';
+    import TurnstileWidget from '@/components/Auth/TurnstileWidget.vue';
 
     interface Props {
         status?: string;
@@ -8,28 +10,33 @@
 
     const props = defineProps<Props>();
     const page = usePage<{ features: { registration: boolean; password_reset: boolean } }>();
+    const turnstileRef = ref<InstanceType<typeof TurnstileWidget>>();
 
     const form = useForm({
         email: '',
         password: '',
         remember: false,
+        cf_turnstile_response: '',
     });
 
     const submit = () => {
         form.post('/login', {
-            onFinish: () => form.reset('password'),
+            onFinish: () => {
+                form.reset('password');
+                turnstileRef.value?.reset();
+            },
         });
     };
 </script>
 
 <template>
-    <AuthLayout :title="$t('auth.login.title')">
+    <AuthLayout :title="$t('sk-auth.login.title')">
         <template #header>
             <h2 class="auth-title">
-                {{ $t('auth.login.heading') }}
+                {{ $t('sk-auth.login.heading') }}
             </h2>
             <p class="auth-subtitle">
-                {{ $t('auth.login.subtitle') }}
+                {{ $t('sk-auth.login.subtitle') }}
             </p>
         </template>
 
@@ -41,14 +48,14 @@
         <form class="auth-form" @submit.prevent="submit">
             <!-- Email -->
             <div class="auth-form__field">
-                <label for="email" class="auth-form__label">{{ $t('auth.login.email_label') }}</label>
+                <label for="email" class="auth-form__label">{{ $t('sk-auth.login.email_label') }}</label>
                 <IconField class="auth-input">
                     <InputIcon class="auth-input__icon pi pi-envelope" />
                     <InputText
                         id="email"
                         v-model="form.email"
                         type="email"
-                        :placeholder="$t('auth.login.email_placeholder')"
+                        :placeholder="$t('sk-auth.login.email_placeholder')"
                         :invalid="!!form.errors.email"
                         :aria-describedby="form.errors.email ? 'email-error' : undefined"
                         autocomplete="email"
@@ -65,9 +72,9 @@
             <!-- Password -->
             <div class="auth-form__field">
                 <div class="auth-form__row">
-                    <label for="password" class="auth-form__label">{{ $t('auth.login.password_label') }}</label>
+                    <label for="password" class="auth-form__label">{{ $t('sk-auth.login.password_label') }}</label>
                     <Link v-if="page.props.features.password_reset" href="/forgot-password" class="auth-link">
-                        {{ $t('auth.login.forgot_password_link') }}
+                        {{ $t('sk-auth.login.forgot_password_link') }}
                     </Link>
                 </div>
                 <IconField class="auth-input auth-input--password">
@@ -94,14 +101,20 @@
             <div class="auth-form__options">
                 <div class="auth-remember">
                     <Checkbox v-model="form.remember" input-id="remember" :binary="true" />
-                    <label for="remember" class="auth-remember__label">{{ $t('auth.login.remember') }}</label>
+                    <label for="remember" class="auth-remember__label">{{ $t('sk-auth.login.remember') }}</label>
                 </div>
             </div>
+
+            <!-- Turnstile -->
+            <TurnstileWidget ref="turnstileRef" v-model="form.cf_turnstile_response" />
+            <small v-if="form.errors.cf_turnstile_response" class="auth-form__error">
+                {{ form.errors.cf_turnstile_response }}
+            </small>
 
             <!-- Submit -->
             <Button
                 type="submit"
-                :label="$t('auth.login.submit')"
+                :label="$t('sk-auth.login.submit')"
                 icon="pi pi-arrow-right"
                 icon-pos="right"
                 :loading="form.processing"
@@ -110,10 +123,10 @@
         </form>
 
         <template v-if="page.props.features.registration" #footer>
-            <span>{{ $t('auth.login.no_account') }}</span>
+            <span>{{ $t('sk-auth.login.no_account') }}</span>
             {{ ' ' }}
             <Link href="/register" class="auth-link">
-                {{ $t('auth.login.create_account') }}
+                {{ $t('sk-auth.login.create_account') }}
             </Link>
         </template>
     </AuthLayout>

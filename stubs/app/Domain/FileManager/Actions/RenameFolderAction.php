@@ -22,7 +22,7 @@ class RenameFolderAction extends BaseAction
             ->exists();
 
         if ($exists) {
-            throw new LogicException(__('file-manager.errors.duplicate_folder'));
+            throw new LogicException(__('sk-file-manager.errors.duplicate_folder'));
         }
 
         $folder->update(['name' => $name]);
@@ -33,7 +33,7 @@ class RenameFolderAction extends BaseAction
     private function assertBelongsToContext(FileManagerContextDTO $context, FileFolder $folder): void
     {
         if ($folder->owner_type !== $context->ownerType || (string) $folder->owner_id !== $context->ownerId) {
-            throw new LogicException(__('file-manager.errors.folder_out_of_context'));
+            throw new LogicException(__('sk-file-manager.errors.folder_out_of_context'));
         }
     }
 }

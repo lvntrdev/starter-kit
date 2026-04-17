@@ -69,7 +69,7 @@ class UserController extends Controller
     ): RedirectResponse {
         $action->execute(UserDTO::fromArray($request->validated()));
 
-        return back()->with('success', __('message.created', ['entity' => __('admin.users.user')]));
+        return back()->with('success', __('sk-message.created', ['entity' => __('sk-user.user')]));
     }
 
     /**
@@ -102,7 +102,7 @@ class UserController extends Controller
     ): RedirectResponse {
         $action->execute($user, UserDTO::fromArray($request->validated()));
 
-        return back()->with('success', __('message.updated', ['entity' => __('admin.users.user')]));
+        return back()->with('success', __('sk-message.updated', ['entity' => __('sk-user.user')]));
     }
 
     /**
@@ -113,7 +113,7 @@ class UserController extends Controller
         try {
             $action->execute($user, (string) Auth::id());
 
-            return back()->with('success', __('message.deleted', ['entity' => __('admin.users.user')]));
+            return back()->with('success', __('sk-message.deleted', ['entity' => __('sk-user.user')]));
         } catch (\LogicException $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -126,7 +126,7 @@ class UserController extends Controller
     {
         $action->execute($user, $request, 'avatar');
 
-        return to_api(['avatar_url' => $user->refresh()->avatar_url], __('message.avatar_uploaded'));
+        return to_api(['avatar_url' => $user->refresh()->avatar_url], __('sk-message.avatar_uploaded'));
     }
 
     /**

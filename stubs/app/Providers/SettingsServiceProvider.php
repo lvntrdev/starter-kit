@@ -147,5 +147,18 @@ class SettingsServiceProvider extends ServiceProvider
                 config(['filesystems.disks.s3.endpoint' => $storage['aws_endpoint']]);
             }
         }
+
+        // Turnstile
+        if ($turnstile = $settings['turnstile'] ?? null) {
+            if (array_key_exists('enabled', $turnstile)) {
+                config(['services.turnstile.enabled' => $turnstile['enabled'] === '1']);
+            }
+            if (array_key_exists('site_key', $turnstile)) {
+                config(['services.turnstile.site_key' => $turnstile['site_key']]);
+            }
+            if (array_key_exists('secret_key', $turnstile)) {
+                config(['services.turnstile.secret_key' => $turnstile['secret_key']]);
+            }
+        }
     }
 }

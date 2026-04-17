@@ -67,7 +67,7 @@
                     onSuccess: () => bus.refresh(REFRESH_KEY),
                 });
             },
-            trans('admin.roles.delete_confirm', { name: role.name }),
+            trans('sk-role.delete_confirm', { name: role.name }),
         );
     }
 
@@ -78,21 +78,21 @@
         .addColumns(
             DB.column<Role>().key('name'),
             DB.column<Role>()
-                .label(trans('admin.roles.permissions'))
+                .label(trans('sk-role.permissions'))
                 .key('permissions_count')
                 .render(
                     (role) =>
                         `<span class="inline-flex items-center gap-1.5 font-medium"><i class="pi pi-shield text-slate-400"></i>${role.permissions_count}</span>`,
                 ),
             DB.column<Role>()
-                .label(trans('admin.roles.users'))
+                .label(trans('sk-role.users'))
                 .key('users_count')
                 .render(
                     (role) =>
                         `<span class="inline-flex items-center gap-1.5 font-medium"><i class="pi pi-users text-slate-400"></i>${role.users_count}</span>`,
                 ),
             DB.column<Role>()
-                .label(trans('common.created_at'))
+                .label(trans('sk-common.created_at'))
                 .key('created_at')
                 .render((role) =>
                     new Date(role.created_at).toLocaleDateString('tr-TR', {
@@ -106,13 +106,13 @@
             DB.action<Role>()
                 .icon('pi pi-pencil')
                 .severity('primary')
-                .tooltip(trans('admin.common.edit'))
+                .tooltip(trans('sk-common.edit'))
                 .visible((role) => can('roles.update') && canManageRole(role))
                 .handle((role) => router.visit(roles.edit.url(role))),
             DB.action<Role>()
                 .icon('pi pi-trash')
                 .severity('danger')
-                .tooltip(trans('admin.common.delete'))
+                .tooltip(trans('sk-common.delete'))
                 .visible(
                     (role) => can('roles.delete') && !props.protectedRoles.includes(role.name) && canManageRole(role),
                 )
@@ -122,11 +122,11 @@
 </script>
 
 <template>
-    <AdminLayout :title="$t('admin.menu.roles_permissions')" :subtitle="$t('admin.roles.subtitle')">
+    <AdminLayout :title="$t('sk-menu.roles_permissions')" :subtitle="$t('sk-role.subtitle')">
         <template v-if="can('roles.create') || isSystemAdmin" #page-actions>
             <Button
                 v-if="isSystemAdmin"
-                :label="$t('admin.roles.sync_permissions')"
+                :label="$t('sk-role.sync_permissions')"
                 icon="pi pi-sync"
                 severity="secondary"
                 outlined
@@ -134,7 +134,7 @@
                 @click="syncPermissions"
             />
             <Link v-if="can('roles.create')" :href="roles.create.url()">
-                <Button :label="$t('admin.roles.create')" icon="pi pi-plus" />
+                <Button :label="$t('sk-role.create')" icon="pi pi-plus" />
             </Link>
         </template>
         <SkDatatable :config="tableConfig" :refresh-key="REFRESH_KEY" />

@@ -1598,20 +1598,20 @@ VUE;
             DB.action<{$dn}>()
                 .icon('pi pi-pencil')
                 .severity('warn')
-                .label('button.edit')
+                .label('sk-button.edit')
                 .handle(({$dnCamel}) => openEditDialog({$dnCamel}.id)),
         )
         .addMenuActions(
             DB.menuAction<{$dn}>()
-                .label('button.edit')
+                .label('sk-button.edit')
                 .icon('pi pi-pencil')
                 .handle(({$dnCamel}) => openEditDialog({$dnCamel}.id)),
             DB.menuAction<{$dn}>()
-                .label('button.edit_on_page')
+                .label('sk-button.edit_on_page')
                 .icon('pi pi-external-link')
                 .handle(({$dnCamel}) => router.visit({$routeImport}.edit.url({$dnCamel}))),
             DB.menuAction<{$dn}>()
-                .label('button.delete')
+                .label('sk-button.delete')
                 .icon('pi pi-trash')
                 .separator()
                 .handle(({$dnCamel}) => deleteRecord({$dnCamel})),
@@ -1905,7 +1905,7 @@ PHP);
     private function buildDatatableColumns(string $dn): string
     {
         if (! $this->withVueFields || empty($this->fields)) {
-            return "            DB.column<{$dn}>().label('common.id').key('id'),";
+            return "            DB.column<{$dn}>().label('sk-common.id').key('id'),";
         }
 
         $lines = [];

@@ -344,7 +344,11 @@
             :option-label="asSelect.optionLabel ?? 'label'"
             :option-value="asSelect.optionValue ?? 'value'"
             :placeholder="
-                loading ? $t('common.loading') : asSelect.placeholder ? $t(asSelect.placeholder) : $t('common.select')
+                loading
+                    ? $t('sk-common.loading')
+                    : asSelect.placeholder
+                        ? $t(asSelect.placeholder)
+                        : $t('sk-common.select')
             "
             :show-clear="asSelect.showClear"
             :filter="asSelect.filter"
@@ -364,7 +368,11 @@
             :option-label="asSelect.optionLabel ?? 'label'"
             :option-value="asSelect.optionValue ?? 'value'"
             :placeholder="
-                loading ? $t('common.loading') : asSelect.placeholder ? $t(asSelect.placeholder) : $t('common.select')
+                loading
+                    ? $t('sk-common.loading')
+                    : asSelect.placeholder
+                        ? $t(asSelect.placeholder)
+                        : $t('sk-common.select')
             "
             :filter="asSelect.filter"
             :disabled="disabled || loading"

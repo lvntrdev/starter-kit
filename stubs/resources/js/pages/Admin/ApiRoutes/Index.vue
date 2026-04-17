@@ -33,7 +33,7 @@
             await api.post(apiRoutes.regenerateDocs.url());
             toast.add({
                 severity: 'success',
-                summary: trans('admin.api_routes.regenerate_docs_success'),
+                summary: trans('sk-api-route.regenerate_docs_success'),
                 group: 'bc',
                 life: 3000,
             });
@@ -59,13 +59,13 @@
 </script>
 
 <template>
-    <Head :title="$t('admin.api_routes.title')" />
+    <Head :title="$t('sk-api-route.title')" />
 
-    <AdminLayout :title="$t('admin.api_routes.title')" :subtitle="$t('admin.api_routes.subtitle')">
+    <AdminLayout :title="$t('sk-api-route.title')" :subtitle="$t('sk-api-route.subtitle')">
         <template #page-actions>
             <div class="flex gap-2">
                 <Button
-                    :label="$t('admin.api_routes.regenerate_docs')"
+                    :label="$t('sk-api-route.regenerate_docs')"
                     icon="pi pi-sync"
                     outlined
                     severity="warn"
@@ -73,7 +73,7 @@
                     @click="regenerateDocs"
                 />
                 <a href="/docs/api" target="_blank">
-                    <Button :label="$t('admin.api_routes.open_api_docs')" icon="pi pi-book" outlined />
+                    <Button :label="$t('sk-api-route.open_api_docs')" icon="pi pi-book" outlined />
                 </a>
             </div>
         </template>
@@ -82,33 +82,33 @@
             <!-- API Endpoints -->
             <Card>
                 <template #title>
-                    {{ $t('admin.api_routes.api_endpoints') }}
+                    {{ $t('sk-api-route.api_endpoints') }}
                 </template>
                 <template #subtitle>
-                    {{ $t('admin.api_routes.api_endpoints_subtitle') }}
+                    {{ $t('sk-api-route.api_endpoints_subtitle') }}
                 </template>
                 <template #content>
                     <div v-if="routes.api.length === 0" class="text-sm text-surface-500">
-                        {{ $t('admin.api_routes.no_routes') }}
+                        {{ $t('sk-api-route.no_routes') }}
                     </div>
                     <div v-else class="overflow-x-auto">
                         <table class="w-full text-sm">
                             <thead>
                                 <tr class="border-b border-surface-200 dark:border-surface-700">
                                     <th class="px-3 py-2 text-left text-xs font-medium uppercase text-surface-500">
-                                        {{ $t('admin.api_routes.method') }}
+                                        {{ $t('sk-api-route.method') }}
                                     </th>
                                     <th class="px-3 py-2 text-left text-xs font-medium uppercase text-surface-500">
-                                        {{ $t('admin.api_routes.uri') }}
+                                        {{ $t('sk-api-route.uri') }}
                                     </th>
                                     <th class="px-3 py-2 text-left text-xs font-medium uppercase text-surface-500">
-                                        {{ $t('admin.api_routes.name') }}
+                                        {{ $t('sk-api-route.name') }}
                                     </th>
                                     <th class="px-3 py-2 text-left text-xs font-medium uppercase text-surface-500">
-                                        {{ $t('admin.api_routes.action') }}
+                                        {{ $t('sk-api-route.action') }}
                                     </th>
                                     <th class="px-3 py-2 text-left text-xs font-medium uppercase text-surface-500">
-                                        {{ $t('admin.api_routes.middleware') }}
+                                        {{ $t('sk-api-route.middleware') }}
                                     </th>
                                 </tr>
                             </thead>
@@ -156,33 +156,33 @@
             <!-- Service Endpoints -->
             <Card>
                 <template #title>
-                    {{ $t('admin.api_routes.service_endpoints') }}
+                    {{ $t('sk-api-route.service_endpoints') }}
                 </template>
                 <template #subtitle>
-                    {{ $t('admin.api_routes.service_endpoints_subtitle') }}
+                    {{ $t('sk-api-route.service_endpoints_subtitle') }}
                 </template>
                 <template #content>
                     <div v-if="routes.service.length === 0" class="text-sm text-surface-500">
-                        {{ $t('admin.api_routes.no_routes') }}
+                        {{ $t('sk-api-route.no_routes') }}
                     </div>
                     <div v-else class="overflow-x-auto">
                         <table class="w-full text-sm">
                             <thead>
                                 <tr class="border-b border-surface-200 dark:border-surface-700">
                                     <th class="px-3 py-2 text-left text-xs font-medium uppercase text-surface-500">
-                                        {{ $t('admin.api_routes.method') }}
+                                        {{ $t('sk-api-route.method') }}
                                     </th>
                                     <th class="px-3 py-2 text-left text-xs font-medium uppercase text-surface-500">
-                                        {{ $t('admin.api_routes.uri') }}
+                                        {{ $t('sk-api-route.uri') }}
                                     </th>
                                     <th class="px-3 py-2 text-left text-xs font-medium uppercase text-surface-500">
-                                        {{ $t('admin.api_routes.name') }}
+                                        {{ $t('sk-api-route.name') }}
                                     </th>
                                     <th class="px-3 py-2 text-left text-xs font-medium uppercase text-surface-500">
-                                        {{ $t('admin.api_routes.action') }}
+                                        {{ $t('sk-api-route.action') }}
                                     </th>
                                     <th class="px-3 py-2 text-left text-xs font-medium uppercase text-surface-500">
-                                        {{ $t('admin.api_routes.middleware') }}
+                                        {{ $t('sk-api-route.middleware') }}
                                     </th>
                                 </tr>
                             </thead>

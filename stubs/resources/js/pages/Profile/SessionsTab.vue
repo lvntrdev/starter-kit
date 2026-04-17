@@ -77,15 +77,15 @@
     <div>
         <Card>
             <template #title>
-                {{ $t('admin.profile.sessions_title') }}
+                {{ $t('sk-profile.sessions_title') }}
             </template>
             <template #subtitle>
-                {{ $t('admin.profile.sessions_subtitle') }}
+                {{ $t('sk-profile.sessions_subtitle') }}
             </template>
             <template #content>
                 <div class="space-y-4">
                     <p class="text-sm text-surface-500 dark:text-surface-400">
-                        {{ $t('admin.profile.sessions_description') }}
+                        {{ $t('sk-profile.sessions_description') }}
                     </p>
 
                     <!-- Loading State -->
@@ -144,10 +144,10 @@
                                 <div class="text-xs text-surface-500 dark:text-surface-400">
                                     {{ session.ip_address }}
                                     <span v-if="session.is_current_device" class="font-semibold text-green-500">
-                                        — {{ $t('admin.profile.sessions_this_device') }}
+                                        — {{ $t('sk-profile.sessions_this_device') }}
                                     </span>
                                     <span v-else>
-                                        — {{ $t('admin.profile.sessions_last_active', { time: session.last_active }) }}
+                                        — {{ $t('sk-profile.sessions_last_active', { time: session.last_active }) }}
                                     </span>
                                 </div>
                             </div>
@@ -157,7 +157,7 @@
                     <!-- Actions -->
                     <div class="flex items-center gap-3">
                         <Button
-                            :label="$t('admin.profile.sessions_logout')"
+                            :label="$t('sk-profile.sessions_logout')"
                             icon="pi pi-sign-out"
                             severity="danger"
                             :loading="logoutProcessing"
@@ -170,7 +170,7 @@
                             leave-to-class="opacity-0"
                         >
                             <span v-if="logoutSuccess" class="text-sm text-green-600 dark:text-green-400">
-                                {{ $t('admin.profile.sessions_done') }}
+                                {{ $t('sk-profile.sessions_done') }}
                             </span>
                         </Transition>
                     </div>
@@ -181,18 +181,18 @@
         <!-- Log Out Other Sessions Dialog -->
         <Dialog
             v-model:visible="showLogoutDialog"
-            :header="$t('admin.profile.sessions_logout')"
+            :header="$t('sk-profile.sessions_logout')"
             modal
             :style="{ width: '25rem' }"
         >
             <p class="mb-4 text-sm text-surface-500 dark:text-surface-400">
-                {{ $t('admin.profile.sessions_logout_confirm') }}
+                {{ $t('sk-profile.sessions_logout_confirm') }}
             </p>
 
             <form @submit.prevent="logoutOtherSessions">
                 <div class="flex flex-col gap-1">
                     <label for="logout_password" class="text-sm font-medium text-surface-700 dark:text-surface-300">
-                        {{ $t('admin.common.password') }}
+                        {{ $t('sk-common.password') }}
                     </label>
                     <Password
                         v-model="logoutPasswordForm.password"
@@ -212,13 +212,13 @@
                 <div class="mt-4 flex justify-end gap-2">
                     <Button
                         type="button"
-                        :label="$t('admin.common.cancel')"
+                        :label="$t('sk-common.cancel')"
                         severity="secondary"
                         @click="showLogoutDialog = false"
                     />
                     <Button
                         type="submit"
-                        :label="$t('admin.profile.sessions_logout')"
+                        :label="$t('sk-profile.sessions_logout')"
                         icon="pi pi-sign-out"
                         severity="danger"
                         :loading="logoutProcessing"

@@ -4,7 +4,7 @@
 </script>
 
 <template>
-    <AdminLayout :title="$t('admin.users.create')" :back-url="true">
+    <AdminLayout :title="$t('sk-user.create')" :back-url="true">
         <UserForm />
     </AdminLayout>
 </template>

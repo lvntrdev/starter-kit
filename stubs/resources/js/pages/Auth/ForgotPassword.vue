@@ -1,19 +1,25 @@
 <script setup lang="ts">
+    import { ref } from 'vue';
     import { useForm } from '@inertiajs/vue3';
     import AuthLayout from '@/layouts/AuthLayout.vue';
+    import TurnstileWidget from '@/components/Auth/TurnstileWidget.vue';
 
     interface Props {
         status?: string;
     }
 
     const props = defineProps<Props>();
+    const turnstileRef = ref<InstanceType<typeof TurnstileWidget>>();
 
     const form = useForm({
         email: '',
+        cf_turnstile_response: '',
     });
 
     const submit = () => {
-        form.post('/forgot-password');
+        form.post('/forgot-password', {
+            onFinish: () => turnstileRef.value?.reset(),
+        });
     };
 </script>
 
@@ -54,6 +60,12 @@
                     {{ form.errors.email }}
                 </small>
             </div>
+
+            <!-- Turnstile -->
+            <TurnstileWidget ref="turnstileRef" v-model="form.cf_turnstile_response" />
+            <small v-if="form.errors.cf_turnstile_response" class="auth-form__error">
+                {{ form.errors.cf_turnstile_response }}
+            </small>
 
             <!-- Submit -->
             <Button

@@ -12,8 +12,8 @@
         FB.form()
             .layout('vertical')
             .cols(2)
-            .cardTitle('admin.profile.info_title')
-            .cardSubtitle('admin.profile.info_subtitle')
+            .cardTitle('sk-profile.info_title')
+            .cardSubtitle('sk-profile.info_subtitle')
             .initialData({
                 first_name: user.value?.first_name ?? '',
                 last_name: user.value?.last_name ?? '',
@@ -25,11 +25,11 @@
                 preserveScroll: true,
             })
             .addFields(
-                FB.inputText().key('first_name').label(trans('admin.common.first_name')),
-                FB.inputText().key('last_name').label(trans('admin.common.last_name')),
+                FB.inputText().key('first_name').label(trans('sk-common.first_name')),
+                FB.inputText().key('last_name').label(trans('sk-common.last_name')),
                 FB.inputText()
                     .key('email')
-                    .label(trans('admin.common.email'))
+                    .label(trans('sk-common.email'))
                     .inputType('email')
                     .placeholder('example@mail.com')
                     .class('col-span-full'),
@@ -44,8 +44,8 @@
         :avatar-url="(user as any)?.avatar_url"
         upload-url="/user/avatar"
         delete-url="/user/avatar"
-        :title="$t('admin.avatar.title')"
-        :subtitle="$t('admin.avatar.subtitle')"
+        :title="$t('sk-avatar.title')"
+        :subtitle="$t('sk-avatar.subtitle')"
         class="mb-8"
     />
 

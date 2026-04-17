@@ -12,14 +12,14 @@
 
     const tabConfig = TB.tabs()
         .addTabs(
-            TB.item().key('general').label('admin.users.tabs.general').icon('pi pi-user'),
-            TB.item().key('files').label('admin.users.tabs.files').icon('pi pi-folder'),
+            TB.item().key('general').label('sk-user.tabs.general').icon('pi pi-user'),
+            TB.item().key('files').label('sk-user.tabs.files').icon('pi pi-folder'),
         )
         .build();
 </script>
 
 <template>
-    <AdminLayout :title="$t('admin.users.edit')" :subtitle="userId" :back-url="true">
+    <AdminLayout :title="$t('sk-user.edit')" :subtitle="userId" :back-url="true">
         <SkTabs :config="tabConfig">
             <template #general>
                 <UserForm :user-id="userId" />

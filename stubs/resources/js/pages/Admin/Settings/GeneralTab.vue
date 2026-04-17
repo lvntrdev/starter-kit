@@ -113,7 +113,7 @@
             } finally {
                 uploading.value = false;
             }
-        }, trans('admin.settings.general.logo_remove_confirm'));
+        }, trans('sk-setting.general.logo_remove_confirm'));
     }
 
     const timezoneOptions = computed(() => props.timezones.map((tz) => ({ label: tz, value: tz })));
@@ -129,8 +129,8 @@
         FB.form()
             .layout('vertical')
             .cols(2)
-            .cardTitle('admin.settings.general.title')
-            .cardSubtitle('admin.settings.general.subtitle')
+            .cardTitle('sk-setting.general.title')
+            .cardSubtitle('sk-setting.general.subtitle')
             .initialData(props.settings)
             .submit({
                 url: adminSettings.update.general.url(),
@@ -142,7 +142,7 @@
                 FB.select().key('timezone').options(timezoneOptions.value).filter(true).class('col-span-full'),
                 FB.checkboxGroup()
                     .key('languages')
-                    .hint(trans('admin.settings.general.languages_hint'))
+                    .hint(trans('sk-setting.general.languages_hint'))
                     .labelPlacement('inline')
                     .controlPosition('left')
                     .options(languageOptions.value)
@@ -156,10 +156,10 @@
     <!-- Logo Upload -->
     <Card class="mb-6">
         <template #title>
-            {{ $t('admin.settings.general.logo') }}
+            {{ $t('sk-setting.general.logo') }}
         </template>
         <template #subtitle>
-            {{ $t('admin.settings.general.logo_hint') }}
+            {{ $t('sk-setting.general.logo_hint') }}
         </template>
         <template #content>
             <div class="flex items-center gap-4">
@@ -180,7 +180,7 @@
                     <div class="flex gap-2">
                         <Button
                             type="button"
-                            :label="$t('admin.settings.general.logo_upload')"
+                            :label="$t('sk-setting.general.logo_upload')"
                             icon="pi pi-upload"
                             size="small"
                             outlined
@@ -190,7 +190,7 @@
                         <Button
                             v-if="logoUrl"
                             type="button"
-                            :label="$t('admin.settings.general.logo_remove')"
+                            :label="$t('sk-setting.general.logo_remove')"
                             icon="pi pi-trash"
                             size="small"
                             severity="danger"

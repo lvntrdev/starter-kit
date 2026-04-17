@@ -69,13 +69,13 @@
 
     const userMenuItems = computed<MenuItem[]>(() => [
         {
-            label: trans('admin.menu.profile'),
+            label: trans('sk-menu.profile'),
             icon: 'pi pi-user',
             command: () => router.visit('/profile'),
         },
         { separator: true },
         {
-            label: trans('admin.menu.logout'),
+            label: trans('sk-menu.logout'),
             icon: 'pi pi-sign-out',
             command: () => router.post('/logout'),
         },
@@ -93,10 +93,10 @@
                 class="admin-header__btn"
                 :title="
                     isMobile
-                        ? $t('admin.layout.open_menu')
+                        ? $t('sk-layout.open_menu')
                         : collapsed
-                            ? $t('admin.layout.expand_menu')
-                            : $t('admin.layout.collapse_menu')
+                            ? $t('sk-layout.expand_menu')
+                            : $t('sk-layout.collapse_menu')
                 "
                 @click="emit('toggleSidebar')"
             >
@@ -123,13 +123,13 @@
 
             <button
                 class="admin-header__btn"
-                :title="isDark ? $t('admin.layout.light_mode') : $t('admin.layout.dark_mode')"
+                :title="isDark ? $t('sk-layout.light_mode') : $t('sk-layout.dark_mode')"
                 @click="emit('toggleDark')"
             >
                 <i :class="isDark ? 'pi pi-sun' : 'pi pi-moon'" />
             </button>
 
-            <button class="admin-header__btn" :title="$t('admin.layout.notifications')">
+            <button class="admin-header__btn" :title="$t('sk-layout.notifications')">
                 <i class="pi pi-bell" />
             </button>
 

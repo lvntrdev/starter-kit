@@ -49,7 +49,7 @@
                     .key('password')
                     .required(!isEdit.value)
                     .toggleMask()
-                    .hint(isEdit.value ? 'admin.users.password_hint' : undefined)
+                    .hint(isEdit.value ? 'sk-user.password_hint' : undefined)
                     .default(''),
                 FB.password().key('password_confirmation').required(!isEdit.value).toggleMask().default(''),
             )

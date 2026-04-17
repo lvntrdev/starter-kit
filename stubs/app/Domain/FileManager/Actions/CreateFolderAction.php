@@ -28,7 +28,7 @@ class CreateFolderAction extends BaseAction
             ->exists();
 
         if ($exists) {
-            throw new LogicException(__('file-manager.errors.duplicate_folder'));
+            throw new LogicException(__('sk-file-manager.errors.duplicate_folder'));
         }
 
         return FileFolder::create([

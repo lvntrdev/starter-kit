@@ -127,7 +127,7 @@ abstract class BaseFieldBuilder<T extends FieldConfig> {
             throw new Error('Field must have a key');
         }
         if (!this.config.label) {
-            this.config.label = `validation.attributes.${this.config.key}`;
+            this.config.label = `sk-attribute.attributes.${this.config.key}`;
         }
         if (this.config.required === undefined) {
             this.config.required = true;

@@ -29,7 +29,7 @@
     // ── Create dialog ─────────────────────────────────────────────────────────────
 
     function openCreateDialog() {
-        dialog.open(UserForm, { inDialog: true }, trans('admin.users.create'), {
+        dialog.open(UserForm, { inDialog: true }, trans('sk-user.create'), {
             refreshKey: REFRESH_KEY,
         });
     }
@@ -37,7 +37,7 @@
     // ── Edit dialog ───────────────────────────────────────────────────────────────
 
     function openEditDialog(userId: string) {
-        dialog.open(UserForm, { userId, inDialog: true }, trans('admin.users.edit'), {
+        dialog.open(UserForm, { userId, inDialog: true }, trans('sk-user.edit'), {
             refreshKey: REFRESH_KEY,
         });
     }
@@ -51,7 +51,7 @@
                     onSuccess: () => bus.refresh('users-table'),
                 });
             },
-            trans('admin.users.delete_confirm', { name: user.full_name }),
+            trans('sk-user.delete_confirm', { name: user.full_name }),
         );
     }
 
@@ -65,47 +65,47 @@
         // .pagination(true)
         // .create({ onClick: openCreateDialog })
         .addColumns(
-            DB.column<User>().label('common.full_name').key('full_name'),
+            DB.column<User>().label('sk-common.full_name').key('full_name'),
             DB.column<User>().key('email'),
-            DB.column<User>().label('common.role').key('role'),
+            DB.column<User>().label('sk-common.role').key('role'),
             DB.column<User>().key('status').tag('definition').tagKey('userStatus').tagOutlined(),
-            DB.column<User>().label('common.created_at').key('created_at'),
+            DB.column<User>().label('sk-common.created_at').key('created_at'),
         )
         .addFilters(
             DB.filter().key('status').definitionOptions('userStatus'),
-            DB.filter().key('role').label('common.role').type('select').options(props.roleOptions),
+            DB.filter().key('role').label('sk-common.role').type('select').options(props.roleOptions),
         )
         .addActions(
             DB.action<User>()
                 .icon('pi pi-pencil')
                 .severity('warn')
-                .label('button.edit')
+                .label('sk-button.edit')
                 .visible(() => can('users.update'))
                 .handle((user) => openEditDialog(user.id)),
             DB.action<User>()
                 .icon('pi pi-trash')
                 .severity('danger')
-                .label('button.delete')
+                .label('sk-button.delete')
                 .visible(() => can('users.delete'))
                 .handle((user) => deleteUser(user)),
         )
         /* .addMenuActions(
             DB.menuAction<User>()
-                .label('button.view')
+                .label('sk-button.view')
                 .icon('pi pi-eye')
                 .handle((user) => router.visit(users.show.url(user))),
             DB.menuAction<User>()
-                .label('button.edit')
+                .label('sk-button.edit')
                 .icon('pi pi-pencil')
                 .visible(() => can('users.update'))
                 .handle((user) => openEditDialog(user.id)),
             DB.menuAction<User>()
-                .label('button.edit_on_page')
+                .label('sk-button.edit_on_page')
                 .icon('pi pi-external-link')
                 .visible(() => can('users.update'))
                 .handle((user) => router.visit(users.edit.url(user))),
             DB.menuAction<User>()
-                .label('button.delete')
+                .label('sk-button.delete')
                 .icon('pi pi-trash')
                 .separator()
                 .visible(() => can('users.delete'))
@@ -115,9 +115,9 @@
 </script>
 
 <template>
-    <AdminLayout :title="$t('admin.menu.users')" :subtitle="$t('admin.users.subtitle')">
+    <AdminLayout :title="$t('sk-menu.users')" :subtitle="$t('sk-user.subtitle')">
         <template v-if="can('users.create')" #page-actions>
-            <Button :label="$t('admin.users.create')" icon="pi pi-user-plus" @click="openCreateDialog" />
+            <Button :label="$t('sk-user.create')" icon="pi pi-user-plus" @click="openCreateDialog" />
         </template>
         <SkDatatable :config="tableConfig" :refresh-key="REFRESH_KEY">
             <!-- <template #toolbar>

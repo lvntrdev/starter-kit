@@ -15,6 +15,7 @@ return [
     'sensitive_keys' => [
         'mail.password',
         'storage.spaces_secret',
+        'turnstile.secret_key',
     ],
 
 ];

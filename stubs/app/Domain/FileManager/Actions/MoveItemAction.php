@@ -44,7 +44,7 @@ class MoveItemAction extends BaseAction
             ->exists();
 
         if (! $exists) {
-            throw new LogicException(__('file-manager.errors.target_missing'));
+            throw new LogicException(__('sk-file-manager.errors.target_missing'));
         }
     }
 
@@ -57,7 +57,7 @@ class MoveItemAction extends BaseAction
             ->firstOrFail();
 
         if ($targetFolderId !== null && $this->wouldCreateCycle($folder, $targetFolderId)) {
-            throw new LogicException(__('file-manager.errors.move_cycle'));
+            throw new LogicException(__('sk-file-manager.errors.move_cycle'));
         }
 
         $duplicate = FileFolder::query()
@@ -69,7 +69,7 @@ class MoveItemAction extends BaseAction
             ->exists();
 
         if ($duplicate) {
-            throw new LogicException(__('file-manager.errors.duplicate_folder'));
+            throw new LogicException(__('sk-file-manager.errors.duplicate_folder'));
         }
 
         $folder->update(['parent_id' => $targetFolderId]);

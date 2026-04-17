@@ -143,10 +143,10 @@
     <div>
         <Card>
             <template #title>
-                {{ $t('admin.profile.two_factor_title') }}
+                {{ $t('sk-profile.two_factor_title') }}
             </template>
             <template #subtitle>
-                {{ $t('admin.profile.two_factor_subtitle') }}
+                {{ $t('sk-profile.two_factor_subtitle') }}
             </template>
             <template #content>
                 <div class="space-y-4">
@@ -156,25 +156,25 @@
                         class="flex items-center gap-2 text-sm font-medium text-green-600 dark:text-green-400"
                     >
                         <i class="pi pi-check-circle" />
-                        {{ $t('admin.profile.two_factor_enabled') }}
+                        {{ $t('sk-profile.two_factor_enabled') }}
                     </div>
 
                     <!-- Status: Not Enabled -->
                     <div v-if="!props.twoFactorEnabled" class="text-sm text-surface-500 dark:text-surface-400">
-                        {{ $t('admin.profile.two_factor_disabled') }}
+                        {{ $t('sk-profile.two_factor_disabled') }}
                     </div>
 
                     <!-- QR Code Setup (enabled but not confirmed OR just enabled) -->
                     <template v-if="props.twoFactorEnabled && !props.twoFactorConfirmed">
                         <div class="flex items-center gap-2 text-sm font-medium text-yellow-600 dark:text-yellow-400">
                             <i class="pi pi-exclamation-triangle" />
-                            {{ $t('admin.profile.two_factor_finish') }}
+                            {{ $t('sk-profile.two_factor_finish') }}
                         </div>
 
                         <!-- QR loaded -->
                         <div v-if="qrCodeSvg" class="space-y-4">
                             <p class="text-sm text-surface-600 dark:text-surface-400">
-                                {{ $t('admin.profile.two_factor_scan') }}
+                                {{ $t('sk-profile.two_factor_scan') }}
                             </p>
 
                             <!-- eslint-disable vue/no-v-html -- QR SVG from trusted server -->
@@ -183,7 +183,7 @@
 
                             <div v-if="setupKey" class="text-sm text-surface-600 dark:text-surface-400">
                                 <p class="font-medium">
-                                    {{ $t('admin.profile.two_factor_manual') }}
+                                    {{ $t('sk-profile.two_factor_manual') }}
                                 </p>
                                 <code
                                     class="mt-1 block rounded bg-surface-100 px-3 py-2 font-mono text-sm dark:bg-surface-800"
@@ -199,7 +199,7 @@
                                         for="confirm_code"
                                         class="text-sm font-medium text-surface-700 dark:text-surface-300"
                                     >
-                                        {{ $t('admin.profile.two_factor_code_label') }}
+                                        {{ $t('sk-profile.two_factor_code_label') }}
                                     </label>
                                     <InputText
                                         id="confirm_code"
@@ -218,13 +218,13 @@
                                 <div class="flex items-center gap-2">
                                     <Button
                                         type="submit"
-                                        :label="$t('admin.profile.two_factor_verify')"
+                                        :label="$t('sk-profile.two_factor_verify')"
                                         icon="pi pi-check"
                                         :loading="confirmForm.processing"
                                     />
                                     <Button
                                         type="button"
-                                        :label="$t('admin.profile.two_factor_cancel_setup')"
+                                        :label="$t('sk-profile.two_factor_cancel_setup')"
                                         icon="pi pi-times"
                                         severity="secondary"
                                         :loading="twoFactorProcessing"
@@ -237,16 +237,16 @@
                         <!-- QR not loaded yet (password confirmation expired) -->
                         <div v-else class="space-y-3">
                             <p class="text-sm text-surface-500 dark:text-surface-400">
-                                {{ $t('admin.profile.two_factor_expired') }}
+                                {{ $t('sk-profile.two_factor_expired') }}
                             </p>
                             <div class="flex items-center gap-2">
                                 <Button
-                                    :label="$t('admin.profile.two_factor_continue')"
+                                    :label="$t('sk-profile.two_factor_continue')"
                                     icon="pi pi-refresh"
                                     @click="requirePasswordConfirmation('enable')"
                                 />
                                 <Button
-                                    :label="$t('admin.profile.two_factor_cancel_setup')"
+                                    :label="$t('sk-profile.two_factor_cancel_setup')"
                                     icon="pi pi-times"
                                     severity="secondary"
                                     :loading="twoFactorProcessing"
@@ -259,7 +259,7 @@
                     <!-- Recovery Codes (shown after confirmation) -->
                     <div v-if="showRecoveryCodes && recoveryCodes.length > 0" class="space-y-3">
                         <p class="text-sm font-medium text-surface-700 dark:text-surface-300">
-                            {{ $t('admin.profile.two_factor_recovery_info') }}
+                            {{ $t('sk-profile.two_factor_recovery_info') }}
                         </p>
                         <div class="rounded-lg bg-surface-100 p-4 dark:bg-surface-800">
                             <code v-for="code in recoveryCodes" :key="code" class="block font-mono text-sm">
@@ -267,7 +267,7 @@
                             </code>
                         </div>
                         <Button
-                            :label="$t('admin.profile.two_factor_regenerate')"
+                            :label="$t('sk-profile.two_factor_regenerate')"
                             icon="pi pi-refresh"
                             severity="secondary"
                             size="small"
@@ -278,7 +278,7 @@
                     <!-- Actions: Not enabled -->
                     <div v-if="!props.twoFactorEnabled" class="flex flex-wrap items-center gap-2">
                         <Button
-                            :label="$t('admin.profile.two_factor_enable')"
+                            :label="$t('sk-profile.two_factor_enable')"
                             icon="pi pi-shield"
                             :loading="twoFactorProcessing"
                             @click="requirePasswordConfirmation('enable')"
@@ -288,13 +288,13 @@
                     <!-- Actions: Enabled & Confirmed -->
                     <div v-if="props.twoFactorConfirmed" class="flex flex-wrap items-center gap-2">
                         <Button
-                            :label="$t('admin.profile.two_factor_show_codes')"
+                            :label="$t('sk-profile.two_factor_show_codes')"
                             icon="pi pi-key"
                             severity="secondary"
                             @click="showExistingRecoveryCodes"
                         />
                         <Button
-                            :label="$t('admin.profile.two_factor_disable')"
+                            :label="$t('sk-profile.two_factor_disable')"
                             icon="pi pi-times"
                             severity="danger"
                             :loading="twoFactorProcessing"
@@ -308,12 +308,12 @@
         <!-- Password Confirmation Dialog -->
         <Dialog
             v-model:visible="showPasswordDialog"
-            :header="$t('admin.profile.confirm_password_title')"
+            :header="$t('sk-profile.confirm_password_title')"
             modal
             :style="{ width: '25rem' }"
         >
             <p class="mb-4 text-sm text-surface-500 dark:text-surface-400">
-                {{ $t('admin.profile.confirm_password_message') }}
+                {{ $t('sk-profile.confirm_password_message') }}
             </p>
 
             <form @submit.prevent="submitPasswordConfirmation">
@@ -322,7 +322,7 @@
                         for="confirm_password_dialog"
                         class="text-sm font-medium text-surface-700 dark:text-surface-300"
                     >
-                        {{ $t('admin.common.password') }}
+                        {{ $t('sk-common.password') }}
                     </label>
                     <Password
                         v-model="passwordConfirmForm.password"
@@ -342,13 +342,13 @@
                 <div class="mt-4 flex justify-end gap-2">
                     <Button
                         type="button"
-                        :label="$t('admin.common.cancel')"
+                        :label="$t('sk-common.cancel')"
                         severity="secondary"
                         @click="showPasswordDialog = false"
                     />
                     <Button
                         type="submit"
-                        :label="$t('admin.common.confirm')"
+                        :label="$t('sk-common.confirm')"
                         icon="pi pi-lock"
                         :loading="passwordConfirmProcessing"
                     />
