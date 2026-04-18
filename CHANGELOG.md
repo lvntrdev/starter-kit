@@ -15,10 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Inactive user block on login** — `FortifyServiceProvider` now rejects the login attempt when the user's status is not `active`, returning a clear error instead of starting a session. Admins can suspend accounts without deleting them.
 
-- **`BaseFormRequest`** — shared parent for every admin/API FormRequest. Centralises `authorize()` defaults, Turnstile guard wiring, and attribute translation. All shipped FormRequests have been migrated to extend it.
-
-- **`SkAttributeTranslationLoader`** — resolves `sk-attribute.{field}` keys for validation error messages (with sensible fallbacks), wired globally via `AppServiceProvider`.
-
 - **`FormBuilder.trans(bool)`** — new fluent method on every field builder that controls whether the label is treated as a translation key (default `true`) or as a pre-resolved raw string (`.trans(false)`). Use `.trans(false)` when supplying `trans('admin.example')` or any already-translated value; the form template then renders it verbatim instead of running `$t()` on it again. Default behaviour unchanged — existing code is not affected.
 
 - **`FilePreviewModal` + `ImageLightbox`** — file previews in both the file manager and form file-upload fields now open in-app instead of a new browser tab. Images render inside a Google-Drive-style fullscreen overlay (`ImageLightbox` — backdrop blur, ESC to close). PDF, video, audio and text files render inside a mime-aware dialog (`FilePreviewModal`) with a built-in "Open in new tab" escape hatch for unsupported formats. Register the global overlay by adding `<ImageLightbox />` next to `<AppDialog />` in your admin layout.
@@ -26,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`MimePickerField`** — replaces the accepted-mime-types multiselect dropdown in **Settings → File Manager** with a categorized card-checkbox grid (Images / Documents / Archive), each option showing its file-type icon. Easier to scan than the dropdown list.
 
 - **`ToggleFeatureCard`** — new UI primitive for boolean feature flags. Shows a coloured icon, a bold label and a helper description next to a toggle switch, styled to match the `MimePickerField` cards. Used by the "Video uploads" and "Audio uploads" toggles in the file-manager settings.
+
+- **`lang/{en,tr}/validation.php`** — Laravel's default validation rule messages are now shipped with the kit, including the `attributes` and `custom` sections used by both the Laravel validator and by FormBuilder / DatatableBuilder (they auto-resolve a field's label via `validation.attributes.{key}` when `.label()` is not given). Turkish rule messages follow the Laravel-Lang/lang conventions.
+
+- **Role name localisation fallback chain** — the role label shared with Inertia via `auth.role` (shown in the admin topbar / sidebar) now resolves in three steps: (1) `roles.display_name[locale]` from the database; (2) `config('permission-resources.display_names.roles.{name}.{locale}')`; (3) `Str::headline($role->name)`. A freshly seeded role like `system_admin` renders as "System Admin" instead of the raw slug even when no localised value is configured.
 
 ### Changed
 
@@ -41,9 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Upload validation rejected `.ogg` video and `.avi` files** — `UploadFileRequest`'s `allow_video=true` branch only whitelisted `video/mp4`, `video/webm`, `video/quicktime` and `video/x-matroska`. Added `video/ogg`, `video/x-msvideo` and `video/avi`, plus the matching extension labels (`.ogv`, `.avi`) shown in the error message's "Allowed types" list.
 
+- **`npm run build` noise cleanup** — two spurious warnings have been scrubbed from production builds: (1) the "Sourcemap is likely to be incorrect" notices emitted by `@tailwindcss/vite` and `@inertiajs/vite` (both plugins skip sourcemap regeneration after their transform; runtime output is unaffected) are now filtered via a targeted Rollup `onwarn` hook in the shipped `stubs/vite.config.ts` — other warnings still pass through; (2) the `resolveDirective imported but never used` warning emitted for the shipped `SkDatatable.vue` and `FileManager.vue` — PrimeVue's `v-tooltip` / `v-ripple` directives are now bound explicitly in the `<script setup>` block (`const vTooltip = Tooltip`) so templates compile to a direct reference instead of a dynamic lookup.
+
 ### Removed
 
-- **Legacy unprefixed translation stubs** — `stubs/lang/{en,tr}/{admin,auth,button,common,datatable,enums,file-manager,message,pagination,passwords,validation}.php` (21 files) are no longer shipped. The application-side code (Vue pages, FormRequests, `SkAttributeTranslationLoader`) has fully moved to the `sk-*` keys, so these files were orphans in fresh installs. The legacy **package-level `starter-kit::` namespace is untouched** — `resources/lang/` inside the package still loads the original files, so `__('starter-kit::admin.menu')` calls keep resolving.
+- **Legacy unprefixed translation stubs** — `stubs/lang/{en,tr}/{admin,auth,button,common,datatable,enums,file-manager,message,pagination,passwords,validation}.php` (21 files) are no longer shipped. The application-side code (Vue pages, FormRequests) has fully moved to the `sk-*` keys — the new `lang/{en,tr}/validation.php` above is the native Laravel replacement, not an unprefixed stub — so these files were orphans in fresh installs. The legacy **package-level `starter-kit::` namespace is untouched** — `resources/lang/` inside the package still loads the original files, so `__('starter-kit::admin.menu')` calls keep resolving.
 
 ### Compatibility
 
