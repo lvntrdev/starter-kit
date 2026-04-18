@@ -39,7 +39,7 @@
   },
   "require-dev": {
     "pestphp/pest": "^4.4",
-    "orchestra/testbench": "^10.0"
+    "orchestra/testbench": "^11.0"
   },
   "autoload": {
     "files": [
@@ -62,7 +62,15 @@
     }
   },
   "config": {
-    "sort-packages": true
+    "sort-packages": true,
+    "allow-plugins": {
+      "pestphp/pest-plugin": true
+    },
+    "audit": {
+      "ignore": {
+        "PKSA-5jz8-6tcw-pbk4": "Pest 4 conflicts with phpunit >12.5.20; advisory affects <=12.5.21. Revisit when Pest 4.7+ widens the phpunit constraint."
+      }
+    }
   },
   "minimum-stability": "stable",
   "prefer-stable": true
