@@ -1,6 +1,5 @@
 {
   "name": "lvntr/laravel-starter-kit",
-  "version": "13.3.0",
   "description": "Laravel Starter Kit with DDD architecture, Inertia.js, Vue 3, PrimeVue, and role-based permissions.",
   "keywords": [
     "laravel",
