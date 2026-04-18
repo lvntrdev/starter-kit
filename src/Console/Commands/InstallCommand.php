@@ -247,7 +247,6 @@ class InstallCommand extends Command
             options: [
                 'mysql' => 'MySQL',
                 'mariadb' => 'MariaDB',
-                'pgsql' => 'PostgreSQL',
             ],
             default: 'mysql',
         );
@@ -255,7 +254,7 @@ class InstallCommand extends Command
         $envValues = ['DB_CONNECTION' => $driver];
 
         $host = text(label: 'Database host', default: '127.0.0.1', required: true);
-        $port = text(label: 'Database port', default: $driver === 'pgsql' ? '5432' : '3306', required: true);
+        $port = text(label: 'Database port', default: '3306', required: true);
         $database = text(label: 'Database name', default: 'starter_kit', required: true);
         $username = text(label: 'Database username', default: 'root', required: true);
         $password = text(label: 'Database password', default: '');
@@ -650,7 +649,7 @@ class InstallCommand extends Command
      */
     private function createAdminUser(): void
     {
-        $email = 'admin@demo.com';
+        $email = 'admin@lvntr.dev';
         $password = 'password';
 
         if (! $this->option('no-interaction')) {

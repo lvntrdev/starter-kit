@@ -42,7 +42,7 @@
         return builder
             .addFields(
                 FB.inputText().key('first_name'),
-                FB.inputText().key('last_name').trans(false),
+                FB.inputText().key('last_name'),
                 FB.inputText().key('email').inputType('email').class('col-span-full'),
                 FB.select().key('status').default('active').definitionOptions('userStatus').class('col-span-full'),
                 FB.password()
