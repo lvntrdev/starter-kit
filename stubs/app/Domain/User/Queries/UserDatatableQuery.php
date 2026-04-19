@@ -40,7 +40,7 @@ class UserDatatableQuery
                     $q->whereHas('roles', fn (Builder $r) => $r->where('name', $value));
                 }),
             ])
-            ->with(['roles'])
+            ->with(['roles', 'media'])
             ->defaultSort('-created_at')
             ->resource(UserResource::class)
             ->response();

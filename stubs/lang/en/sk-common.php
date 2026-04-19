@@ -17,6 +17,7 @@ return [
     'updated_at' => 'Last Updated',
     'search' => 'Search',
     'select' => 'Select',
+    'password' => 'Password',
 
     'placeholder' => [
         'select_role' => 'Select Role',

@@ -27,7 +27,8 @@
                 host: string | null;
                 port: number | null;
                 username: string | null;
-                password: string | null;
+                password: null;
+                password_is_set: boolean;
                 encryption: string | null;
                 from_address: string;
                 from_name: string;
@@ -35,13 +36,15 @@
             storage: {
                 media_disk: string;
                 spaces_key: string | null;
-                spaces_secret: string | null;
+                spaces_secret: null;
+                spaces_secret_is_set: boolean;
                 spaces_region: string | null;
                 spaces_bucket: string | null;
                 spaces_endpoint: string | null;
                 spaces_url: string | null;
                 aws_key: string | null;
-                aws_secret: string | null;
+                aws_secret: null;
+                aws_secret_is_set: boolean;
                 aws_region: string | null;
                 aws_bucket: string | null;
                 aws_url: string | null;
@@ -56,7 +59,8 @@
             turnstile: {
                 enabled: boolean;
                 site_key: string | null;
-                secret_key: string | null;
+                secret_key: null;
+                secret_key_is_set: boolean;
             };
         };
         timezones: string[];

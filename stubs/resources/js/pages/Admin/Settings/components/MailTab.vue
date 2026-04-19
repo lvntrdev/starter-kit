@@ -9,7 +9,8 @@
             host: string | null;
             port: number | null;
             username: string | null;
-            password: string | null;
+            password: null;
+            password_is_set: boolean;
             encryption: string | null;
             from_address: string;
             from_name: string;
@@ -28,6 +29,8 @@
 
     const isSmtp = (values: Record<string, unknown>) => values.mailer === 'smtp';
 
+    const passwordPlaceholder = computed(() => (props.settings.password_is_set ? '••••••••' : ''));
+
     const formConfig = computed(() =>
         FB.form()
             .layout('vertical')
@@ -38,7 +41,9 @@
                 ...props.settings,
                 host: props.settings.host ?? '',
                 username: props.settings.username ?? '',
-                password: props.settings.password ?? '',
+                // Never prefill the stored password — the backend preserves it
+                // when this field is submitted empty.
+                password: '',
                 encryption: props.settings.encryption ?? 'none',
             })
             .submit({
@@ -51,7 +56,7 @@
                 FB.inputText().key('host').placeholder('smtp.example.com').visible(isSmtp),
                 FB.inputNumber().key('port').visible(isSmtp).useGrouping(false),
                 FB.inputText().key('username').visible(isSmtp),
-                FB.password().key('password').toggleMask().visible(isSmtp),
+                FB.password().key('password').toggleMask().visible(isSmtp).placeholder(passwordPlaceholder.value),
                 FB.select().key('encryption').options(encryptionOptions).default('none').visible(isSmtp),
                 FB.inputText().key('from_address').inputType('email').placeholder('noreply@example.com'),
                 FB.inputText().key('from_name'),

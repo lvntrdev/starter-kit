@@ -33,6 +33,11 @@ class UserFactory extends Factory
             'password' => static::$password ??= Hash::make('password'),
             'status' => 'active',
             'remember_token' => Str::random(10),
+            // Seeded explicitly so Eloquent strict mode does not complain when
+            // code reads these attributes on a fresh factory instance.
+            'two_factor_secret' => null,
+            'two_factor_recovery_codes' => null,
+            'two_factor_confirmed_at' => null,
         ];
     }
 

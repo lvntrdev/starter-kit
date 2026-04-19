@@ -3,6 +3,14 @@
 return [
     'title' => 'Profile',
     'subtitle' => 'Manage your account settings.',
+
+    'tabs' => [
+        'general' => 'General',
+        'password' => 'Password',
+        'security' => 'Security',
+        'sessions' => 'Sessions',
+    ],
+
     'info_title' => 'Profile Information',
     'info_subtitle' => 'Update your name and email address.',
 

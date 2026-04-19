@@ -3,6 +3,14 @@
 return [
     'title' => 'Profil',
     'subtitle' => 'Hesap ayarlarınızı yönetin.',
+
+    'tabs' => [
+        'general' => 'Genel',
+        'password' => 'Parola',
+        'security' => 'Güvenlik',
+        'sessions' => 'Oturumlar',
+    ],
+
     'info_title' => 'Profil Bilgileri',
     'info_subtitle' => 'Adınızı ve e-posta adresinizi güncelleyin.',
 

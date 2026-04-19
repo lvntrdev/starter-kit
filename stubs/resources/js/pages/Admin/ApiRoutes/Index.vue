@@ -72,7 +72,7 @@
                     :loading="regenerating"
                     @click="regenerateDocs"
                 />
-                <a href="/docs/api" target="_blank">
+                <a href="/docs/api" target="_blank" rel="noopener noreferrer">
                     <Button :label="$t('sk-api-route.open_api_docs')" icon="pi pi-book" outlined />
                 </a>
             </div>

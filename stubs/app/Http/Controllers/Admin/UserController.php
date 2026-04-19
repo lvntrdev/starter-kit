@@ -20,6 +20,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -55,9 +56,11 @@ class UserController extends Controller
     /**
      * Show the form for creating a new user.
      */
-    public function create(): Response
+    public function create(RoleSelectOptionsQuery $roleOptions): Response
     {
-        return Inertia::render('Admin/Users/Create');
+        return Inertia::render('Admin/Users/Create', [
+            'roleOptions' => $roleOptions->get(Auth::user()),
+        ]);
     }
 
     /**
@@ -77,6 +80,8 @@ class UserController extends Controller
      */
     public function data(User $user): ApiResponse
     {
+        Gate::authorize('view', $user);
+
         $user->load(['roles', 'media']);
 
         return to_api(['user' => new UserResource($user)]);
@@ -85,10 +90,13 @@ class UserController extends Controller
     /**
      * Show the form for editing the specified user.
      */
-    public function edit(User $user): Response
+    public function edit(User $user, RoleSelectOptionsQuery $roleOptions): Response
     {
+        Gate::authorize('view', $user);
+
         return Inertia::render('Admin/Users/Edit', [
             'userId' => $user->id,
+            'roleOptions' => $roleOptions->get(Auth::user()),
         ]);
     }
 
@@ -110,6 +118,8 @@ class UserController extends Controller
      */
     public function destroy(User $user, DeleteUserAction $action): RedirectResponse
     {
+        Gate::authorize('delete', $user);
+
         try {
             $action->execute($user, (string) Auth::id());
 
@@ -134,6 +144,8 @@ class UserController extends Controller
      */
     public function deleteAvatar(User $user, ClearMediaAction $action): ApiResponse|JsonResponse
     {
+        Gate::authorize('update', $user);
+
         $action->execute($user, 'avatar');
 
         return to_api(status: 204);

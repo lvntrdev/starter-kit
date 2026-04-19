@@ -7,6 +7,7 @@ return [
     'light_mode' => 'Açık tema',
     'dark_mode' => 'Koyu tema',
     'notifications' => 'Bildirimler',
+    'language' => 'Dil',
     'success' => 'Başarılı',
     'error' => 'Hata',
     'warning' => 'Uyarı',

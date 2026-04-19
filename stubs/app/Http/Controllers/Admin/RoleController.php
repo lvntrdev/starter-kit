@@ -15,6 +15,7 @@ use App\Enums\RoleEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Role\StoreRoleRequest;
 use App\Http\Requests\Admin\Role\UpdateRoleRequest;
+use App\Http\Resources\Admin\Role\RoleResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\Role;
 use Illuminate\Http\RedirectResponse;
@@ -86,10 +87,7 @@ class RoleController extends Controller
     {
         $role->load('permissions');
 
-        return to_api([
-            ...$role->toArray(),
-            'permissions' => $role->permissions->pluck('name'),
-        ]);
+        return to_api(new RoleResource($role));
     }
 
     /**
@@ -108,10 +106,7 @@ class RoleController extends Controller
         $role->load('permissions');
 
         return Inertia::render('Admin/Roles/Edit', [
-            'role' => [
-                ...$role->toArray(),
-                'permissions' => $role->permissions->pluck('name'),
-            ],
+            'role' => (new RoleResource($role))->resolve(),
             'permissionsByGroup' => $permissionsQuery->get(),
             'availableLocales' => config('app.languages', ['en' => 'English']),
             'userPermissions' => $grantableQuery->get(Auth::user()),

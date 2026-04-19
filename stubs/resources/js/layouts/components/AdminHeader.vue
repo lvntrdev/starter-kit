@@ -34,7 +34,8 @@
     const localeMenuItems = computed<MenuItem[]>(() =>
         Object.entries(availableLocales.value).map(([code, label]) => ({
             label,
-            icon: code === currentLocale.value ? 'pi pi-check' : 'pi pi-fw',
+            code,
+            active: code === currentLocale.value,
             command: () => switchLocale(code),
         })),
     );
@@ -77,6 +78,7 @@
         {
             label: trans('sk-menu.logout'),
             icon: 'pi pi-sign-out',
+            danger: true,
             command: () => router.post('/logout'),
         },
     ]);
@@ -118,7 +120,24 @@
                     <i class="pi pi-globe" />
                     <span class="admin-header__locale-code">{{ currentLocale.toUpperCase() }}</span>
                 </button>
-                <Menu ref="localeMenuRef" :model="localeMenuItems" :popup="true" />
+                <Menu ref="localeMenuRef" class="sk-locale-menu" :model="localeMenuItems" :popup="true">
+                    <template #start>
+                        <div class="sk-locale-menu__label">
+                            {{ $t('sk-layout.language') }}
+                        </div>
+                    </template>
+                    <template #item="{ item, props }">
+                        <a
+                            v-bind="props.action"
+                            class="sk-locale-menu__item"
+                            :class="{ 'sk-locale-menu__item--active': (item as any).active }"
+                        >
+                            <span class="sk-locale-menu__code">{{ (item as any).code?.toUpperCase() }}</span>
+                            <span class="sk-locale-menu__name">{{ item.label }}</span>
+                            <i v-if="(item as any).active" class="pi pi-check sk-locale-menu__check" />
+                        </a>
+                    </template>
+                </Menu>
             </template>
 
             <button
@@ -147,7 +166,41 @@
                 </div>
             </button>
 
-            <Menu ref="userMenuRef" :model="userMenuItems" :popup="true" />
+            <Menu ref="userMenuRef" class="sk-user-menu" :model="userMenuItems" :popup="true">
+                <template #start>
+                    <div v-if="user" class="sk-user-menu__header">
+                        <img v-if="user.avatar_url" :src="user.avatar_url" alt="Avatar" class="sk-user-menu__avatar">
+                        <div v-else class="sk-user-menu__avatar sk-user-menu__avatar--placeholder">
+                            {{ initials }}
+                        </div>
+                        <div class="sk-user-menu__identity">
+                            <div class="sk-user-menu__name">
+                                {{ user.full_name }}
+                            </div>
+                            <div class="sk-user-menu__email">
+                                {{ user.email }}
+                            </div>
+                            <div v-if="role" class="sk-user-menu__role">
+                                <i class="pi pi-shield" />
+                                <span>{{ role }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <template #item="{ item, props }">
+                    <a
+                        v-bind="props.action"
+                        class="sk-user-menu__item"
+                        :class="{ 'sk-user-menu__item--danger': (item as any).danger }"
+                    >
+                        <span class="sk-user-menu__item-icon">
+                            <i :class="item.icon" />
+                        </span>
+                        <span class="sk-user-menu__item-label">{{ item.label }}</span>
+                        <i class="pi pi-arrow-up-right sk-user-menu__item-arrow" />
+                    </a>
+                </template>
+            </Menu>
         </div>
     </header>
 </template>

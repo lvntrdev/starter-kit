@@ -5,6 +5,8 @@ namespace App\Domain\FileManager\Actions;
 use App\Domain\FileManager\DTOs\FileManagerContextDTO;
 use App\Domain\Shared\Actions\BaseAction;
 use App\Models\FileFolder;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Collection;
 use LogicException;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -56,10 +58,12 @@ class MoveItemAction extends BaseAction
             ->where('id', $folderId)
             ->firstOrFail();
 
-        if ($targetFolderId !== null && $this->wouldCreateCycle($folder, $targetFolderId)) {
+        if ($targetFolderId !== null && $this->wouldCreateCycle($context, $folder, $targetFolderId)) {
             throw new LogicException(__('sk-file-manager.errors.move_cycle'));
         }
 
+        // Pre-check handles parent_id=NULL where the unique index does not
+        // enforce uniqueness. The catch guards the narrow race window.
         $duplicate = FileFolder::query()
             ->where('owner_type', $context->ownerType)
             ->where('owner_id', $context->ownerId)
@@ -72,7 +76,15 @@ class MoveItemAction extends BaseAction
             throw new LogicException(__('sk-file-manager.errors.duplicate_folder'));
         }
 
-        $folder->update(['parent_id' => $targetFolderId]);
+        try {
+            $folder->update(['parent_id' => $targetFolderId]);
+        } catch (QueryException $e) {
+            if ($this->isUniqueViolation($e)) {
+                throw new LogicException(__('sk-file-manager.errors.duplicate_folder'));
+            }
+
+            throw $e;
+        }
     }
 
     private function moveFile(FileManagerContextDTO $context, string $mediaId, ?string $targetFolderId): void
@@ -88,17 +100,39 @@ class MoveItemAction extends BaseAction
         $media->save();
     }
 
-    private function wouldCreateCycle(FileFolder $folder, string $targetFolderId): bool
+    /**
+     * Walk up from `targetFolderId` toward root using a single pre-loaded
+     * id → parent_id map, avoiding one SELECT per ancestor.
+     */
+    private function wouldCreateCycle(FileManagerContextDTO $context, FileFolder $folder, string $targetFolderId): bool
     {
-        $current = FileFolder::query()->find($targetFolderId);
+        /** @var Collection<string, string|null> $parents */
+        $parents = FileFolder::query()
+            ->where('owner_type', $context->ownerType)
+            ->where('owner_id', $context->ownerId)
+            ->pluck('parent_id', 'id');
 
-        while ($current !== null) {
-            if ((string) $current->id === (string) $folder->id) {
+        $currentId = $targetFolderId;
+        $visited = [];
+
+        while ($currentId !== null) {
+            if ((string) $currentId === (string) $folder->id) {
                 return true;
             }
-            $current = $current->parent_id ? FileFolder::query()->find($current->parent_id) : null;
+
+            if (isset($visited[$currentId])) {
+                return true;
+            }
+            $visited[$currentId] = true;
+
+            $currentId = $parents[$currentId] ?? null;
         }
 
         return false;
+    }
+
+    private function isUniqueViolation(QueryException $e): bool
+    {
+        return (string) $e->getCode() === '23000' || (int) ($e->errorInfo[1] ?? 0) === 1062;
     }
 }

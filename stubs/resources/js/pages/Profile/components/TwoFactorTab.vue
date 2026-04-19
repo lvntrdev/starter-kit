@@ -24,13 +24,14 @@
     const showPasswordDialog = ref(false);
     const passwordConfirmError = ref('');
     const passwordConfirmProcessing = ref(false);
-    const pendingAction = ref<'enable' | 'disable' | null>(null);
+    type PendingAction = 'enable' | 'disable' | 'show-codes' | 'regenerate-codes';
+    const pendingAction = ref<PendingAction | null>(null);
 
     const passwordConfirmForm = useForm({
         password: '',
     });
 
-    function requirePasswordConfirmation(action: 'enable' | 'disable') {
+    function requirePasswordConfirmation(action: PendingAction) {
         pendingAction.value = action;
         passwordConfirmForm.reset();
         passwordConfirmError.value = '';
@@ -52,6 +53,12 @@
                 await enableTwoFactor();
             } else if (pendingAction.value === 'disable') {
                 await disableTwoFactor();
+            } else if (pendingAction.value === 'show-codes') {
+                await fetchRecoveryCodes();
+                showRecoveryCodes.value = true;
+            } else if (pendingAction.value === 'regenerate-codes') {
+                await regenerateRecoveryCodes();
+                showRecoveryCodes.value = true;
             }
         } catch (err) {
             const error = err as AxiosError<{ errors?: { password?: string[] } }>;
@@ -124,8 +131,11 @@
     }
 
     async function showExistingRecoveryCodes() {
-        await fetchRecoveryCodes();
-        showRecoveryCodes.value = !showRecoveryCodes.value;
+        if (showRecoveryCodes.value) {
+            showRecoveryCodes.value = false;
+            return;
+        }
+        requirePasswordConfirmation('show-codes');
     }
 
     onMounted(async () => {
@@ -342,13 +352,13 @@
                 <div class="mt-4 flex justify-end gap-2">
                     <Button
                         type="button"
-                        :label="$t('sk-common.cancel')"
+                        :label="$t('sk-button.cancel')"
                         severity="secondary"
                         @click="showPasswordDialog = false"
                     />
                     <Button
                         type="submit"
-                        :label="$t('sk-common.confirm')"
+                        :label="$t('sk-button.confirm')"
                         icon="pi pi-lock"
                         :loading="passwordConfirmProcessing"
                     />

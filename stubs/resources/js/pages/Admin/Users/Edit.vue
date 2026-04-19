@@ -6,6 +6,7 @@
 
     interface Props {
         userId: string;
+        roleOptions: { label: string; value: string }[];
     }
 
     defineProps<Props>();
@@ -22,7 +23,7 @@
     <AdminLayout :title="$t('sk-user.edit')" :subtitle="userId" :back-url="true">
         <SkTabs :config="tabConfig">
             <template #general>
-                <UserForm :user-id="userId" />
+                <UserForm :user-id="userId" :role-options="roleOptions" />
             </template>
 
             <template #files>

@@ -251,6 +251,7 @@ return [
         'spaces_region' => 'Spaces Region',
         'aws_bucket' => 'AWS Bucket',
         'spaces_bucket' => 'Spaces Bucket',
+        'current_password' => 'Current Password',
     ],
 
 ];

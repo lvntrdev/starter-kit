@@ -241,6 +241,7 @@ return [
         'spaces_region' => 'Spaces Bölgesi',
         'aws_bucket' => 'AWS Bucket',
         'spaces_bucket' => 'Spaces Bucket',
+        'current_password' => 'Mevcut Parola',
     ],
 
 ];

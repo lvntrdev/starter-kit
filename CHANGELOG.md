@@ -5,6 +5,105 @@ All notable changes to `lvntr/laravel-starter-kit` will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [13.3.2] - 2026-04-19
+
+### Security
+
+- **Privilege escalation via unvalidated role assignment — admin user flow.** Shipped `StoreUserRequest` and `UpdateUserRequest` stubs validated the `role` field with `Rule::exists('roles', 'name')` only, so any user holding `users.create` or `users.update` could submit `role=system_admin` via a raw HTTP request regardless of the dropdown options in the UI — instantly granting themselves super-admin (which bypasses every authorization check via `Gate::before`). `UpdateUserRequest` additionally had no rank check on the target user, so a lower-ranked actor could edit or demote a higher-ranked one. Fix: `role` is now validated with `Rule::in(...)` built from `RoleSelectOptionsQuery` (the hierarchy-aware list that feeds the dropdown). `UpdateUserRequest::authorize()` now rejects attempts to edit a target whose top-ranked role outranks the actor's. A user holding `users.*` as a direct Spatie permission without any assigned role is treated as the lowest possible rank — they can no longer assign any role or edit anyone other than themselves; the previous `(int) null = 0` fallback accidentally opened the full role list including `system_admin`.
+
+- **Settings secrets no longer leak to the frontend.** The shipped **Settings** page was sending `mail.password`, `storage.spaces_secret`, `storage.aws_secret` and `turnstile.secret_key` in plain text as Inertia props for any user with `settings.read`. Even values that lived only in `.env` leaked out through the `config()` fallback. Fix: `SettingsDefaultsQuery` now returns `null` for every secret field and adds a parallel `*_is_set: bool` flag. `MailSettingsDTO`, `StorageSettingsDTO` and `TurnstileSettingsDTO` omit the secret key from `toArray()` when submitted blank so `SettingService::setGroup()` preserves the stored value. The shipped `MailTab.vue`, `StorageTab.vue` and `TurnstileTab.vue` render a `••••••••` placeholder when `*_is_set` is true and submit an empty string when the admin doesn't type a new value. A new `tests/Feature/Admin/Settings/SecretsDisclosureTest` stub asserts the Inertia payload never contains the raw secret string anywhere.
+
+- **`storage.aws_secret` now stored encrypted at rest.** `stubs/config/settings.php` gained `storage.aws_secret` in its `sensitive_keys` list — it previously contained `mail.password`, `storage.spaces_secret` and `turnstile.secret_key` but not the AWS counterpart, so S3 secrets saved through the UI lived as plaintext in the `settings` table. `SettingService` encrypts every listed key with `Crypt::encryptString` on write and decrypts on read.
+
+- **`CheckResourcePermission` middleware now fails closed in production.** The middleware used to allow the request through when a route-derived permission (e.g. `users.read` for `users.index`) was not seeded in the database — silently unprotecting any new route whose permission row was forgotten. The middleware now throws `AuthorizationException` (403) when running under `app()->environment('production')` and `Log::warning`s the unseeded permission in non-production environments. Dev ergonomics preserved, the production foot-gun is closed.
+
+- **Test-mail endpoint no longer reflects raw exception details.** The shipped `SettingsController::testMail()` used to flash the SMTP exception message (host / username / TLS details) back to the browser. It now writes the exception class + message to `Log::error` and returns a generic "Failed to send test email. Check the server logs for details." message to the user — same success/failure signal without the information disclosure.
+
+- **API auth — email verification and 2FA parity with the web flow.** The shipped `RegisterUserAction`, `LoginUserAction`, `AuthController` and `routes/api/public-api.php` stubs were reworked. The API previously issued an access token immediately on register and on any successful password login, bypassing the email-verification and 2FA checkpoints that the web flow enforces:
+    - **`register`** — when Fortify's `emailVerification` feature is enabled, no token is issued. The action creates the user, fires `Illuminate\Auth\Events\Registered` so Fortify's notification pipeline sends the verification link, and returns `{ user, requires_verification: true }` with 201. Feature-off behaviour (token issued on register) is preserved.
+    - **`login`** — returns a discriminated payload: `{ user, token }` on normal success, `{ requires_verification: true }` when the email is unverified with the feature on, or `{ requires_two_factor: true, challenge: "<uuid>" }` when the account has confirmed 2FA. The challenge id is cached for 5 minutes.
+    - **`two-factor-challenge`** — new endpoint `POST /api/v1/auth/two-factor-challenge` (throttled `5/min`) plus a `TwoFactorChallengeAction` + `TwoFactorChallengeRequest` stub. Accepts `{ challenge, code }` for TOTP or `{ challenge, recovery_code }`. On success it issues `{ user, token }`. TOTP is verified through Fortify's `TwoFactorAuthenticationProvider`; recovery codes are matched with `hash_equals` and consumed via `replaceRecoveryCode`. Invalid / unknown / expired challenges return 401.
+
+    **Breaking for API consumers** — clients that expected `{ user, token }` on every 2xx response from `register` / `login` must now branch on `data.requires_verification` and `data.requires_two_factor` flags, and complete the challenge at `/api/v1/auth/two-factor-challenge` before receiving a token when 2FA is confirmed on the account. Non-2FA, verified users keep seeing the old shape.
+
+- **Settings `required` validation now matches the UI secret indicator.** `UpdateMailSettingsRequest` and `UpdateTurnstileSettingsRequest` previously only checked the DB row when deciding whether a secret was "already set"; if the value lived only in `.env`, the UI's `*_is_set` flag reported `true` (because `SettingsDefaultsQuery` falls back to `config()`) but a blank submit triggered a confusing `required` validation error. The `required` branch now mirrors the query — DB row OR config fallback — so env-backed installations no longer see the spurious error.
+
+- **IDOR on admin avatar upload / delete (shipped stubs).** `POST /users/{user}/avatar` and `DELETE /users/{user}/avatar` resolved to no permission under `CheckResourcePermission` — the route actions `uploadAvatar` / `deleteAvatar` were not in the middleware's `ACTION_ABILITY_MAP`, and `UploadAvatarRequest::authorize()` returned `true` unconditionally. Any authenticated + email-verified user could overwrite or delete any other user's avatar, system admin included. Fix: the map gains `uploadAvatar => update` and `deleteAvatar => update`; `UploadAvatarRequest::authorize()` delegates to `UserPolicy::update` when a `{user}` route param is bound (profile self-upload is preserved); `UserController::deleteAvatar` calls `Gate::authorize('update', $user)` explicitly.
+
+- **Rank-hierarchy guard on view / update / delete (admin + API).** `GET /users/{user}/data`, `GET /users/{user}/edit`, `DELETE /users/{user}` (admin), `PATCH /api/v1/users/{user}` and `DELETE /api/v1/users/{user}` previously relied solely on the `users.read` / `users.update` / `users.delete` permission. A lower-ranked admin holding the permission could still read or delete a higher-ranked user through these endpoints. Fix: `UserPolicy::view / update / delete` now run the same `canManage()` rank check (system_admin bypasses, role-less actors are treated as the lowest rank). Admin and API controllers call `Gate::authorize('view' / 'update' / 'delete', $user)` on every cross-user operation; admin + API `UpdateUserRequest::authorize()` both delegate to `UserPolicy::update` so the rank check is uniform.
+
+- **`POST /api-routes/regenerate-docs` was reachable by any authenticated user.** The `regenerateDocs` action was not in the `ACTION_ABILITY_MAP`, so `CheckResourcePermission` passed the request through without a permission check. Fix: `regenerateDocs => update` added to the map; `api-routes.update` added to `config/permission-resources.php` so the seeder creates the permission row.
+
+- **SVG uploads blocked on logo + FileManager (stored XSS).** Both the logo uploader and the FileManager default MIME list accepted `image/svg+xml` and stored files on the `public` disk; SVG can embed `<script>` / `onload` / foreignObject JavaScript and executes in the app origin when viewed through `/storage/...`. Fix: logo validation now pins `mimes:png,jpg,jpeg,webp` + `dimensions:max_width=4096,max_height=4096`. `UploadFileRequest` keeps a `BLOCKED_MIMES` list that is stripped from the effective MIME list on every upload regardless of stored settings. `UpdateFileManagerSettingsRequest` rejects those MIMEs at settings-save time (`Rule::notIn(...)` + MIME regex). The shipped UI pickers (`MimePickerField`, `FileManagerTab`, `GeneralTab` logo input) no longer list SVG. `SettingsDefaultsQuery::fileManager()` strips the blocked MIMEs from the stored list before returning the payload so older installs do not see SVG as a selected option.
+
+- **Avatar rule tightened.** `UploadAvatarRequest::rules()` upgraded from `['required','image','max:2048']` to `required | image | mimes:jpg,jpeg,png,webp | max:2048 | dimensions:max_width=4096,max_height=4096` — blocks SVG and caps pixel dimensions against decompression bombs.
+
+- **`media-library.disk_name` default changed from `public` to `local`.** Missing or mis-seeded configuration no longer places user-uploaded documents on a world-readable URL. FileManager already streams downloads via `DownloadFileAction`, so a private disk is sufficient.
+
+- **`SESSION_ENCRYPT` + `SESSION_SECURE_COOKIE` default to `true`.** Deployments that forgot to set either env var would ship plaintext session payloads over an insecure cookie on HTTPS. Both defaults are now `true`; local dev is unaffected because `.env.example` already sets both.
+
+- **Baseline CSP header on `SecurityHeaders` middleware.** Both the Lvntr-namespaced middleware (`src/`) and the shipped stub now emit a conservative `Content-Security-Policy` in non-local environments. Local dev is exempt because the Vite HMR dev-server origin varies per developer and would just block normal work.
+
+- **Scramble "Try It" disabled in production.** `config/scramble.php` shipped with `hide_try_it: false` + `try_it_credentials_policy: 'include'`, handing any admin with `api-docs.read` an in-browser API tester that forwarded their session cookies on every request. Both values now branch on `APP_ENV === 'production'` (hidden + `omit` in prod).
+
+- **Passport access-token TTL shortened, scope catalogue seeded.** `config/starter-kit.php` defaults changed from 15 days / 30 days / 6 months (access / refresh / personal) to 60 minutes / 14 days / 30 days. Legacy `PASSPORT_TOKEN_DAYS` / `PASSPORT_PERSONAL_TOKEN_MONTHS` env keys still take precedence when set, so existing installs with explicit env values are not disturbed. `StarterKitServiceProvider::configurePassport` accepts both the new `access_token_minutes` / `personal_token_days` keys and the legacy `_days` / `_months` keys. An opt-in scope catalogue (`users.read`, `users.write`, `files.read`, `files.write`, `admin`) is pre-wired via `Passport::tokensCan()` — attach `middleware('scope:...')` to specific API routes when you are ready to enforce.
+
+- **API register / login now honour the `turnstile` middleware.** The shipped `routes/api/public-api.php` stub attaches `turnstile` middleware to `POST /api/v1/auth/register` and `POST /api/v1/auth/login`. When Turnstile is disabled in settings the middleware is a no-op; when enabled it picks up the same `cf_turnstile_response` enforcement as the web forms, so automated account creation is capped.
+
+### Fixed
+
+- **User domain events now dispatch on Create/Update/Delete.** Shipped `CreateUserAction`, `UpdateUserAction` and `DeleteUserAction` stubs previously had their `UserCreated::dispatch(...)` / `UserUpdated::dispatch(...)` calls commented out or missing — any listener registered in `DomainServiceProvider` (e.g. the audit-log listener) never ran for user writes. `Create` and `Update` now dispatch only when at least one tracked field changes; `Delete` captures id/email before deletion and dispatches `UserDeleted` on success, matching the `Role*` action pattern.
+
+- **Admin `users.show` route returned 500.** The shipped `routes/web/user-route.php` used `Route::resource('users', UserController::class)`, implicitly opening `GET /users/{user}` — but `UserController` never had a `show()` method, so every hit threw `BadMethodCallException`. Resource registration is now scoped with `->except(['show'])`. Detail data remains available via the existing `GET /users/{user}/data` endpoint consumed by the admin UI.
+
+- **`SettingsController` logo endpoints now return the `ApiResponse` envelope.** `POST /settings/logo` and `DELETE /settings/logo` used raw `response()->json([...])` / `response()->json(status: 204)`, breaking the "every JSON response carries `{ success, status, message, data }`" contract. Both endpoints now go through `to_api(...)`. Frontend consumer shape (`json.data.logo_url`) is preserved.
+
+- **`UserPolicy` gained a `delete` ability.** `DELETE /media/{media}` calls `Gate::authorize('delete', $media->model)`. For media owned by a `User`, `UserPolicy` had no `delete` method (only `view` and `update`), so the Gate fell through to the default deny and returned 403 — even for the owner deleting their own avatar. The new `delete(User $actor, User $user)` mirrors `update`: self is always allowed, otherwise the actor needs the `users.delete` permission.
+
+- **`CheckResourcePermission` middleware: process-wide `static` cache replaced with a request-scoped container binding.** The permission-existence lookup used to memoise its result in `static $cached`. Under long-lived workers (Octane, queue workers keeping the container warm), newly-seeded permissions were invisible until the worker restarted. Inside the test suite the static survived across tests despite `RefreshDatabase`, producing intermittent 403s. The cache now lives in `app()->instance('check-permission.cache', ...)` — request-scoped in production, test-scoped under the testing container.
+
+- **`UserFactory` seeds `two_factor_*` columns as `null` by default.** Eloquent strict mode (enabled in non-prod by `Lvntr\StarterKit\StarterKitServiceProvider::shouldBeStrict`) throws "attribute [two_factor_secret] either does not exist or was not retrieved" when code reads those columns on a fresh factory instance. The factory now writes `two_factor_secret`, `two_factor_recovery_codes` and `two_factor_confirmed_at` as explicit `null`s so consumer tests relying on `User::factory()->create()` don't need a `->refresh()` before hitting Fortify-aware code.
+
+- **`CreateUserAction` + `UpdateUserAction` now wrap the write + role sync in `DB::transaction`.** A `syncRoles` failure after `User::create` previously left a user row with no roles. Events dispatch post-commit so listeners observe consistent state.
+
+- **`MoveItemAction::wouldCreateCycle` collapsed from N queries to 1.** The ancestor walk used to issue a `FileFolder::find` per hop. The ancestor map is now loaded once per call; the walk happens in memory with a visited-guard against cycles in corrupt data.
+
+- **Folder create / rename / move now catch unique-constraint violations.** Concurrent requests could pass the `->exists()` check in lockstep; the second write surfaced a raw `QueryException`. `CreateFolderAction`, `RenameFolderAction` and `MoveItemAction` now catch SQLSTATE `23000` / MySQL `1062` and rethrow a localised `LogicException` — the controllers already translate that to a 422.
+
+- **`UserDatatableQuery` eager-loads `media`.** `UserResource::$appends` forces the `avatar_url` accessor (calls `getFirstMedia('avatar')`). Without `media` in the eager load, each row triggered a separate media lookup (N+1). Datatable render drops from `1 + n` queries to `2`.
+
+- **`RoleController@data` and `@edit` use the new `RoleResource` instead of spreading `$role->toArray()`.** The old spread would silently broadcast any future sensitive column added to the `roles` table. The new resource lists the intended fields explicitly; frontend payload shape preserved.
+
+- **`resources/js/pages/Admin/ApiRoutes/Index.vue`: `rel="noopener noreferrer"` added to the external `target="_blank"` link.** Consistent with the rest of the project.
+
+- **Missing 2FA-disable confirmation dialog translations.** `sk-setting.auth.two_factor_disable_title` and `sk-setting.auth.two_factor_disable_warning` were referenced from the Auth settings tab but not defined in either language file. Added for EN and TR.
+
+### Added
+
+- **Passport key auto-generation for the API test suite.** The shipped `tests/Pest.php` registers a `beforeEach` hook scoped to `tests/Feature/Api` that runs `passport:keys --force` when `storage/oauth-private.key` is missing. Fresh clones and CI runs no longer need `php artisan site:install` before Passport-backed tests can pass.
+
+- **`App\Http\Resources\Admin\Role\RoleResource`.** Canonical response shape for the role dialog / edit screen; replaces ad-hoc `$role->toArray()` spreads. Automatically picked up by the shipped `RoleController` stubs.
+
+### Compatibility
+
+- The **Fixed** changes are additive or behaviour-preserving in the happy path; consumers who publish the affected stubs should re-run `php artisan sk:update` (or copy the new versions) to pick up the user-event dispatch and the policy additions. Hash-aware merge will skip any of these files you have modified — review the update summary and resolve manually.
+
+- The **Security** changes are behaviour-changing and should not be skipped. Re-run `php artisan sk:update` and make sure the following files land (or merge them manually):
+
+    - `app/Http/Requests/Admin/User/{Store,Update}UserRequest.php` — new hierarchy-aware `role` validation and the `UpdateUserRequest::authorize()` rank check.
+    - `app/Domain/Setting/Queries/SettingsDefaultsQuery.php` — secret redaction + `*_is_set` flags.
+    - `app/Domain/Setting/DTOs/{Mail,Storage,Turnstile}SettingsDTO.php` — blank-preserves-stored-value semantics.
+    - `app/Http/Requests/Admin/Settings/Update{Mail,Turnstile}SettingsRequest.php` — config-aware `hasEffectiveSecret()` check.
+    - `app/Http/Middleware/CheckResourcePermission.php` — fail-closed in production.
+    - `app/Http/Controllers/Admin/SettingsController.php` — generic test-mail error message.
+    - `app/Domain/Auth/Actions/{Register,Login,TwoFactorChallenge}UserAction.php`, `app/Http/Controllers/Api/Auth/AuthController.php`, `app/Http/Requests/Api/Auth/TwoFactorChallengeRequest.php`, `routes/api/public-api.php` — API verification + 2FA parity.
+    - `config/settings.php` — `storage.aws_secret` added to `sensitive_keys`.
+    - Shipped Vue: `resources/js/pages/Admin/Settings/components/{MailTab,StorageTab,TurnstileTab}.vue` + `resources/js/pages/Admin/Settings/Index.vue` prop types.
+
+- If any `storage.aws_secret` rows already exist in your `settings` table (saved through the UI before this release), they are still plaintext — rotate the AWS secret through the admin panel (or re-encrypt via a one-off tinker snippet) so the at-rest value becomes encrypted.
+
+- **API consumers must update** to handle `data.requires_verification` and `data.requires_two_factor` flags on the login response and to call `POST /api/v1/auth/two-factor-challenge` when 2FA is confirmed on the account. See the **Security → API auth** bullet above for the full payload shapes.
+
 ## [13.3.0] - 2026-04-18
 
 ### Added

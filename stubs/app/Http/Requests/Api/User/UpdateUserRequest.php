@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\User;
 
+use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -13,11 +14,20 @@ use Illuminate\Validation\Rules\Password;
 class UpdateUserRequest extends FormRequest
 {
     /**
-     * Determine if the user is authorized to make this request.
+     * Delegates to UserPolicy::update which enforces the `users.update`
+     * permission plus the rank-hierarchy guard so a lower-ranked actor
+     * cannot mutate a higher-ranked target (e.g. admin → system_admin).
      */
     public function authorize(): bool
     {
-        return true;
+        $target = $this->route('user');
+        $actor = $this->user();
+
+        if (! $target instanceof User || $actor === null) {
+            return false;
+        }
+
+        return $actor->can('update', $target);
     }
 
     /**

@@ -22,8 +22,16 @@ class RoleSelectOptionsQuery
         $query = Role::query()->orderBy('sort_order');
 
         if (! $user->hasRole(RoleEnum::SystemAdmin)) {
-            $userMinSortOrder = (int) $user->roles->min('sort_order');
-            $query->where('sort_order', '>=', $userMinSortOrder);
+            $userMinSortOrder = $user->roles->min('sort_order');
+
+            // Actor has no role at all (e.g. direct-permission user) — they
+            // must not be able to assign any role. Casting null → 0 here
+            // would open the hierarchy to every role including system_admin.
+            if ($userMinSortOrder === null) {
+                return [];
+            }
+
+            $query->where('sort_order', '>=', (int) $userMinSortOrder);
         }
 
         return $query->get()->map(fn (Role $role) => [

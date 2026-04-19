@@ -35,7 +35,7 @@ return [
         'roles' => ['create', 'read', 'update', 'delete'],
         'activity-logs' => ['read'],
         'settings' => ['read', 'update'],
-        'api-routes' => ['read'],
+        'api-routes' => ['read', 'update'],
         'files' => ['create', 'read', 'update', 'delete'],
     ],
 

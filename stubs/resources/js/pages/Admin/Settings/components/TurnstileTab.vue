@@ -8,11 +8,14 @@
         settings: {
             enabled: boolean;
             site_key: string | null;
-            secret_key: string | null;
+            secret_key: null;
+            secret_key_is_set: boolean;
         };
     }
 
     const props = defineProps<Props>();
+
+    const secretKeyPlaceholder = computed(() => (props.settings.secret_key_is_set ? '••••••••' : ''));
 
     const formConfig = computed(() =>
         FB.form()
@@ -23,7 +26,9 @@
             .initialData({
                 enabled: props.settings.enabled,
                 site_key: props.settings.site_key ?? '',
-                secret_key: props.settings.secret_key ?? '',
+                // Never prefill stored secret — backend preserves it when
+                // this field is submitted empty.
+                secret_key: '',
             })
             .submit({
                 url: adminSettings.update.turnstile.url(),
@@ -33,7 +38,11 @@
             .addFields(
                 FB.toggleSwitch().key('enabled').hint(trans('sk-setting.turnstile.enabled_hint')),
                 FB.inputText().key('site_key').label('sk-setting.turnstile.site_key_label'),
-                FB.password().key('secret_key').label('sk-setting.turnstile.secret_key_label').toggleMask(),
+                FB.password()
+                    .key('secret_key')
+                    .label('sk-setting.turnstile.secret_key_label')
+                    .toggleMask()
+                    .placeholder(secretKeyPlaceholder.value),
             )
             .build(),
     );

@@ -42,15 +42,21 @@ readonly class MailSettingsDTO extends BaseDTO
      */
     public function toArray(): array
     {
-        return [
+        $data = [
             'mailer' => $this->mailer,
             'host' => $this->host,
             'port' => $this->port,
             'username' => $this->username,
-            'password' => $this->password,
             'encryption' => $this->encryption,
             'from_address' => $this->fromAddress,
             'from_name' => $this->fromName,
         ];
+
+        // Omit password when blank so the existing stored value is preserved.
+        if ($this->password !== null && $this->password !== '') {
+            $data['password'] = $this->password;
+        }
+
+        return $data;
     }
 }

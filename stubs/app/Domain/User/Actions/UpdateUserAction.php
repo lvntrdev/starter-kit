@@ -7,11 +7,15 @@ use App\Domain\User\DTOs\UserDTO;
 use App\Domain\User\Events\UserUpdated;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Action: Update an existing user.
  * Handles password-optional updates via DTO.
  * Dispatches UserUpdated event with changed fields.
+ *
+ * The attribute update + role sync run inside a transaction so a failed
+ * role change does not leave inconsistent state behind.
  */
 class UpdateUserAction extends BaseAction
 {
@@ -22,19 +26,31 @@ class UpdateUserAction extends BaseAction
     {
         $data = $dto->toArray();
 
-        // Track which fields actually changed
-        $changedFields = array_keys(array_filter(
-            $data,
-            fn ($value, $key) => $user->getAttribute($key) !== $value,
-            ARRAY_FILTER_USE_BOTH,
-        ));
+        [$user, $changedFields] = DB::transaction(function () use ($user, $dto, $data): array {
+            $changedFields = array_keys(array_filter(
+                $data,
+                fn ($value, $key) => $user->getAttribute($key) !== $value,
+                ARRAY_FILTER_USE_BOTH,
+            ));
 
-        $user->update($data);
+            $user->update($data);
 
-        $user->refresh();
+            if ($dto->role !== null) {
+                $currentRole = $user->roles()->first()?->name;
+
+                if ($currentRole !== $dto->role) {
+                    $user->syncRoles([$dto->role]);
+                    $changedFields[] = 'role';
+                }
+            }
+
+            $user->refresh();
+
+            return [$user, $changedFields];
+        });
 
         if (! empty($changedFields)) {
-            // UserUpdated::dispatch($user, $changedFields, Auth::id());
+            UserUpdated::dispatch($user, $changedFields, Auth::id());
         }
 
         return $user;

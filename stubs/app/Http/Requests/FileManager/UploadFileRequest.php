@@ -17,7 +17,6 @@ class UploadFileRequest extends FileManagerRequest
         'image/png',
         'image/gif',
         'image/webp',
-        'image/svg+xml',
         'application/pdf',
         'application/vnd.ms-excel',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -25,6 +24,20 @@ class UploadFileRequest extends FileManagerRequest
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'text/plain',
         'text/csv',
+    ];
+
+    /**
+     * MIME types that must never be accepted regardless of admin settings.
+     * SVG can embed <script>/onload/foreignObject JavaScript and becomes
+     * stored XSS when served from the public disk without sanitization.
+     *
+     * @var array<int, string>
+     */
+    private const BLOCKED_MIMES = [
+        'image/svg+xml',
+        'image/svg',
+        'text/html',
+        'application/xhtml+xml',
     ];
 
     /**
@@ -168,6 +181,8 @@ class UploadFileRequest extends FileManagerRequest
         if ($mimes === []) {
             $mimes = self::DEFAULT_MIMES;
         }
+
+        $mimes = array_values(array_diff($mimes, self::BLOCKED_MIMES));
 
         return array_values(array_unique($mimes));
     }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
+    import userPassword from '@/routes/user-password';
     import { FB } from '@lvntr/components/FormBuilder/core';
     import SkForm from '@lvntr/components/FormBuilder/SkForm.vue';
-    import userPassword from '@/routes/user-password';
     import { trans } from 'laravel-vue-i18n';
 
     const formConfig = computed(() =>
@@ -15,9 +15,9 @@
                 preserveScroll: true,
             })
             .addFields(
-                FB.password().key('current_password').label(trans('sk-profile.current_password')).toggleMask(),
-                FB.password().key('password').label(trans('sk-profile.new_password')).toggleMask().feedback(true),
-                FB.password().key('password_confirmation').label(trans('sk-common.confirm_password')).toggleMask(),
+                FB.password().key('current_password').toggleMask(),
+                FB.password().key('password').toggleMask().feedback(true),
+                FB.password().key('password_confirmation').toggleMask(),
             )
             .actionLabels({ submit: trans('sk-profile.update_password') })
             .build(),

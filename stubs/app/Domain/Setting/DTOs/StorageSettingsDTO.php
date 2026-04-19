@@ -52,20 +52,29 @@ readonly class StorageSettingsDTO extends BaseDTO
      */
     public function toArray(): array
     {
-        return [
+        $data = [
             'media_disk' => $this->mediaDisk,
             'spaces_key' => $this->spacesKey,
-            'spaces_secret' => $this->spacesSecret,
             'spaces_region' => $this->spacesRegion,
             'spaces_bucket' => $this->spacesBucket,
             'spaces_endpoint' => $this->spacesEndpoint,
             'spaces_url' => $this->spacesUrl,
             'aws_key' => $this->awsKey,
-            'aws_secret' => $this->awsSecret,
             'aws_region' => $this->awsRegion,
             'aws_bucket' => $this->awsBucket,
             'aws_url' => $this->awsUrl,
             'aws_endpoint' => $this->awsEndpoint,
         ];
+
+        // Omit secrets when blank so the existing stored values are preserved.
+        if ($this->spacesSecret !== null && $this->spacesSecret !== '') {
+            $data['spaces_secret'] = $this->spacesSecret;
+        }
+
+        if ($this->awsSecret !== null && $this->awsSecret !== '') {
+            $data['aws_secret'] = $this->awsSecret;
+        }
+
+        return $data;
     }
 }

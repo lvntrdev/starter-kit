@@ -8,12 +8,14 @@
         userId?: string | null;
         inDialog?: boolean;
         showBack?: boolean;
+        roleOptions?: { label: string; value: string }[];
     }
 
     const props = withDefaults(defineProps<Props>(), {
         userId: null,
         inDialog: false,
         showBack: false,
+        roleOptions: () => [],
     });
 
     const emit = defineEmits<{
@@ -44,7 +46,8 @@
                 FB.inputText().key('first_name'),
                 FB.inputText().key('last_name'),
                 FB.inputText().key('email').inputType('email').class('col-span-full'),
-                FB.select().key('status').default('active').definitionOptions('userStatus').class('col-span-full'),
+                FB.select().key('role').options(props.roleOptions).filter(true),
+                FB.select().key('status').default('active').definitionOptions('userStatus'),
                 FB.password()
                     .key('password')
                     .required(!isEdit.value)

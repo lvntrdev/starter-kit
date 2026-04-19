@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin\User;
 
+use App\Domain\Role\Queries\RoleSelectOptionsQuery;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -27,12 +28,17 @@ class StoreUserRequest extends FormRequest
      */
     public function rules(): array
     {
+        $allowedRoles = collect(app(RoleSelectOptionsQuery::class)->get($this->user()))
+            ->pluck('value')
+            ->all();
+
         return [
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'confirmed', Password::defaults()],
             'status' => ['required', 'string', Rule::in(['active', 'inactive', 'banned'])],
+            'role' => ['required', 'string', Rule::in($allowedRoles)],
         ];
     }
 }

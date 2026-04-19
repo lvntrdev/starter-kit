@@ -29,7 +29,7 @@
     // ── Create dialog ─────────────────────────────────────────────────────────────
 
     function openCreateDialog() {
-        dialog.open(UserForm, { inDialog: true }, trans('sk-user.create'), {
+        dialog.open(UserForm, { inDialog: true, roleOptions: props.roleOptions }, trans('sk-user.create'), {
             refreshKey: REFRESH_KEY,
         });
     }
@@ -37,7 +37,7 @@
     // ── Edit dialog ───────────────────────────────────────────────────────────────
 
     function openEditDialog(userId: string) {
-        dialog.open(UserForm, { userId, inDialog: true }, trans('sk-user.edit'), {
+        dialog.open(UserForm, { userId, inDialog: true, roleOptions: props.roleOptions }, trans('sk-user.edit'), {
             refreshKey: REFRESH_KEY,
         });
     }

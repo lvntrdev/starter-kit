@@ -16,6 +16,7 @@ readonly class UserDTO extends BaseDTO
         public string $email,
         public ?string $password = null,
         public string $status = 'active',
+        public ?string $role = null,
     ) {}
 
     /**
@@ -31,6 +32,7 @@ readonly class UserDTO extends BaseDTO
             email: $data['email'],
             password: $data['password'] ?? null,
             status: $data['status'] ?? 'active',
+            role: $data['role'] ?? null,
         );
     }
 

@@ -3,6 +3,7 @@
 namespace App\Domain\User\Actions;
 
 use App\Domain\Shared\Actions\BaseAction;
+use App\Domain\User\Events\UserDeleted;
 use App\Models\User;
 
 /**
@@ -26,6 +27,15 @@ class DeleteUserAction extends BaseAction
             throw new \LogicException('You cannot delete your own account.');
         }
 
-        return (bool) $user->delete();
+        $userId = $user->id;
+        $userEmail = $user->email;
+
+        $result = (bool) $user->delete();
+
+        if ($result) {
+            UserDeleted::dispatch($userId, $userEmail, $performedById);
+        }
+
+        return $result;
     }
 }

@@ -10,4 +10,4 @@ Route::prefix('users')->name('users.')->controller(UserController::class)->group
     Route::delete('{user}/avatar', 'deleteAvatar')->name('deleteAvatar');
 });
 
-Route::resource('users', UserController::class);
+Route::resource('users', UserController::class)->except(['show']);

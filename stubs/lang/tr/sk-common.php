@@ -17,6 +17,7 @@ return [
     'updated_at' => 'Son Güncelleme',
     'search' => 'Ara',
     'select' => 'Seçin',
+    'password' => 'Şifre',
 
     'placeholder' => [
         'select_role' => 'Rol Seçin',

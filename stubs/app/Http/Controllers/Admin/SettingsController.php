@@ -20,10 +20,12 @@ use App\Http\Requests\Admin\Settings\UpdateGeneralSettingsRequest;
 use App\Http\Requests\Admin\Settings\UpdateMailSettingsRequest;
 use App\Http\Requests\Admin\Settings\UpdateStorageSettingsRequest;
 use App\Http\Requests\Admin\Settings\UpdateTurnstileSettingsRequest;
+use App\Http\Responses\ApiResponse;
 use App\Models\Setting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -114,10 +116,18 @@ class SettingsController extends Controller
     /**
      * Upload application logo.
      */
-    public function uploadLogo(Request $request): JsonResponse
+    public function uploadLogo(Request $request): ApiResponse
     {
+        // SVG is intentionally excluded — can embed <script>/onload and execute
+        // in the app origin when served from the public disk.
         $request->validate([
-            'logo' => ['required', 'image', 'mimes:png,jpg,jpeg,svg,webp', 'max:2048'],
+            'logo' => [
+                'required',
+                'image',
+                'mimes:png,jpg,jpeg,webp',
+                'max:2048',
+                'dimensions:max_width=4096,max_height=4096',
+            ],
         ]);
 
         // Delete old logo if exists
@@ -129,9 +139,7 @@ class SettingsController extends Controller
         $path = $request->file('logo')->store('logo', 'public');
         Setting::setValue('general.logo', $path);
 
-        return response()->json([
-            'data' => ['logo_url' => Storage::disk('public')->url($path)],
-        ]);
+        return to_api(['logo_url' => Storage::disk('public')->url($path)], 'Logo uploaded.');
     }
 
     /**
@@ -146,7 +154,7 @@ class SettingsController extends Controller
 
         Setting::setValue('general.logo', null);
 
-        return response()->json(status: 204);
+        return to_api(status: 204);
     }
 
     /**
@@ -158,8 +166,16 @@ class SettingsController extends Controller
             $action->execute($request->input('test_email'));
 
             return back()->with('success', 'Test email sent successfully.');
-        } catch (\Exception $e) {
-            return back()->with('error', 'Failed to send test email: '.$e->getMessage());
+        } catch (\Throwable $e) {
+            // SMTP exceptions often include host/username/TLS details. Keep
+            // that context in the server log but do not flash it back to
+            // the admin — return a generic failure instead.
+            Log::error('Test mail failed', [
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', 'Failed to send test email. Check the server logs for details.');
         }
     }
 }

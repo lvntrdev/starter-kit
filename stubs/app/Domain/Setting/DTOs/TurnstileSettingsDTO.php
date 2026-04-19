@@ -32,10 +32,16 @@ readonly class TurnstileSettingsDTO extends BaseDTO
      */
     public function toArray(): array
     {
-        return [
+        $data = [
             'enabled' => $this->enabled,
             'site_key' => $this->siteKey,
-            'secret_key' => $this->secretKey,
         ];
+
+        // Omit secret_key when blank so the existing stored value is preserved.
+        if ($this->secretKey !== null && $this->secretKey !== '') {
+            $data['secret_key'] = $this->secretKey;
+        }
+
+        return $data;
     }
 }

@@ -7,6 +7,7 @@ use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -14,7 +15,11 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * Maps route names like "admin.users.index" to permission "users.read"
  * using the last two segments as resource and action.
- * If the resolved permission does not exist in the database, access is allowed.
+ *
+ * Behavior when the resolved permission is NOT seeded in the database:
+ *   - production → deny (AuthorizationException) to avoid silently
+ *     exposing endpoints whose permission row was forgotten.
+ *   - non-production → allow + log a warning so developers can seed it.
  * Super admin bypass is handled by Gate::before in AppServiceProvider.
  */
 class CheckResourcePermission
@@ -34,6 +39,9 @@ class CheckResourcePermission
         'store' => 'create',
         'edit' => 'update',
         'update' => 'update',
+        'uploadAvatar' => 'update',
+        'deleteAvatar' => 'update',
+        'regenerateDocs' => 'update',
         'destroy' => 'delete',
         'import' => 'import',
         'export' => 'export',
@@ -84,6 +92,16 @@ class CheckResourcePermission
         }
 
         if (! $this->permissionExists($permission)) {
+            if (app()->environment('production')) {
+                throw new AuthorizationException('You are not authorized for this action.');
+            }
+
+            Log::warning('check.permission: resolved permission is not seeded; allowing in non-production env.', [
+                'permission' => $permission,
+                'route' => $request->route()?->getName(),
+                'path' => $request->path(),
+            ]);
+
             return $next($request);
         }
 
@@ -123,17 +141,19 @@ class CheckResourcePermission
     }
 
     /**
-     * Check if the given permission exists in the database (cached).
+     * Check if the given permission exists in the database.
+     *
+     * A per-request cache is kept in the container so repeat lookups on the
+     * same request stay cheap; the container instance resets between tests,
+     * which avoids stale state pollution.
      */
     private function permissionExists(string $permissionName): bool
     {
-        /** @var Collection<int, string> $cached */
-        static $cached = null;
+        /** @var Collection<int, string> $names */
+        $names = app()->has('check-permission.cache')
+            ? app('check-permission.cache')
+            : tap(Permission::pluck('name'), fn (Collection $c) => app()->instance('check-permission.cache', $c));
 
-        if ($cached === null) {
-            $cached = Permission::pluck('name');
-        }
-
-        return $cached->contains($permissionName);
+        return $names->contains($permissionName);
     }
 }

@@ -7,13 +7,15 @@
         settings: {
             media_disk: string;
             spaces_key: string | null;
-            spaces_secret: string | null;
+            spaces_secret: null;
+            spaces_secret_is_set: boolean;
             spaces_region: string | null;
             spaces_bucket: string | null;
             spaces_endpoint: string | null;
             spaces_url: string | null;
             aws_key: string | null;
-            aws_secret: string | null;
+            aws_secret: null;
+            aws_secret_is_set: boolean;
             aws_region: string | null;
             aws_bucket: string | null;
             aws_url: string | null;
@@ -22,6 +24,9 @@
     }
 
     const props = defineProps<Props>();
+
+    const spacesSecretPlaceholder = computed(() => (props.settings.spaces_secret_is_set ? '••••••••' : ''));
+    const awsSecretPlaceholder = computed(() => (props.settings.aws_secret_is_set ? '••••••••' : ''));
 
     const diskOptions = [
         { label: 'Local', value: 'local' },
@@ -72,13 +77,15 @@
             .initialData({
                 media_disk: props.settings.media_disk ?? 'local',
                 spaces_key: props.settings.spaces_key ?? '',
-                spaces_secret: props.settings.spaces_secret ?? '',
+                // Never prefill stored secrets — backend preserves them on
+                // empty submissions.
+                spaces_secret: '',
                 spaces_region: props.settings.spaces_region ?? '',
                 spaces_bucket: props.settings.spaces_bucket ?? '',
                 spaces_endpoint: props.settings.spaces_endpoint ?? '',
                 spaces_url: props.settings.spaces_url ?? '',
                 aws_key: props.settings.aws_key ?? '',
-                aws_secret: props.settings.aws_secret ?? '',
+                aws_secret: '',
                 aws_region: props.settings.aws_region ?? '',
                 aws_bucket: props.settings.aws_bucket ?? '',
                 aws_url: props.settings.aws_url ?? '',
@@ -95,7 +102,12 @@
                 // ── DO Spaces ──
                 FB.title('sk-setting.storage.spaces_title').class('col-span-full').visible(isDo),
                 FB.inputText().key('spaces_key').visible(isDo).optional(),
-                FB.password().key('spaces_secret').toggleMask().visible(isDo).optional(),
+                FB.password()
+                    .key('spaces_secret')
+                    .toggleMask()
+                    .visible(isDo)
+                    .optional()
+                    .placeholder(spacesSecretPlaceholder.value),
                 FB.select().key('spaces_region').options(doRegionOptions).visible(isDo).optional(),
                 FB.inputText().key('spaces_bucket').visible(isDo).optional(),
                 FB.inputText()
@@ -112,7 +124,12 @@
                 // ── AWS S3 ──
                 FB.title('sk-setting.storage.s3_title').class('col-span-full').visible(isS3),
                 FB.inputText().key('aws_key').visible(isS3).optional(),
-                FB.password().key('aws_secret').toggleMask().visible(isS3).optional(),
+                FB.password()
+                    .key('aws_secret')
+                    .toggleMask()
+                    .visible(isS3)
+                    .optional()
+                    .placeholder(awsSecretPlaceholder.value),
                 FB.select().key('aws_region').options(awsRegionOptions).visible(isS3).optional(),
                 FB.inputText().key('aws_bucket').visible(isS3).optional(),
                 FB.inputText().key('aws_endpoint').placeholder('https://s3.amazonaws.com').visible(isS3).optional(),

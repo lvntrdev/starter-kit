@@ -16,6 +16,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Spatie\QueryBuilder\AllowedFilter;
 
 /**
@@ -70,6 +71,8 @@ class UserController extends Controller
      */
     public function show(User $user): ApiResponse
     {
+        Gate::authorize('view', $user);
+
         return to_api(new UserResource($user->loadMissing('roles')));
     }
 
@@ -102,8 +105,10 @@ class UserController extends Controller
      */
     public function destroy(Request $request, User $user, DeleteUserAction $action): ApiResponse|JsonResponse
     {
+        Gate::authorize('delete', $user);
+
         try {
-            $action->execute($user, $request->user()?->id);
+            $action->execute($user, (string) $request->user()?->id);
 
             return to_api(status: 204);
         } catch (\LogicException $e) {

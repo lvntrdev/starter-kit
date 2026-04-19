@@ -7,6 +7,7 @@ return [
     'light_mode' => 'Light mode',
     'dark_mode' => 'Dark mode',
     'notifications' => 'Notifications',
+    'language' => 'Language',
     'success' => 'Success',
     'error' => 'Error',
     'warning' => 'Warning',
