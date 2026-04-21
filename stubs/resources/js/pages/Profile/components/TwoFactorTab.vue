@@ -216,7 +216,7 @@
                                     :src="qrCodeDataUrl"
                                     :alt="$t('sk-profile.two_factor_scan')"
                                     class="h-48 w-48"
-                                />
+                                >
                             </div>
 
                             <div v-if="setupKey" class="text-sm text-surface-600 dark:text-surface-400">

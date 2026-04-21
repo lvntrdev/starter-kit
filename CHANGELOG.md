@@ -5,6 +5,82 @@ All notable changes to `lvntr/laravel-starter-kit` will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [13.4.0] - 2026-04-21
+
+Security hardening sprint — a parallel code-review sweep surfaced ~37 findings across HIGH / MEDIUM / LOW severities. 36 are closed in this release; 1 HIGH (Passport private-key rotation in git history) is a manual operator step documented in the consumer [UPGRADE guide](https://github.com/lvntrdev/laravel-starter-kit/blob/main/docs/UPGRADE.md). Most patches touch **shipped** files (the files `sk:install` copies into the consumer app), so existing consumer apps must follow the UPGRADE guide to apply the diffs; new installs pick everything up automatically. Package-tier changes (HSTS `preload`, stub refresh) arrive via `composer update lvntr/laravel-starter-kit`.
+
+### Security
+
+- **Self-delete blocked on shipped `UserPolicy::delete` + null guard on shipped `Api\UserController::destroy`.** The shipped `UserPolicy::delete` stub previously returned `true` when actor === target, so any authenticated user holding `users.delete` could remove themselves via `DELETE /api/v1/users/{self}`. The self-branch now returns `false` — the only supported self-removal path is the password-confirmed Fortify flow in Profile. `Api\UserController::destroy` also returns a clean 401 when `$request->user()` is null (stale/expired bearer), replacing the previous `(string) null = ''` cast that logged an empty performer id.
+
+- **Shipped `CreateRoleAction` + `UpdateRoleAction` wrap role + permission sync in `DB::transaction`.** `Role::create(...)` followed by `->syncPermissions(...)` ran outside a transaction; a permission-cache race or connection drop between the two writes could leave a role row with no permissions. Both actions now run inside `DB::transaction(...)`; `RoleCreated` / `RoleUpdated` dispatch after commit so listeners observe a consistent state.
+
+- **Shipped `UpdateAuthSettingsAction` wraps the 2FA revoke loop in `DB::transaction`.** When the admin toggles `auth.two_factor` off, the action writes the setting and then clears `two_factor_*` columns on every user. A mid-loop failure previously left the system in a half-revoked state — the setting said "2FA off" but some users still had active TOTP secrets. The full operation is now atomic.
+
+- **Shipped `LogoutUserAction` — null-safe token revoke.** The API logout endpoint called `$user->token()->revoke()`; if the request reached the controller without an active access token the chained call threw `Error: Call to a member function revoke() on null` and 500'd. Now uses `?->revoke()`.
+
+- **Shipped FileManager subtree walks reduced from N queries to 1.** `BulkDeleteAction::collectDescendantIds` and `DeleteFolderAction::collectDescendantIds` issued a `FileFolder::find` per hop — a 50-level tree meant 50 serial queries, giving attackers a request-timing DoS knob. Both actions now load the owner-scoped `(id, parent_id)` map in one `select` and walk the tree in PHP with a visited-set cycle guard.
+
+- **Shipped `SettingsServiceProvider` — SMTP `encryption=none` now disables TLS correctly.** The "No encryption" Mail settings option wrote the literal string `'none'` into `config('mail.mailers.smtp.encryption')`. Laravel's SMTP transport treats any non-null value as "use this TLS mode", so saved configurations fell back to STARTTLS on first connect. The provider now maps `'none' → null`.
+
+- **Shipped `ApiExceptionHandler` — exception-message leak + `X-Request-ID` log injection.** The `default` arm of the exception→status mapping returned `config('app.debug') ? $e->getMessage() : 'A server error occurred.'`; in any environment where `APP_DEBUG` was accidentally left on, unhandled exceptions leaked stack-trace-grade detail to API consumers. The handler now returns the generic message unconditionally; debug details live only in `Log::error` plus the `debug` block that is already gated on `APP_DEBUG`. The trace id is always server-generated via `Str::uuid()`; any client-supplied `X-Request-ID` is accepted only after a `[A-Za-z0-9._-]{1,128}` sanitiser and is logged as `client_request_id` — a malicious client can no longer inject a CRLF payload or a fake trace id into the application log.
+
+- **Package `SecurityHeaders` HSTS directive gains `preload`.** The baseline HSTS header moved from `max-age=31536000; includeSubDomains` to `max-age=31536000; includeSubDomains; preload`, making the deployment eligible for the HSTS preload list. Ships from the package `src/` — picked up automatically by `composer update`.
+
+- **Shipped `AppServiceProvider` raises the password policy.** A project-wide `Password::defaults(...)` now enforces 10+ chars, mixed case, letters, numbers and symbols; every FormRequest relying on the default picks this up automatically (registration, password reset, password confirm, profile password change). Existing users' passwords are not invalidated — only new passwords are measured against the stronger rule.
+
+- **Shipped `resources/js/app.ts` — Axios CSRF + credential defaults.** `axios.defaults.withCredentials = true`, `xsrfCookieName = 'XSRF-TOKEN'`, `xsrfHeaderName = 'X-XSRF-TOKEN'` + `X-Requested-With: XMLHttpRequest` + `Accept: application/json`. Admin UI calls to Fortify endpoints (2FA, sessions, password-confirm) now pass through the same CSRF check the web flow relies on.
+
+- **Shipped `TwoFactorTab.vue` — QR code rendered through `<img src="data:image/svg+xml;base64,...">` instead of `v-html`.** Fortify returns the QR code as an SVG string; a man-in-the-middle or compromised Fortify override could have smuggled `<script>` / `onload` into it. The new approach base64-encodes the SVG into an `<img>` data URL — the `<img>` sandbox does not execute inline scripts.
+
+- **Shipped `useDefinition.load()` / `loadAll()` — error-safe fetch.** The composable is the one-stop loader for the definition JSON that drives datatable / form option dropdowns. It previously chained `.then(r => r.json())` directly — a failed fetch left `loaded.value = true` with an empty payload, so consumers rendered stale or empty dropdowns with no console feedback. Both methods are now `try/catch`-wrapped, check `res.ok`, surface errors to the console, and leave `loaded.value = false` on failure so consumers can retry.
+
+- **Shipped FormRequest `authorize(): return true;` — eleven offenders closed.** The following requests — admin user store, API user store, admin role store, admin settings (auth/general/mail/storage/filemanager/turnstile), test-mail, destroy-sessions — now delegate `authorize()` to the matching `*.create` / `*.update` permission (destroy-sessions checks `$this->user() !== null`). The `CheckResourcePermission` middleware already enforced these at the route level, but the in-request check closes the defense-in-depth gap that opens the moment the action is invoked off-route or the route-name map drifts. Public auth endpoints and FileManager context-based requests are intentionally left alone.
+
+- **Shipped `TwoFactorChallengeAction` — single-use challenge.** The action previously left the `api:2fa_challenge:{uuid}` cache entry intact on a wrong TOTP / wrong recovery code / empty submit, so an attacker with a valid challenge id got the full 5-minute TTL × `throttle:5/min` window to try codes. Every failure arm now calls `Cache::forget($cacheKey)`.
+
+- **Shipped `SettingService` — read from `allGrouped()` cache + `setGroup()` wrapped in `DB::transaction`.** The hot read path previously ran one query per `getValue()` / `getGroup()` even though a full-cache layer existed. Settings-heavy requests (Dashboard, FileManager, Admin pages) save a handful of round-trips per request. Bulk writes are also now atomic.
+
+- **Shipped `MoveItemRequest` — typed `item_id` based on `item_type`.** Effective rule: `integer|min:1` for `item_type=file`, `uuid` for `item_type=folder`, matching the DB schema; `item_type` itself uses `Rule::in([...])` instead of the `string|in:...` string form.
+
+- **New shipped `DeleteFolderRequest` replaces a bare `Request` in `FileManagerController::deleteFolder`.** Extends `FileManagerRequest`, runs the shared context rules, and exposes `$request->context()` — identical surface to the other FileManager endpoints.
+
+- **Shipped `Admin\UserController::uploadAvatar` runs an explicit `Gate::authorize('update', $user)`.** Redundant with the existing `UploadAvatarRequest::authorize()` delegation to `UserPolicy::update`, but mirrors the belt-and-braces pattern used on view/update/delete and keeps the check visible when reading the controller in isolation.
+
+### Security — manual operator step (not automated)
+
+- **Passport private-key rotation (GV-H1).** `storage/oauth-private.key` / `storage/oauth-public.key` live in git history for legacy installs that committed them before the `.gitignore` rule landed. The [UPGRADE guide](https://github.com/lvntrdev/laravel-starter-kit/blob/main/docs/UPGRADE.md) documents the `git filter-repo` + `passport:keys --force` + `passport:purge` + team-wide `git reset --hard` sequence. If the install never committed the key files, this step is skipped.
+
+### Changed
+
+- **Shipped `.env.example` — `LOG_LEVEL` default flipped from `debug` to `error`.** `debug` in production fills the log with SQL traces and Passport debug info — noisy and occasionally sensitive. Production profiles should ship `error` or `warning`.
+
+- **Shipped `.env.example` — `PASSPORT_PRIVATE_KEY` / `PASSPORT_PUBLIC_KEY` stubs + Turnstile placeholders.** Two commented-out placeholders document the env-based key-loading path (recommended over committing `storage/oauth-*.key`), and an uncommented `TURNSTILE_ENABLED=false` + empty site/secret keys make the Turnstile middleware a no-op on fresh installs.
+
+- **Shipped `composer.json` stub — `laravel/tinker` moved from `require` to `require-dev`.** Tinker is a dev tool; shipping it as a production dependency pulled PsySH and its transitive chain into every container build. Local dev still installs it because it's in `require-dev`.
+
+- **Shipped `HandleInertiaRequests::share` — `appEnv` / `appDebug` only leak outside production.** Both keys return `null` / `false` under `app()->environment('production')`; non-prod keeps the real value for the dev overlay.
+
+- **Shipped `config/cors.php` — `max_age` raised from 0 to 7200 seconds.** SPA / mobile clients can cache the OPTIONS response for 2 hours instead of re-running the preflight on every mutating request.
+
+### Fixed
+
+- **Shipped `useDialog` / `useImageLightbox` — 300 ms timer leak.** A rapid `open → close → open` sequence queued two timers; the trailing one fired after the dialog was re-opened and cancelled the render. A module-level timer ref is now cleared on both `open()` and `close()` entry.
+
+- **Shipped `SkForm` — dirty-form guard stops parent prop updates from wiping user input.** `watch(derivedDefaults, ...)` used to reset the form unconditionally whenever the parent passed a new object; a polled datatable / shared-state update wiped in-progress input. The watcher now checks `internalForm.isDirty` — dirty forms record new values as defaults without touching the live state.
+
+- **Shipped `SkDatatable` URL filters — `api.get` + `Promise.allSettled`.** The URL-driven filter loader used bare `fetch(...)` + `Promise.all`; a single failing filter-options endpoint poisoned the whole filter bar. The loader now uses the shared `api.get<T>()` helper (picks up the Axios defaults + XSRF) and `Promise.allSettled`, so each filter is independent; failing endpoints fall back to an empty list with a console warning. Same file flips `let activeMenuItems` → `const activeMenuItems`.
+
+- **Shipped `TwoFactorTab.enableTwoFactor` awaits the Inertia reload.** `router.reload({ only: [...] })` is now wrapped in a promise that resolves on `onFinish` — the QR fetch no longer races the reload on slow connections.
+
+- **Shipped `ProfileInfoTab` / `UserForm` — `as any` avatar casts replaced with typed shapes.** No behaviour change, but the cast hid a legitimate TypeScript error if the backing type ever dropped the `avatar_url` accessor.
+
+- **Shipped `Admin\DashboardController::index` gains an explicit `: Response` return type.** Closes the last Larastan `return_type_missing` finding.
+
+### Upgrade
+
+New installs via `sk:install` pick up everything automatically. Existing consumer apps: `composer update lvntr/laravel-starter-kit --with-all-dependencies` picks up only the package `src/` tier (HSTS `preload`, stub refresh) — the rest of the fixes land in published / stub-backed files. Follow [docs/UPGRADE.md](https://github.com/lvntrdev/laravel-starter-kit/blob/main/docs/UPGRADE.md) for the full diff-style patch list and smoke-test checklist.
+
 ## [13.3.3] - 2026-04-20
 
 ### Fixed
