@@ -7,6 +7,14 @@
 ![Packagist Sürüm](https://img.shields.io/packagist/v/lvntr/laravel-starter-kit?style=flat-square&label=packagist)
 ![Downloads](https://img.shields.io/packagist/dt/lvntr/laravel-starter-kit?style=flat-square&label=downloads)
 
+> ## ⚠️ UYARI
+>
+> Bu depo aktif geliştirme aşamasındadır ve sık sık değişikliklere tabidir. Projenin stabilitesi henüz garanti altına alınmamıştır. Kullanmadan önce lütfen aşağıdaki noktaları göz önünde bulundurun:
+>
+> 1. **Kod Değişiklikleri:** Dizin yapısı veya çekirdek sınıflar, önceden haber verilmeksizin radikal değişikliklere uğrayabilir.
+> 2. **Güncelleme Süreci:** Güncellemeler her zaman otomatik bir geçiş (migration) yolu sunmayabilir. Güncelleme komutlarını çalıştırmanın yanı sıra, `README` veya `CHANGELOG` dosyalarını kontrol ederek elle müdahale yapmanız gerekebilir.
+> 3. **Risk:** Yapılan önemli değişiklikler, mevcut projenizde veri kaybına veya kırıcı (breaking) hatalara yol açabilir.
+
 ## Tanıtım
 
 Lvntr Starter Kit; **Laravel 13**, **Inertia.js v3**, **Vue 3**, **PrimeVue 4** ve **Tailwind CSS 4** üzerine kurulmuş, tam donanımlı bir Laravel admin panel paketidir.

@@ -7,6 +7,14 @@
 ![Packagist Version](https://img.shields.io/packagist/v/lvntr/laravel-starter-kit?style=flat-square&label=packagist)
 ![Downloads](https://img.shields.io/packagist/dt/lvntr/laravel-starter-kit?style=flat-square&label=downloads)
 
+> ## ⚠️ WARNING
+>
+> This repository is under active development and is subject to frequent changes. The stability of the project is not yet guaranteed. Please consider the following points before use:
+>
+> 1. **Code Changes:** The directory structure or core classes may undergo radical changes without prior notice.
+> 2. **Update Process:** Updates may not always provide an automated migration path. In addition to running update commands, you may need to perform manual interventions by checking the `README` or `CHANGELOG` files.
+> 3. **Risk:** Significant changes may lead to data loss or breaking issues in your existing project.
+
 ## Introduction
 
 Lvntr Starter Kit is a full-featured admin panel for Laravel, built with **Laravel 13**, **Inertia.js v3**, **Vue 3**, **PrimeVue 4** and **Tailwind CSS 4**.
