@@ -13,15 +13,16 @@ use Illuminate\Support\Facades\Http;
  * a fresh collection.
  *
  * Workflow:
- *   1. {@see OpenApiExporter} produces the spec with form-data bodies.
- *   2. Any previous collection (tracked via `postman.collection_id`
- *      setting) is deleted to keep the workspace free of duplicates.
- *   3. The spec is imported through Postman's `POST /import/openapi`
+ *   1. {@see OpenApiExporter} produces the spec.
+ *   2. The spec is imported through Postman's `POST /import/openapi`
  *      endpoint with `folderStrategy=Tags` so OpenAPI tags become
  *      Postman folders.
- *   4. The newly issued collection UID is persisted back to the
- *      `postman.collection_id` setting so the next invocation can
- *      replace this collection in turn.
+ *   3. On success, the newly issued UID is persisted to the
+ *      `postman.collection_id` setting.
+ *   4. The previous collection (if any) is deleted as a best-effort
+ *      cleanup. Keeping the delete *after* a confirmed import means a
+ *      failed push never leaves the workspace without a working
+ *      collection — the old one stays until the new one is proven good.
  *
  * Configuration lives in the `postman` settings group (admin UI → Settings
  * → API Clients → Postman). The api_key is encrypted at rest; collection_id
@@ -54,13 +55,10 @@ class SyncPostmanAction extends BaseAction
 
         $openapi = $this->exporter->export();
 
-        if ($previousCollectionId !== '') {
-            Http::withHeaders(['X-API-Key' => $apiKey])
-                ->acceptJson()
-                ->timeout(30)
-                ->delete("https://api.getpostman.com/collections/{$previousCollectionId}");
-        }
-
+        // 1. Import the fresh spec first. If this fails, the previous
+        //    collection is still intact — the user is never left without
+        //    a working Postman collection because of a transient API
+        //    error, invalid credentials, or a Postman-side outage.
         $response = Http::withHeaders(['X-API-Key' => $apiKey])
             ->acceptJson()
             ->timeout(60)
@@ -89,7 +87,20 @@ class SyncPostmanAction extends BaseAction
             throw ApiException::serverError('Postman responded without a collection UID.');
         }
 
+        // 2. Persist the new UID before touching the old collection — if
+        //    the process dies between the delete call and a setting
+        //    write, we would forget which collection is live.
         Setting::setValue('postman.collection_id', $newUid);
+
+        // 3. Best-effort cleanup of the previous collection. A failure
+        //    here only leaves an orphan in the workspace; the new one is
+        //    already pinned in settings and functional.
+        if ($previousCollectionId !== '' && $previousCollectionId !== $newUid) {
+            Http::withHeaders(['X-API-Key' => $apiKey])
+                ->acceptJson()
+                ->timeout(30)
+                ->delete("https://api.getpostman.com/collections/{$previousCollectionId}");
+        }
 
         return [
             'name' => $newName,
