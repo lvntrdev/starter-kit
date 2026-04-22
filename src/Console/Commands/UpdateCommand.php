@@ -38,9 +38,13 @@ class UpdateCommand extends Command
 
         // Middleware from package (excluding CheckResourcePermission — user may customize)
         'app/Http/Middleware/SecurityHeaders.php',
+        'app/Http/Middleware/AssignTraceId.php',
 
         // API Response builder
         'app/Http/Responses/ApiResponse.php',
+
+        // Global helpers (to_api, format_date, definition, definitionLabel)
+        'app/Helpers/sk-helpers.php',
 
         // Traits from package
         'app/Traits/',

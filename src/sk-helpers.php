@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 
 /*
 |--------------------------------------------------------------------------
@@ -38,7 +39,11 @@ if (! function_exists('to_api')) {
     /**
      * Wrap data with ApiResponse and return.
      *
-     * Automatically detects paginators and extracts pagination meta.
+     * Automatically detects paginators (including simplePaginate / cursor) and
+     * extracts pagination meta. Returns an ApiResponse on every branch except
+     * 204, where a raw JsonResponse with an empty body is emitted — that keeps
+     * controllers typed `: JsonResponse` working while allowing the fluent
+     * chain on every other status.
      *
      * Usage:
      *   return to_api($user);
@@ -46,52 +51,43 @@ if (! function_exists('to_api')) {
      *   return to_api(User::paginate(15));
      *   return to_api($user, 'Created.', 201);
      *   return to_api(null, 'Error', 400);  // success: false
+     *   return to_api(status: 204);         // empty 204 body
      */
     function to_api(mixed $data = null, string $message = 'Operation successful.', int $status = 200): ApiResponse|JsonResponse
     {
-        // Error responses (4xx, 5xx)
+        // Error responses (4xx, 5xx) — data is ignored on purpose.
         if ($status >= 400) {
             return ApiResponse::error($message, $status);
         }
 
-        // 201 Created
-        if ($status === 201) {
-            return ApiResponse::created($data, $message);
-        }
-
-        // 202 Accepted — job queued, not yet completed
-        if ($status === 202) {
-            return ApiResponse::success($data, $message ?: 'Operation queued.')->status(202);
-        }
-
-        // 204 No Content — for delete/update operations with no response body
+        // 204 No Content — for delete/update operations with no response body.
         if ($status === 204) {
             return ApiResponse::noContent();
         }
 
-        // Auto-detect paginators
-        if ($data instanceof LengthAwarePaginator || $data instanceof CursorPaginator) {
-            return ApiResponse::paginated($data, $message);
+        // Auto-detect paginators before the 201/202 branches so a paginator
+        // dispatched with a non-200 status (e.g. 201 batch-create) still
+        // receives pagination meta instead of being serialised as a raw object.
+        if ($data instanceof LengthAwarePaginator || $data instanceof CursorPaginator || $data instanceof Paginator) {
+            $response = ApiResponse::paginated($data, $message);
+        } elseif ($data instanceof AnonymousResourceCollection && (
+            $data->resource instanceof LengthAwarePaginator
+            || $data->resource instanceof CursorPaginator
+            || $data->resource instanceof Paginator
+        )) {
+            $response = ApiResponse::paginatedCollection($data, $message);
+        } elseif ($status === 201) {
+            return ApiResponse::created($data, $message);
+        } else {
+            // 200 OK (default) and any other 2xx we treat as success + status override.
+            $response = ApiResponse::success($data, $message);
         }
 
-        // ResourceCollection wrapping a paginator (e.g. UserResource::collection($paginator))
-        if ($data instanceof AnonymousResourceCollection && $data->resource instanceof LengthAwarePaginator) {
-            $paginator = $data->resource;
-            $resolved = $data->resolve(request());
-
-            return ApiResponse::success($resolved, $message)->meta([
-                'current_page' => $paginator->currentPage(),
-                'from' => $paginator->firstItem(),
-                'last_page' => $paginator->lastPage(),
-                'path' => $paginator->path(),
-                'per_page' => $paginator->perPage(),
-                'to' => $paginator->lastItem(),
-                'total' => $paginator->total(),
-            ]);
+        if ($status !== 200) {
+            $response->status($status);
         }
 
-        // 200 OK (default)
-        return ApiResponse::success($data, $message);
+        return $response;
     }
 }
 

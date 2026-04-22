@@ -8,10 +8,12 @@ use App\Domain\Auth\Actions\RegisterUserAction;
 use App\Domain\Auth\Actions\TwoFactorChallengeAction;
 use App\Domain\Auth\DTOs\LoginDTO;
 use App\Domain\Auth\DTOs\RegisterDTO;
+use App\Exceptions\ApiException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Auth\LoginRequest;
 use App\Http\Requests\Api\Auth\RegisterRequest;
 use App\Http\Requests\Api\Auth\TwoFactorChallengeRequest;
+use App\Http\Resources\Admin\User\UserResource;
 use App\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,16 +34,21 @@ class AuthController extends Controller
     public function register(RegisterRequest $request, RegisterUserAction $action): ApiResponse
     {
         $result = $action->execute(RegisterDTO::fromArray($request->validated()));
+        $userPayload = new UserResource($result['user']->loadMissing('roles'));
 
         if ($result['requires_verification']) {
             return to_api(
-                ['user' => $result['user'], 'requires_verification' => true],
+                ['user' => $userPayload, 'requires_verification' => true],
                 'Registration successful. Please verify your email address before logging in.',
                 201,
             );
         }
 
-        return to_api($result, 'Registration successful.', 201);
+        return to_api(
+            ['user' => $userPayload, 'token' => $result['token'], 'requires_verification' => false],
+            'Registration successful.',
+            201,
+        );
     }
 
     /**
@@ -52,7 +59,7 @@ class AuthController extends Controller
         $result = $action->execute(LoginDTO::fromArray($request->validated()));
 
         if (! $result) {
-            return to_api(null, 'Invalid email or password.', 401);
+            throw ApiException::unauthorized('Invalid email or password.');
         }
 
         // Verification-required and 2FA-required outcomes both return 200
@@ -69,7 +76,10 @@ class AuthController extends Controller
                 'Two-factor authentication required.',
             ),
             default => to_api(
-                ['user' => $result['user'], 'token' => $result['token']],
+                [
+                    'user' => new UserResource($result['user']->loadMissing('roles')),
+                    'token' => $result['token'],
+                ],
                 'Login successful.',
             ),
         };
@@ -88,10 +98,16 @@ class AuthController extends Controller
         );
 
         if (! $result) {
-            return to_api(null, 'Invalid or expired two-factor code.', 401);
+            throw ApiException::unauthorized('Invalid or expired two-factor code.');
         }
 
-        return to_api($result, 'Login successful.');
+        return to_api(
+            [
+                'user' => new UserResource($result['user']->loadMissing('roles')),
+                'token' => $result['token'],
+            ],
+            'Login successful.',
+        );
     }
 
     /**
@@ -109,6 +125,6 @@ class AuthController extends Controller
      */
     public function me(Request $request): ApiResponse
     {
-        return to_api($request->user());
+        return to_api(new UserResource($request->user()->loadMissing('roles')));
     }
 }

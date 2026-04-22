@@ -5,19 +5,23 @@ namespace App\Http\Controllers\Admin;
 use App\Domain\Setting\Actions\SendTestMailAction;
 use App\Domain\Setting\Actions\UpdateAuthSettingsAction;
 use App\Domain\Setting\Actions\UpdateSettingsAction;
+use App\Domain\Setting\DTOs\ApidogSettingsDTO;
 use App\Domain\Setting\DTOs\AuthSettingsDTO;
 use App\Domain\Setting\DTOs\FileManagerSettingsDTO;
 use App\Domain\Setting\DTOs\GeneralSettingsDTO;
 use App\Domain\Setting\DTOs\MailSettingsDTO;
+use App\Domain\Setting\DTOs\PostmanSettingsDTO;
 use App\Domain\Setting\DTOs\StorageSettingsDTO;
 use App\Domain\Setting\DTOs\TurnstileSettingsDTO;
 use App\Domain\Setting\Queries\SettingsDefaultsQuery;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Settings\SendTestMailRequest;
+use App\Http\Requests\Admin\Settings\UpdateApidogSettingsRequest;
 use App\Http\Requests\Admin\Settings\UpdateAuthSettingsRequest;
 use App\Http\Requests\Admin\Settings\UpdateFileManagerSettingsRequest;
 use App\Http\Requests\Admin\Settings\UpdateGeneralSettingsRequest;
 use App\Http\Requests\Admin\Settings\UpdateMailSettingsRequest;
+use App\Http\Requests\Admin\Settings\UpdatePostmanSettingsRequest;
 use App\Http\Requests\Admin\Settings\UpdateStorageSettingsRequest;
 use App\Http\Requests\Admin\Settings\UpdateTurnstileSettingsRequest;
 use App\Http\Responses\ApiResponse;
@@ -111,6 +115,26 @@ class SettingsController extends Controller
         $action->execute('turnstile', TurnstileSettingsDTO::fromArray($request->validated()));
 
         return back()->with('success', 'Turnstile settings updated.');
+    }
+
+    /**
+     * Update Postman integration settings.
+     */
+    public function updatePostman(UpdatePostmanSettingsRequest $request, UpdateSettingsAction $action): RedirectResponse
+    {
+        $action->execute('postman', PostmanSettingsDTO::fromArray($request->validated()));
+
+        return back()->with('success', 'Postman settings updated.');
+    }
+
+    /**
+     * Update Apidog integration settings.
+     */
+    public function updateApidog(UpdateApidogSettingsRequest $request, UpdateSettingsAction $action): RedirectResponse
+    {
+        $action->execute('apidog', ApidogSettingsDTO::fromArray($request->validated()));
+
+        return back()->with('success', 'Apidog settings updated.');
     }
 
     /**

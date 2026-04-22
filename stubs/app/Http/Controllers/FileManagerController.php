@@ -14,6 +14,7 @@ use App\Domain\FileManager\DTOs\FileManagerContextDTO;
 use App\Domain\FileManager\Queries\FolderContentsQuery;
 use App\Domain\FileManager\Queries\FolderTreeQuery;
 use App\Domain\FileManager\Services\FileManagerAuthorizer;
+use App\Exceptions\ApiException;
 use App\Http\Requests\FileManager\BulkDeleteRequest;
 use App\Http\Requests\FileManager\DeleteFolderRequest;
 use App\Http\Requests\FileManager\MoveItemRequest;
@@ -70,7 +71,7 @@ class FileManagerController extends Controller
         try {
             $result = $action->execute($context, $items);
         } catch (LogicException $e) {
-            return to_api(null, $e->getMessage(), 422);
+            throw ApiException::unprocessable($e->getMessage());
         }
 
         return to_api($result, __('sk-file-manager.bulk_deleted'));
@@ -88,7 +89,7 @@ class FileManagerController extends Controller
                 parentId: $request->input('parent_id'),
             );
         } catch (LogicException $e) {
-            return to_api(null, $e->getMessage(), 422);
+            throw ApiException::unprocessable($e->getMessage());
         }
 
         return to_api(['folder' => [
@@ -106,7 +107,7 @@ class FileManagerController extends Controller
         try {
             $folder = $action->execute($context, $folder, $request->string('name')->toString());
         } catch (LogicException $e) {
-            return to_api(null, $e->getMessage(), 422);
+            throw ApiException::unprocessable($e->getMessage());
         }
 
         return to_api(['folder' => [
@@ -129,7 +130,7 @@ class FileManagerController extends Controller
                 targetFolderId: $request->input('target_folder_id'),
             );
         } catch (LogicException $e) {
-            return to_api(null, $e->getMessage(), 422);
+            throw ApiException::unprocessable($e->getMessage());
         }
 
         return to_api(message: __('sk-file-manager.item_moved'));
@@ -143,7 +144,7 @@ class FileManagerController extends Controller
         try {
             $action->execute($context, $folder);
         } catch (LogicException $e) {
-            return to_api(null, $e->getMessage(), 422);
+            throw ApiException::unprocessable($e->getMessage());
         }
 
         return to_api(message: __('sk-file-manager.folder_deleted'));
@@ -161,7 +162,7 @@ class FileManagerController extends Controller
                 folderId: $request->input('folder_id'),
             );
         } catch (LogicException $e) {
-            return to_api(null, $e->getMessage(), 422);
+            throw ApiException::unprocessable($e->getMessage());
         }
 
         return to_api(['files' => $uploaded], __('sk-file-manager.files_uploaded'), 201);
@@ -175,7 +176,7 @@ class FileManagerController extends Controller
         try {
             $action->execute($context, $media);
         } catch (LogicException $e) {
-            return to_api(null, $e->getMessage(), 422);
+            throw ApiException::unprocessable($e->getMessage());
         }
 
         return to_api(message: __('sk-file-manager.file_deleted'));

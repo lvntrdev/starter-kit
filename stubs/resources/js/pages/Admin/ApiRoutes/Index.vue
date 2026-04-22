@@ -1,5 +1,5 @@
 <script setup lang="ts">
-    import { Head } from '@inertiajs/vue3';
+    import { Head, router } from '@inertiajs/vue3';
     import AdminLayout from '@/layouts/AdminLayout.vue';
     import { trans } from 'laravel-vue-i18n';
     import { useApi } from '@/composables/useApi';
@@ -19,13 +19,26 @@
             api: RouteItem[];
             service: RouteItem[];
         };
+        postman: {
+            configured: boolean;
+            collection_id: string | null;
+            workspace_id: string | null;
+            settings_url: string;
+        };
+        apidog: {
+            configured: boolean;
+            project_id: string | null;
+            settings_url: string;
+        };
     }
 
-    defineProps<Props>();
+    const props = defineProps<Props>();
 
     const api = useApi();
     const toast = useToast();
     const regenerating = ref(false);
+    const syncingPostman = ref(false);
+    const syncingApidog = ref(false);
 
     async function regenerateDocs(): Promise<void> {
         regenerating.value = true;
@@ -39,6 +52,58 @@
             });
         } finally {
             regenerating.value = false;
+        }
+    }
+
+    async function syncPostman(): Promise<void> {
+        if (!props.postman.configured) {
+            toast.add({
+                severity: 'warn',
+                summary: trans('sk-api-route.sync_postman_not_configured'),
+                group: 'bc',
+                life: 4000,
+            });
+            router.visit(props.postman.settings_url);
+            return;
+        }
+
+        syncingPostman.value = true;
+        try {
+            await api.post(apiRoutes.syncPostman.url());
+            toast.add({
+                severity: 'success',
+                summary: trans('sk-api-route.sync_postman_success'),
+                group: 'bc',
+                life: 3000,
+            });
+        } finally {
+            syncingPostman.value = false;
+        }
+    }
+
+    async function syncApidog(): Promise<void> {
+        if (!props.apidog.configured) {
+            toast.add({
+                severity: 'warn',
+                summary: trans('sk-api-route.sync_apidog_not_configured'),
+                group: 'bc',
+                life: 4000,
+            });
+            router.visit(props.apidog.settings_url);
+            return;
+        }
+
+        syncingApidog.value = true;
+        try {
+            await api.post(apiRoutes.syncApidog.url());
+            toast.add({
+                severity: 'success',
+                summary: trans('sk-api-route.sync_apidog_success'),
+                group: 'bc',
+                life: 3000,
+            });
+        } finally {
+            syncingApidog.value = false;
         }
     }
 
@@ -71,6 +136,22 @@
                     severity="warn"
                     :loading="regenerating"
                     @click="regenerateDocs"
+                />
+                <Button
+                    :label="$t('sk-api-route.sync_postman')"
+                    icon="pi pi-send"
+                    outlined
+                    severity="info"
+                    :loading="syncingPostman"
+                    @click="syncPostman"
+                />
+                <Button
+                    :label="$t('sk-api-route.sync_apidog')"
+                    icon="pi pi-share-alt"
+                    outlined
+                    severity="help"
+                    :loading="syncingApidog"
+                    @click="syncApidog"
                 />
                 <a href="/docs/api" target="_blank" rel="noopener noreferrer">
                     <Button :label="$t('sk-api-route.open_api_docs')" icon="pi pi-book" outlined />

@@ -1,6 +1,7 @@
 <script setup lang="ts">
     import AdminLayout from '@/layouts/AdminLayout.vue';
     import { TB } from '@lvntr/components/TabBuilder/core';
+    import ApiClientsTab from './components/ApiClientsTab.vue';
     import AuthTab from './components/AuthTab.vue';
     import FileManagerTab from './components/FileManagerTab.vue';
     import GeneralTab from './components/GeneralTab.vue';
@@ -62,6 +63,17 @@
                 secret_key: null;
                 secret_key_is_set: boolean;
             };
+            postman: {
+                workspace_id: string | null;
+                collection_id: string | null;
+                api_key: null;
+                api_key_is_set: boolean;
+            };
+            apidog: {
+                project_id: string | null;
+                access_token: null;
+                access_token_is_set: boolean;
+            };
         };
         timezones: string[];
         availableLanguages: Record<string, string>;
@@ -78,6 +90,7 @@
             TB.item().key('storage').label('sk-setting.tabs.storage').icon('pi pi-cloud'),
             TB.item().key('file_manager').label('sk-setting.tabs.file_manager').icon('pi pi-sliders-h'),
             TB.item().key('turnstile').label('sk-setting.tabs.turnstile').icon('pi pi-shield'),
+            TB.item().key('api_clients').label('sk-setting.tabs.api_clients').icon('pi pi-send'),
         )
         .build();
 </script>
@@ -111,6 +124,10 @@
 
             <template #turnstile>
                 <TurnstileTab :settings="props.settings.turnstile" />
+            </template>
+
+            <template #api_clients>
+                <ApiClientsTab :postman="props.settings.postman" :apidog="props.settings.apidog" />
             </template>
         </SkTabs>
     </AdminLayout>

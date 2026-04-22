@@ -16,4 +16,10 @@ return [
     'open_api_docs' => 'API Dokümanlarını Aç',
     'regenerate_docs' => 'Dokümanları Yeniden Oluştur',
     'regenerate_docs_success' => 'API dokümantasyonu başarıyla yeniden oluşturuldu.',
+    'sync_postman' => "Postman'e Gönder",
+    'sync_postman_success' => 'Postman koleksiyonu başarıyla güncellendi.',
+    'sync_postman_not_configured' => 'Postman henüz yapılandırılmadı. Ayarlara yönlendiriliyor…',
+    'sync_apidog' => "Apidog'a Gönder",
+    'sync_apidog_success' => 'Apidog projesi başarıyla güncellendi.',
+    'sync_apidog_not_configured' => 'Apidog henüz yapılandırılmadı. Ayarlara yönlendiriliyor…',
 ];

@@ -6,6 +6,7 @@ use App\Domain\User\Actions\CreateUserAction;
 use App\Domain\User\Actions\DeleteUserAction;
 use App\Domain\User\Actions\UpdateUserAction;
 use App\Domain\User\DTOs\UserDTO;
+use App\Exceptions\ApiException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\User\StoreUserRequest;
 use App\Http\Requests\Api\User\UpdateUserRequest;
@@ -109,15 +110,15 @@ class UserController extends Controller
 
         $performedById = $request->user()?->id;
         if ($performedById === null) {
-            return to_api(null, 'Unauthenticated.', 401);
+            throw ApiException::unauthorized();
         }
 
         try {
             $action->execute($user, (string) $performedById);
-
-            return to_api(status: 204);
         } catch (\LogicException $e) {
-            return to_api(null, $e->getMessage(), 400);
+            throw ApiException::badRequest($e->getMessage());
         }
+
+        return to_api(status: 204);
     }
 }

@@ -17,6 +17,8 @@ return [
         'storage.spaces_secret',
         'storage.aws_secret',
         'turnstile.secret_key',
+        'postman.api_key',
+        'apidog.access_token',
     ],
 
 ];

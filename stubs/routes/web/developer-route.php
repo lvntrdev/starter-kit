@@ -9,4 +9,6 @@ Route::prefix('api-routes')
     ->group(function () {
         Route::get('/', 'index')->name('index');
         Route::post('regenerate-docs', 'regenerateDocs')->name('regenerateDocs');
+        Route::post('postman-sync', 'syncPostman')->name('syncPostman');
+        Route::post('apidog-sync', 'syncApidog')->name('syncApidog');
     });

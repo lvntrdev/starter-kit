@@ -24,6 +24,41 @@ class SettingsDefaultsQuery
             'storage' => $this->storage(),
             'file_manager' => $this->fileManager(),
             'turnstile' => $this->turnstile(),
+            'postman' => $this->postman(),
+            'apidog' => $this->apidog(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function apidog(): array
+    {
+        $stored = Setting::getGroup('apidog');
+        $accessToken = $stored['access_token'] ?? null;
+
+        return [
+            'project_id' => $stored['project_id'] ?? null,
+            // Never expose the token; only tell the UI whether one exists.
+            'access_token' => null,
+            'access_token_is_set' => $this->isFilled($accessToken),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function postman(): array
+    {
+        $stored = Setting::getGroup('postman');
+        $apiKey = $stored['api_key'] ?? null;
+
+        return [
+            'workspace_id' => $stored['workspace_id'] ?? null,
+            'collection_id' => $stored['collection_id'] ?? null,
+            // Never expose the key; only tell the UI whether one exists.
+            'api_key' => null,
+            'api_key_is_set' => $this->isFilled($apiKey),
         ];
     }
 

@@ -3,6 +3,7 @@
 namespace Lvntr\StarterKit;
 
 use App\Exceptions\ApiExceptionHandler;
+use App\Http\Middleware\AssignTraceId;
 use App\Http\Middleware\CheckResourcePermission;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SecurityHeaders;
@@ -33,6 +34,14 @@ class Bootstrap
             SetLocale::class,
             HandleInertiaRequests::class,
             SecurityHeaders::class,
+        ]);
+
+        // AssignTraceId runs first on the API group so every downstream
+        // handler (success path via ApiResponse, error path via
+        // ApiExceptionHandler) can read a single shared trace id from the
+        // request attributes.
+        $middleware->api(prepend: [
+            AssignTraceId::class,
         ]);
 
         $middleware->alias([

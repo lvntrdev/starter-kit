@@ -11,6 +11,7 @@ return [
         'storage' => 'Depolama',
         'file_manager' => 'Dosya Yöneticisi',
         'turnstile' => 'Güvenlik',
+        'api_clients' => 'API İstemcileri',
     ],
 
     'general' => [
@@ -83,5 +84,25 @@ return [
         'enabled_hint' => 'Turnstile doğrulamayı aktif et',
         'site_key_label' => 'Site Anahtarı',
         'secret_key_label' => 'Gizli Anahtar',
+    ],
+
+    'postman' => [
+        'title' => 'Postman Entegrasyonu',
+        'subtitle' => "API Rotaları sayfasından OpenAPI belgesini Postman'e gönderebilmek için yapılandırın.",
+        'api_key_label' => 'API Anahtarı',
+        'api_key_hint' => "postman.co → Settings → API Keys'ten üretilen kişisel anahtar (PMAK- ile başlar).",
+        'workspace_id_label' => 'Workspace ID',
+        'workspace_id_hint' => "Workspace URL'indeki UUID kısmı.",
+        'collection_id_label' => 'Mevcut Postman Koleksiyon UID',
+        'collection_id_hint' => "Her Postman senkronizasyonundan sonra otomatik güncellenir. Manuel düzenlemeye gerek yok.",
+    ],
+
+    'apidog' => [
+        'title' => 'Apidog Entegrasyonu',
+        'subtitle' => 'OpenAPI belgesini mevcut bir Apidog projesine gönderir; eşleşen endpointler üzerine yazılır.',
+        'access_token_label' => 'Access Token',
+        'access_token_hint' => 'apidog.com → Account Settings → API Access Token üzerinden üretilen kişisel token.',
+        'project_id_label' => 'Proje ID',
+        'project_id_hint' => 'Apidog proje URL\'inde yer alan sayısal proje ID (…/project/<id>).',
     ],
 ];

@@ -25,7 +25,7 @@ use Throwable;
  * {
  *     "success": false,
  *     "status": 404,
- *     "message": "Record not found.",
+ *     "message": "User not found.",
  *     "data": null,
  *     "errors": { ... },       // only on validation errors
  *     "trace_id": "uuid",      // request correlation ID
@@ -54,10 +54,10 @@ class ApiExceptionHandler
      */
     private static function handle(Throwable $e, Request $request): JsonResponse
     {
-        // 1. Trace ID — always server-generated to prevent log / header injection.
-        //    Any client-supplied X-Request-ID is accepted as correlation metadata
-        //    only after being sanitised and length-capped.
-        $traceId = (string) Str::uuid();
+        // 1. Trace ID — reuse the request attribute set by AssignTraceId so the
+        //    success-path and error-path share the same identifier. Falls back
+        //    to a fresh UUID if the middleware did not run (e.g. early failure).
+        $traceId = self::resolveTraceId($request);
         $clientRequestId = self::sanitizeClientRequestId($request->header('X-Request-ID'));
 
         // 2. Status + Message mapping
@@ -86,6 +86,20 @@ class ApiExceptionHandler
             $response->errors($e->errors());
         }
 
+        // Rate-limit headers propagated from ThrottleRequestsException so clients
+        // can honour Retry-After and the standard X-RateLimit-* contract.
+        if ($e instanceof ThrottleRequestsException) {
+            foreach ($e->getHeaders() as $header => $value) {
+                $response->header($header, (string) $value);
+            }
+        }
+
+        // Correlation header — echo the sanitised client-supplied ID so the
+        // caller can match its own log records to the server-side trace id.
+        if ($clientRequestId !== null) {
+            $response->header('X-Correlation-ID', $clientRequestId);
+        }
+
         // Debug info — only in development environment
         if (config('app.debug', false) && $status >= 400) {
             $response->debug([
@@ -101,18 +115,22 @@ class ApiExceptionHandler
 
         return $response
             ->header('X-Request-ID', $traceId)
-            ->toResponse(request());
+            ->toResponse($request);
     }
 
     /**
      * Resolve [status, message] pair from the exception type.
+     *
+     * Match branch order matters: ApiException extends HttpException, so it
+     * must be checked before HttpExceptionInterface — otherwise custom API
+     * exceptions would be routed through the generic abort() handling.
      *
      * @return array{int, string}
      */
     private static function resolve(Throwable $e): array
     {
         return match (true) {
-            // Our custom API exception — carries its own message and status code
+            // Our custom API exception — carries its own curated message and status.
             $e instanceof ApiException => [
                 $e->getStatusCode(),
                 $e->getMessage(),
@@ -156,18 +174,21 @@ class ApiExceptionHandler
                 'You are not authorized for this action.',
             ],
 
-            // Rate limiting
+            // Rate limiting — interpolate Retry-After when available.
             $e instanceof ThrottleRequestsException => [
                 429,
-                'Too many requests. Please try again after '
-                    .($e->getHeaders()['Retry-After'] ?? '?')
-                    .' seconds.',
+                isset($e->getHeaders()['Retry-After'])
+                    ? 'Too many requests. Please try again after '.$e->getHeaders()['Retry-After'].' seconds.'
+                    : 'Too many requests. Please try again later.',
             ],
 
-            // Other Symfony HttpExceptions (abort() calls)
+            // Other Symfony HttpExceptions (abort() calls). The raw exception
+            // message is dropped on purpose so internal details (SQL, paths,
+            // stack context) never leak — developers should throw an
+            // ApiException with a curated message instead.
             $e instanceof HttpExceptionInterface => [
                 $e->getStatusCode(),
-                $e->getMessage() ?: self::defaultMessageForStatus($e->getStatusCode()),
+                self::defaultMessageForStatus($e->getStatusCode()),
             ],
 
             // Unexpected errors — never leak the raw exception message into
@@ -178,6 +199,24 @@ class ApiExceptionHandler
                 'A server error occurred.',
             ],
         };
+    }
+
+    /**
+     * Look up the trace id assigned by AssignTraceId middleware, generating
+     * one on the fly if the middleware did not run for this request path.
+     */
+    private static function resolveTraceId(Request $request): string
+    {
+        $existing = $request->attributes->get('trace_id');
+
+        if (is_string($existing) && $existing !== '') {
+            return $existing;
+        }
+
+        $generated = (string) Str::uuid();
+        $request->attributes->set('trace_id', $generated);
+
+        return $generated;
     }
 
     /**
@@ -197,15 +236,24 @@ class ApiExceptionHandler
     }
 
     /**
-     * Extract a human-readable model name from ModelNotFoundException.
+     * Build a human-readable message from a ModelNotFoundException, using the
+     * short model class name so clients get "User not found." rather than a
+     * generic fallback. Falls back to a neutral message when the model name
+     * cannot be resolved.
      */
     private static function modelNotFoundMessage(ModelNotFoundException|Throwable $e): string
     {
         if (! ($e instanceof ModelNotFoundException)) {
-            return 'Record not found.';
+            return 'The requested resource was not found.';
         }
 
-        return 'The requested resource was not found.';
+        $model = $e->getModel();
+
+        if (! is_string($model) || $model === '') {
+            return 'The requested resource was not found.';
+        }
+
+        return class_basename($model).' not found.';
     }
 
     /**

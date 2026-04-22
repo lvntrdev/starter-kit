@@ -1275,6 +1275,7 @@ use {$actionsNamespace}\\Create{$this->dn}Action;
 use {$actionsNamespace}\\Delete{$this->dn}Action;
 use {$actionsNamespace}\\Update{$this->dn}Action;
 use {$dtoNamespace}\\{$this->dn}DTO;
+use App\Exceptions\ApiException;
 use App\Http\Controllers\Controller;
 use {$requestNamespace}\\Store{$this->dn}Request;
 use {$requestNamespace}\\Update{$this->dn}Request;
@@ -1319,11 +1320,11 @@ class {$this->dn}Controller extends Controller
     {
         try {
             \$action->execute(\${$v});
-
-            return to_api(status: 204);
         } catch (\LogicException \$e) {
-            return to_api(null, \$e->getMessage(), 400);
+            throw ApiException::badRequest(\$e->getMessage());
         }
+
+        return to_api(status: 204);
     }
 }
 PHP);

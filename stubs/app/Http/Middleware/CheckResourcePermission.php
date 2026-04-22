@@ -42,6 +42,8 @@ class CheckResourcePermission
         'uploadAvatar' => 'update',
         'deleteAvatar' => 'update',
         'regenerateDocs' => 'update',
+        'syncPostman' => 'update',
+        'syncApidog' => 'update',
         'destroy' => 'delete',
         'import' => 'import',
         'export' => 'export',

@@ -16,4 +16,10 @@ return [
     'open_api_docs' => 'Open API Docs',
     'regenerate_docs' => 'Regenerate Docs',
     'regenerate_docs_success' => 'API documentation regenerated successfully.',
+    'sync_postman' => 'Sync to Postman',
+    'sync_postman_success' => 'Postman collection synced successfully.',
+    'sync_postman_not_configured' => 'Postman is not configured yet. Redirecting to settings…',
+    'sync_apidog' => 'Sync to Apidog',
+    'sync_apidog_success' => 'Apidog project synced successfully.',
+    'sync_apidog_not_configured' => 'Apidog is not configured yet. Redirecting to settings…',
 ];

@@ -11,6 +11,7 @@ return [
         'storage' => 'Storage',
         'file_manager' => 'File Manager',
         'turnstile' => 'Security',
+        'api_clients' => 'API Clients',
     ],
 
     'general' => [
@@ -83,5 +84,25 @@ return [
         'enabled_hint' => 'Enable Turnstile challenge',
         'site_key_label' => 'Site Key',
         'secret_key_label' => 'Secret Key',
+    ],
+
+    'postman' => [
+        'title' => 'Postman Integration',
+        'subtitle' => 'Push the generated OpenAPI spec to Postman from the API Routes page.',
+        'api_key_label' => 'API Key',
+        'api_key_hint' => 'Personal API key from postman.co → Settings → API Keys (starts with PMAK-).',
+        'workspace_id_label' => 'Workspace ID',
+        'workspace_id_hint' => 'UUID portion of the workspace URL.',
+        'collection_id_label' => 'Current Postman Collection UID',
+        'collection_id_hint' => 'Automatically updated after each Postman sync. No need to edit manually.',
+    ],
+
+    'apidog' => [
+        'title' => 'Apidog Integration',
+        'subtitle' => 'Push the generated OpenAPI spec to an existing Apidog project (endpoints are overwritten in place).',
+        'access_token_label' => 'Access Token',
+        'access_token_hint' => 'Personal access token from apidog.com → Account Settings → API Access Token.',
+        'project_id_label' => 'Project ID',
+        'project_id_hint' => 'Numeric project ID from the Apidog project URL (…/project/<id>).',
     ],
 ];
