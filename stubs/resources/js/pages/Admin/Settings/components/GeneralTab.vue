@@ -13,6 +13,7 @@
             timezone: string;
             languages: string[];
             logo_url: string | null;
+            welcome_message: string | null;
         };
         timezones: string[];
         availableLanguages: Record<string, string>;
@@ -147,6 +148,19 @@
                     .controlPosition('left')
                     .options(languageOptions.value)
                     .class('col-span-full'),
+                FB.editor()
+                    .key('welcome_message')
+                    .optional()
+                    .class('col-span-full')
+                    .minHeight('14rem')
+                    .toolbar('standard')
+                    .links(true)
+                    .placeholder('sk-setting.general.welcome_message_placeholder')
+                    .hint(trans('sk-setting.general.welcome_message_hint'))
+                    .imageUpload({
+                        context: 'global',
+                        folderName: 'Welcome Message',
+                    }),
             )
             .build(),
     );

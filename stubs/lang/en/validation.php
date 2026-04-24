@@ -225,6 +225,7 @@ return [
         'app_url' => 'App URL',
         'timezone' => 'Timezone',
         'languages' => 'Languages',
+        'welcome_message' => 'Welcome Message',
         'debug' => 'Debug Mode',
         'registration' => 'Registration',
         'email_verification' => 'Email Verification',

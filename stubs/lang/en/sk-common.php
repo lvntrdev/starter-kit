@@ -18,6 +18,11 @@ return [
     'search' => 'Search',
     'select' => 'Select',
     'password' => 'Password',
+    'generate_password' => 'Generate password',
+    'password_generated' => 'Password generated',
+    'password_generated_detail' => 'A new password has been generated and filled in.',
+    'show_password' => 'Show password',
+    'hide_password' => 'Hide password',
 
     'placeholder' => [
         'select_role' => 'Select Role',

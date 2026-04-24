@@ -4,6 +4,9 @@ import type {
     CheckboxFieldConfig,
     ColorSelectorFieldConfig,
     DatePickerFieldConfig,
+    EditorFieldConfig,
+    EditorImageUploadConfig,
+    EditorToolbarPreset,
     ExistingMedia,
     FieldConfig,
     FileUploadFieldConfig,
@@ -18,6 +21,7 @@ import type {
     InputTextFieldConfig,
     OptionFilter,
     PasswordFieldConfig,
+    PasswordGeneratorConfig,
     SelectFieldConfig,
     SelectOption,
     SlotFieldConfig,
@@ -447,6 +451,19 @@ export class PasswordBuilder extends BaseFieldBuilder<PasswordFieldConfig> {
         this.config.toggleMask = show;
         return this;
     }
+
+    /**
+     * Render a "generate" button next to the input.
+     *
+     * @example
+     *   FB.password().key('password').generator()                        // default: 16 chars, all categories
+     *   FB.password().key('password').generator({ length: 20 })
+     *   FB.password().key('password').generator({ length: 12, symbols: false })
+     */
+    generator(config: boolean | PasswordGeneratorConfig = true): this {
+        this.config.generator = config;
+        return this;
+    }
 }
 
 export class TextareaBuilder extends BaseFieldBuilder<TextareaFieldConfig> {
@@ -466,6 +483,42 @@ export class TextareaBuilder extends BaseFieldBuilder<TextareaFieldConfig> {
 
     autoResize(enabled = true): this {
         this.config.autoResize = enabled;
+        return this;
+    }
+}
+
+export class EditorBuilder extends BaseFieldBuilder<EditorFieldConfig> {
+    constructor() {
+        super('editor');
+    }
+
+    placeholder(placeholder: string | boolean): this {
+        this.config.placeholder = placeholder as string;
+        return this;
+    }
+
+    minHeight(value: string): this {
+        this.config.minHeight = value;
+        return this;
+    }
+
+    toolbar(preset: EditorToolbarPreset): this {
+        this.config.toolbar = preset;
+        return this;
+    }
+
+    imageUpload(config: EditorImageUploadConfig): this {
+        this.config.imageUpload = config;
+        return this;
+    }
+
+    links(enabled = true): this {
+        this.config.links = enabled;
+        return this;
+    }
+
+    treatEmptyAsBlank(enabled = true): this {
+        this.config.treatEmptyAsBlank = enabled;
         return this;
     }
 }

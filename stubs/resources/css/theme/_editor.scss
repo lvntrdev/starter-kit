@@ -1,0 +1,431 @@
+/**
+ * SkEditor — Rich Text (Tiptap) editor styles.
+ *
+ *   1. Wrapper, invalid / disabled states
+ *   2. Toolbar
+ *   3. Editor body
+ *   4. Prose content (shared by .sk-rte__content and .sk-prose)
+ *   5. Placeholder
+ */
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   WRAPPER
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.sk-rte {
+    @apply flex flex-col overflow-hidden rounded-md border;
+    border-color: var(--p-surface-300);
+    background: var(--p-surface-0);
+}
+
+:root.dark .sk-rte {
+    border-color: var(--p-surface-700);
+    background: var(--p-surface-900);
+}
+
+.sk-rte:focus-within {
+    border-color: var(--p-primary-400);
+}
+
+.sk-rte--invalid {
+    border-color: var(--p-red-400) !important;
+}
+
+.sk-rte--disabled {
+    @apply pointer-events-none opacity-60;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TOOLBAR
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.sk-rte__toolbar {
+    @apply flex flex-wrap items-center gap-1 border-b p-1;
+    border-color: var(--p-surface-200);
+    background: var(--p-surface-50);
+}
+
+:root.dark .sk-rte__toolbar {
+    border-color: var(--p-surface-700);
+    background: var(--p-surface-800);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   EDITOR BODY
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.sk-rte__body {
+    @apply overflow-y-auto px-4 py-3;
+}
+
+.sk-rte__body .ProseMirror {
+    @apply h-full outline-none;
+}
+
+.sk-rte__body .ProseMirror:focus {
+    @apply outline-none;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   PROSE CONTENT
+   Shared class .sk-prose can be used by view pages via `<div class="sk-prose" v-html="...">`.
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.sk-rte__content,
+.sk-prose {
+    @apply text-base leading-relaxed;
+    color: var(--p-surface-700);
+}
+
+:root.dark .sk-rte__content,
+:root.dark .sk-prose {
+    color: var(--p-surface-200);
+}
+
+.sk-rte__content p,
+.sk-prose p {
+    @apply my-2;
+}
+
+.sk-rte__content strong,
+.sk-prose strong {
+    @apply font-semibold;
+}
+
+.sk-rte__content em,
+.sk-prose em {
+    @apply italic;
+}
+
+.sk-rte__content h2,
+.sk-prose h2 {
+    @apply mt-4 mb-2 text-xl font-bold;
+}
+
+.sk-rte__content h3,
+.sk-prose h3 {
+    @apply mt-3 mb-2 text-lg font-bold;
+}
+
+.sk-rte__content h4,
+.sk-prose h4 {
+    @apply mt-2 mb-1 text-base font-bold;
+}
+
+.sk-rte__content ul,
+.sk-prose ul {
+    @apply my-2 ml-5 list-disc;
+}
+
+.sk-rte__content ol,
+.sk-prose ol {
+    @apply my-2 ml-5 list-decimal;
+}
+
+.sk-rte__content blockquote,
+.sk-prose blockquote {
+    @apply my-3 border-l-4 pl-3 italic;
+    border-color: var(--p-surface-300);
+}
+
+:root.dark .sk-rte__content blockquote,
+:root.dark .sk-prose blockquote {
+    border-color: var(--p-surface-600);
+}
+
+.sk-rte__content a,
+.sk-prose a {
+    @apply underline;
+    color: var(--p-primary-500);
+}
+
+.sk-rte__content img,
+.sk-prose img {
+    @apply my-2 h-auto max-w-full rounded;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.sk-rte__content img[data-align='left'],
+.sk-prose img[data-align='left'] {
+    @apply float-left mr-4 mb-2;
+}
+
+.sk-rte__content img[data-align='right'],
+.sk-prose img[data-align='right'] {
+    @apply float-right ml-4 mb-2;
+}
+
+.sk-rte__content img[data-align='center'],
+.sk-prose img[data-align='center'] {
+    @apply mx-auto block;
+}
+
+.sk-rte__content p:has(> img[data-align='left']),
+.sk-rte__content p:has(> img[data-align='right']),
+.sk-prose p:has(> img[data-align='left']),
+.sk-prose p:has(> img[data-align='right']) {
+    overflow: auto;
+}
+
+/* Inside table cells, images keep their own size regardless of column width —
+   max-width is lifted so shrinking a column does not shrink the image. */
+.sk-rte__content td img,
+.sk-rte__content th img,
+.sk-prose td img,
+.sk-prose th img {
+    max-width: none;
+}
+
+.sk-rte__body img.ProseMirror-selectednode {
+    outline: 2px solid var(--p-primary-400);
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+}
+
+.sk-rte__content ul[data-type='taskList'],
+.sk-prose ul[data-type='taskList'] {
+    @apply my-2 ml-0 list-none space-y-1;
+}
+
+.sk-rte__content ul[data-type='taskList'] li,
+.sk-prose ul[data-type='taskList'] li {
+    @apply flex items-start gap-2;
+}
+
+.sk-rte__content ul[data-type='taskList'] li > label,
+.sk-prose ul[data-type='taskList'] li > label {
+    @apply mt-1 flex shrink-0 cursor-pointer items-center;
+}
+
+.sk-rte__content ul[data-type='taskList'] li > div,
+.sk-prose ul[data-type='taskList'] li > div {
+    @apply flex-1;
+}
+
+.sk-rte__content hr,
+.sk-prose hr {
+    @apply my-4 border-0 border-t;
+    border-color: var(--p-surface-300);
+}
+
+:root.dark .sk-rte__content hr,
+:root.dark .sk-prose hr {
+    border-color: var(--p-surface-700);
+}
+
+.sk-rte__content pre,
+.sk-prose pre {
+    @apply my-3 overflow-x-auto rounded p-3 text-sm;
+    background: var(--p-surface-100);
+    font-family:
+        ui-monospace,
+        SFMono-Regular,
+        SF Mono,
+        Menlo,
+        Consolas,
+        monospace;
+}
+
+:root.dark .sk-rte__content pre,
+:root.dark .sk-prose pre {
+    background: var(--p-surface-800);
+}
+
+.sk-rte__content pre code,
+.sk-prose pre code {
+    @apply bg-transparent p-0;
+}
+
+.sk-rte__content code,
+.sk-prose code {
+    @apply rounded px-1;
+    font-family:
+        ui-monospace,
+        SFMono-Regular,
+        SF Mono,
+        Menlo,
+        Consolas,
+        monospace;
+    background: var(--p-surface-100);
+}
+
+:root.dark .sk-rte__content code,
+:root.dark .sk-prose code {
+    background: var(--p-surface-800);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   PLACEHOLDER
+   Tiptap Placeholder extension ships a `.is-editor-empty` attribute.
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.sk-rte__content p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: var(--p-surface-400);
+    float: left;
+    height: 0;
+    pointer-events: none;
+}
+
+:root.dark .sk-rte__content p.is-editor-empty:first-child::before {
+    color: var(--p-surface-500);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   IMAGE BUBBLE MENU
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.sk-rte__bubble {
+    @apply flex items-center gap-1 rounded-md border p-1 shadow-lg;
+    border-color: var(--p-surface-200);
+    background: var(--p-surface-0);
+}
+
+:root.dark .sk-rte__bubble {
+    border-color: var(--p-surface-700);
+    background: var(--p-surface-900);
+}
+
+.sk-rte__bubble-sep {
+    @apply mx-1 h-5 w-px;
+    background: var(--p-surface-300);
+}
+
+:root.dark .sk-rte__bubble-sep {
+    background: var(--p-surface-600);
+}
+
+.sk-rte__bubble-input {
+    @apply w-20;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TABLE
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.sk-rte__content table,
+.sk-prose table {
+    @apply my-3 w-full border-collapse;
+}
+
+.sk-rte__content th,
+.sk-rte__content td,
+.sk-prose th,
+.sk-prose td {
+    @apply px-3 py-2 align-top;
+    min-width: 2.5rem;
+}
+
+/* Border width + default color via CSS custom properties so the inline
+   `--sk-table-border` override (custom color picker) beats the preset. */
+.sk-rte__content table,
+.sk-prose table {
+    --sk-table-border-width: 1px;
+    --sk-table-border: var(--p-surface-200);
+    border: var(--sk-table-border-width) solid var(--sk-table-border);
+    th,
+    td {
+        border: var(--sk-table-border-width) solid var(--sk-table-border);
+    }
+}
+
+.sk-rte__content .sk-rte__table--light,
+.sk-prose .sk-rte__table--light {
+    --sk-table-border: var(--p-surface-200);
+    --sk-table-border-width: 1px;
+}
+
+.sk-rte__content .sk-rte__table--none,
+.sk-prose .sk-rte__table--none {
+    --sk-table-border: transparent;
+    --sk-table-border-width: 0;
+}
+
+.sk-rte__content .sk-rte__table--normal,
+.sk-prose .sk-rte__table--normal {
+    --sk-table-border: var(--p-surface-400);
+    --sk-table-border-width: 1px;
+}
+
+.sk-rte__content .sk-rte__table--bold,
+.sk-prose .sk-rte__table--bold {
+    --sk-table-border: var(--p-surface-600);
+    --sk-table-border-width: 2px;
+}
+
+.sk-rte__content .sk-rte__table--primary,
+.sk-prose .sk-rte__table--primary {
+    --sk-table-border: var(--p-primary-400);
+    --sk-table-border-width: 1px;
+}
+
+:root.dark .sk-rte__content table,
+:root.dark .sk-prose table,
+:root.dark .sk-rte__content .sk-rte__table--light,
+:root.dark .sk-prose .sk-rte__table--light {
+    --sk-table-border: var(--p-surface-700);
+}
+
+:root.dark .sk-rte__content .sk-rte__table--normal,
+:root.dark .sk-prose .sk-rte__table--normal {
+    --sk-table-border: var(--p-surface-500);
+}
+
+:root.dark .sk-rte__content .sk-rte__table--bold,
+:root.dark .sk-prose .sk-rte__table--bold {
+    --sk-table-border: var(--p-surface-300);
+}
+
+.sk-rte__content th,
+.sk-prose th {
+    @apply text-left font-semibold;
+    background: var(--p-surface-50);
+}
+
+:root.dark .sk-rte__content th,
+:root.dark .sk-prose th {
+    background: var(--p-surface-800);
+}
+
+.sk-rte__content .selectedCell,
+.sk-rte__body .selectedCell {
+    background: color-mix(in oklab, var(--p-primary-400) 15%, transparent);
+}
+
+.sk-rte__content .column-resize-handle,
+.sk-rte__body .column-resize-handle {
+    @apply pointer-events-none absolute right-0 top-0 w-0.5;
+    bottom: -2px;
+    background: var(--p-primary-400);
+}
+
+.sk-rte__body .tableWrapper {
+    @apply overflow-x-auto;
+}
+
+.sk-rte__content .resize-cursor,
+.sk-rte__body .resize-cursor {
+    cursor: col-resize;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TEXT ALIGNMENT (set by @tiptap/extension-text-align as inline style)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.sk-rte__content [style*='text-align: left'],
+.sk-prose [style*='text-align: left'] {
+    text-align: left;
+}
+.sk-rte__content [style*='text-align: center'],
+.sk-prose [style*='text-align: center'] {
+    text-align: center;
+}
+.sk-rte__content [style*='text-align: right'],
+.sk-prose [style*='text-align: right'] {
+    text-align: right;
+}
+.sk-rte__content [style*='text-align: justify'],
+.sk-prose [style*='text-align: justify'] {
+    text-align: justify;
+}

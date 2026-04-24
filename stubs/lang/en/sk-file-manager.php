@@ -63,5 +63,6 @@ return [
         'upload_invalid_type' => ':attribute could not be uploaded: this file type is not allowed. Allowed types: :types.',
         'upload_too_large' => ':attribute could not be uploaded: file is too large (max :max).',
         'upload_invalid_file' => ':attribute could not be uploaded: invalid file.',
+        'too_large' => 'File is too large — it exceeds the server upload limit.',
     ],
 ];

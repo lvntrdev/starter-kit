@@ -51,6 +51,14 @@ class UploadFileRequest extends FileManagerRequest
         return [
             ...$this->contextRules(),
             'folder_id' => ['nullable', 'uuid'],
+            // Opt-in "managed folder" name: when present (and folder_id is
+            // not), the upload action idempotently ensures a root-level
+            // folder with this name exists in the context and drops the
+            // files there. Used by rich-text editor uploads to group
+            // their media (e.g. "Welcome Message") without requiring the
+            // client to pre-create the folder. Strict regex blocks path
+            // traversal and arbitrary characters.
+            'folder_name' => ['nullable', 'string', 'max:100', 'regex:/^[\p{L}\p{N} _-]+$/u'],
             'files' => ['required', 'array', 'min:1'],
             'files.*' => [
                 'required',

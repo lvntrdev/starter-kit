@@ -5,6 +5,7 @@
 @import './_navigation.scss';
 @import './_datatable.scss';
 @import './_formbuilder.scss';
+@import './_editor.scss';
 @import './_tabs.scss';
 @import './_card.scss';
 @import './_primevue.scss';

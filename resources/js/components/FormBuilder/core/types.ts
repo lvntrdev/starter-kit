@@ -15,6 +15,7 @@ export type FieldType =
     | 'password'
     | 'select-button'
     | 'textarea'
+    | 'editor'
     | 'toggle-button'
     | 'toggle-switch'
     | 'checkbox-group'
@@ -185,12 +186,33 @@ export interface CheckboxFieldConfig extends BaseFieldConfig {
     type: 'checkbox';
 }
 
+export interface PasswordGeneratorConfig {
+    /** Total character count (default: 16). Clamped to [8, 128]. */
+    length?: number;
+    /** Include both upper- and lower-case letters (default: true). */
+    mixedCase?: boolean;
+    /** Include letters (default: true). */
+    letters?: boolean;
+    /** Include digits 0–9 (default: true). */
+    numbers?: boolean;
+    /** Include symbol characters (default: true). */
+    symbols?: boolean;
+}
+
 export interface PasswordFieldConfig extends BaseFieldConfig {
     type: 'password';
     placeholder?: string;
     /** Show strength meter (default: false). */
     feedback?: boolean;
     toggleMask?: boolean;
+    /**
+     * Render a "generate" button next to the input.
+     * Pass `true` for defaults (16 chars, all categories) or a config
+     * object to customise. Generated passwords are intentionally stricter
+     * than the server-side `Password::defaults()` policy by default so
+     * validation always passes.
+     */
+    generator?: boolean | PasswordGeneratorConfig;
 }
 
 export interface TextareaFieldConfig extends BaseFieldConfig {
@@ -198,6 +220,43 @@ export interface TextareaFieldConfig extends BaseFieldConfig {
     placeholder?: string;
     rows?: number;
     autoResize?: boolean;
+}
+
+export type EditorToolbarPreset = 'minimal' | 'standard' | 'full';
+
+export interface EditorImageUploadConfig {
+    /** FileManager context key (e.g. 'user', 'global'). Must be registered in ContextRegistry. */
+    context: string;
+    /** Owner id when the context path requires one (e.g. user id). */
+    contextId?: string | number | null;
+    /** Target folder id within the context — null/omitted uploads to the root. */
+    folderId?: string | null;
+    /**
+     * Name of a root-level "managed" folder to host these uploads.
+     * When provided (and `folderId` is not), the backend idempotently
+     * resolves/restores/creates this folder before the upload. Useful
+     * for grouping editor-originated media (e.g. 'Welcome Message')
+     * without requiring the client to pre-create the folder.
+     * Must match /^[\p{L}\p{N} _-]+$/u (max 100 chars).
+     */
+    folderName?: string;
+    /** Override accepted MIME types (default: image/jpeg, image/png, image/gif, image/webp). */
+    acceptedMimes?: string[];
+}
+
+export interface EditorFieldConfig extends BaseFieldConfig {
+    type: 'editor';
+    placeholder?: string;
+    /** Minimum editor content height as a CSS value. Default: '10rem'. */
+    minHeight?: string;
+    /** Toolbar preset controlling which buttons are rendered. Default: 'standard'. */
+    toolbar?: EditorToolbarPreset;
+    /** When provided, enables the image button + paste/drop image uploads. */
+    imageUpload?: EditorImageUploadConfig;
+    /** Enable link toolbar button and paste auto-linking. Default: false. */
+    links?: boolean;
+    /** Emit empty string instead of '<p></p>' when the editor is empty. Default: true. */
+    treatEmptyAsBlank?: boolean;
 }
 
 export interface ToggleButtonFieldConfig extends BaseFieldConfig {
@@ -270,6 +329,7 @@ export type FieldConfig =
     | CheckboxFieldConfig
     | PasswordFieldConfig
     | TextareaFieldConfig
+    | EditorFieldConfig
     | ToggleButtonFieldConfig
     | ToggleSwitchFieldConfig
     | FileUploadFieldConfig

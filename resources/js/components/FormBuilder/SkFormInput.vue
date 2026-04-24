@@ -1,6 +1,7 @@
 <script setup lang="ts">
     import type {
         ColorSelectorFieldConfig,
+        EditorFieldConfig,
         ExistingMedia,
         FieldConfig,
         FileUploadFieldConfig,
@@ -10,17 +11,21 @@
         DatePickerFieldConfig,
         InputTextFieldConfig,
         PasswordFieldConfig,
+        PasswordGeneratorConfig,
         SelectFieldConfig,
         SelectOption,
         TextareaFieldConfig,
         ToggleButtonFieldConfig,
     } from '@lvntr/components/FormBuilder/core';
     import ColorSelector from '@lvntr/components/FormBuilder/SkColorSelector.vue';
+    import EditorInput from '@lvntr/components/FormBuilder/inputs/EditorInput.vue';
+    import { generatePassword } from '@lvntr/components/FormBuilder/utils/passwordGenerator';
     import FilePreviewModal, {
         suggestedPreviewWidth,
         type FilePreviewFile,
     } from '@lvntr/components/ui/FilePreviewModal.vue';
     import { InputGroup } from 'primevue';
+    import { useToast } from 'primevue/usetoast';
     import { useApi } from '@/composables/useApi';
     import { useConfirm } from '@/composables/useConfirm';
     import { useDialog } from '@/composables/useDialog';
@@ -57,6 +62,7 @@
     const asSelect = computed(() => props.field as SelectFieldConfig);
     const asPassword = computed(() => props.field as PasswordFieldConfig);
     const asTextarea = computed(() => props.field as TextareaFieldConfig);
+    const asEditor = computed(() => props.field as EditorFieldConfig);
     const asToggleButton = computed(() => props.field as ToggleButtonFieldConfig);
     const asFileUpload = computed(() => props.field as FileUploadFieldConfig);
     const asColorSelector = computed(() => props.field as ColorSelectorFieldConfig);
@@ -68,8 +74,36 @@
     const translatedOptions = computed(() => props.options.map((opt) => ({ ...opt, label: trans(opt.label) })));
     const controlPosition = computed(() => props.field.controlPosition ?? 'left');
 
+    /**
+     * Render password fields as plain InputText + our own eye/generate
+     * addons by default. Only fall back to PrimeVue's `<Password>` when the
+     * consumer explicitly opts into its strength-meter feedback, since that
+     * component owns its own absolute-positioned icons and fights InputGroup.
+     */
+    const useCustomPasswordInput = computed(() => props.field.type === 'password' && !asPassword.value.feedback);
+
+    /** True when the password field should render our custom eye toggle. */
+    const showPasswordToggle = computed(() => useCustomPasswordInput.value && (asPassword.value.toggleMask ?? true));
+
+    /** True when the password field should render the generate button. */
+    const showPasswordGenerator = computed(() => useCustomPasswordInput.value && !!asPassword.value.generator);
+
+    /** Local visibility state — only used when we render the custom eye toggle. */
+    const passwordVisible = ref(false);
+
+    /** Resolve the generator config: `true` → {}, object → itself. */
+    const passwordGeneratorConfig = computed<PasswordGeneratorConfig>(() => {
+        const raw = asPassword.value.generator;
+        return typeof raw === 'object' && raw !== null ? raw : {};
+    });
+
     /** InputGroup wrapper detection. */
-    const hasGroup = computed(() => !!(props.field.groupPrefix || props.field.groupSuffix));
+    const hasGroup = computed(
+        () =>
+            !!(props.field.groupPrefix || props.field.groupSuffix) ||
+            showPasswordToggle.value ||
+            showPasswordGenerator.value,
+    );
     const isIcon = (text: string) => text.startsWith('pi ');
 
     const stringVal = computed({
@@ -123,6 +157,22 @@
         get: () => (props.value as Date | Date[] | null) ?? null,
         set: (v) => emit('update', v),
     });
+
+    // ── Password generator ───────────────────────────────────────────────────────
+
+    const toast = useToast();
+
+    function handleGeneratePassword(): void {
+        const value = generatePassword(passwordGeneratorConfig.value);
+        emit('update', value);
+        toast.add({
+            severity: 'success',
+            summary: trans('sk-common.password_generated'),
+            detail: trans('sk-common.password_generated_detail'),
+            group: 'bc',
+            life: 3000,
+        });
+    }
 
     // ── File Upload ───────────────────────────────────────────────────────────────
 
@@ -476,7 +526,23 @@
             </div>
         </div>
 
-        <!-- Password -->
+        <!-- Password (default path) — rendered as plain InputText so the
+             InputGroup can cleanly host our own eye-toggle + generate buttons
+             without fighting PrimeVue Password's absolute-positioned icons. -->
+        <InputText
+            v-else-if="field.type === 'password' && useCustomPasswordInput"
+            :id="field.key"
+            v-model="stringVal"
+            :type="passwordVisible ? 'text' : 'password'"
+            :placeholder="asPassword.placeholder ? $t(asPassword.placeholder) : undefined"
+            :disabled="disabled"
+            :invalid="invalid"
+            autocomplete="new-password"
+            class="w-full"
+            v-bind="extraProps"
+        />
+
+        <!-- Password (PrimeVue with strength feedback meter) -->
         <Password
             v-else-if="field.type === 'password'"
             :id="field.key"
@@ -512,6 +578,23 @@
             :placeholder="asTextarea.placeholder ? $t(asTextarea.placeholder) : undefined"
             :rows="asTextarea.rows ?? 4"
             :auto-resize="asTextarea.autoResize ?? false"
+            :disabled="disabled"
+            :invalid="invalid"
+            class="w-full"
+            v-bind="extraProps"
+        />
+
+        <!-- Editor (Tiptap rich text) -->
+        <EditorInput
+            v-else-if="field.type === 'editor'"
+            :id="field.key"
+            v-model="stringVal"
+            :placeholder="asEditor.placeholder ? $t(asEditor.placeholder) : undefined"
+            :toolbar="asEditor.toolbar ?? 'standard'"
+            :min-height="asEditor.minHeight ?? '10rem'"
+            :image-upload="asEditor.imageUpload"
+            :links="asEditor.links ?? false"
+            :treat-empty-as-blank="asEditor.treatEmptyAsBlank ?? true"
             :disabled="disabled"
             :invalid="invalid"
             class="w-full"
@@ -689,6 +772,32 @@
             <template v-else>
                 {{ field.groupSuffix }}
             </template>
+        </InputGroupAddon>
+
+        <InputGroupAddon v-if="showPasswordToggle" class="sk-fb__password-toggle">
+            <Button
+                v-tooltip.top="$t(passwordVisible ? 'sk-common.hide_password' : 'sk-common.show_password')"
+                type="button"
+                :icon="passwordVisible ? 'pi pi-eye-slash' : 'pi pi-eye'"
+                severity="secondary"
+                variant="text"
+                :disabled="disabled"
+                :aria-label="$t(passwordVisible ? 'sk-common.hide_password' : 'sk-common.show_password')"
+                @click="passwordVisible = !passwordVisible"
+            />
+        </InputGroupAddon>
+
+        <InputGroupAddon v-if="showPasswordGenerator" class="sk-fb__password-generator">
+            <Button
+                v-tooltip.top="$t('sk-common.generate_password')"
+                type="button"
+                icon="pi pi-refresh"
+                severity="primary"
+                variant="text"
+                :disabled="disabled"
+                :aria-label="$t('sk-common.generate_password')"
+                @click="handleGeneratePassword"
+            />
         </InputGroupAddon>
     </component>
 </template>

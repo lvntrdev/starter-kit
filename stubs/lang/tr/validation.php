@@ -215,6 +215,7 @@ return [
         'app_url' => 'Uygulama URL',
         'timezone' => 'Zaman Dilimi',
         'languages' => 'Diller',
+        'welcome_message' => 'Hoş Geldin Mesajı',
         'debug' => 'Hata Ayıklama Modu',
         'registration' => 'Kayıt',
         'email_verification' => 'E-posta Doğrulama',

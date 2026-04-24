@@ -297,15 +297,25 @@ export function useFileManager(options: Options) {
             });
 
             xhr.onload = () => {
+                if (xhr.status === 413) {
+                    reject(new Error('sk-file-manager.errors.too_large'));
+                    return;
+                }
                 try {
                     const envelope = JSON.parse(xhr.responseText);
                     if (xhr.status >= 200 && xhr.status < 300) {
                         resolve((envelope.data as UploadResponse).files);
                     } else {
-                        reject(new Error(extractValidationMessage(envelope) ?? envelope?.message ?? 'Upload failed'));
+                        reject(
+                            new Error(
+                                extractValidationMessage(envelope) ??
+                                    envelope?.message ??
+                                    `Upload failed (${xhr.status})`,
+                            ),
+                        );
                     }
                 } catch {
-                    reject(new Error('Upload failed'));
+                    reject(new Error(xhr.status === 0 ? 'Network error' : `Upload failed (${xhr.status})`));
                 }
             };
             xhr.onerror = () => reject(new Error('Network error'));

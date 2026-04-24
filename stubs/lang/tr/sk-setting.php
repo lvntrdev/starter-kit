@@ -23,6 +23,8 @@ return [
         'logo_upload' => 'Logo Yükle',
         'logo_remove' => 'Kaldır',
         'logo_remove_confirm' => 'Uygulama logosunu kaldırmak istediğinizden emin misiniz?',
+        'welcome_message_placeholder' => 'Kısa bir hoş geldin mesajı yazın…',
+        'welcome_message_hint' => 'Yönetim panelinin ana sayfasında gösterilir. Temel biçimlendirme ve görsel desteği vardır.',
     ],
 
     'auth' => [

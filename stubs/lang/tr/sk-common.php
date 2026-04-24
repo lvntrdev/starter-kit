@@ -18,6 +18,11 @@ return [
     'search' => 'Ara',
     'select' => 'Seçin',
     'password' => 'Şifre',
+    'generate_password' => 'Şifre oluştur',
+    'password_generated' => 'Şifre oluşturuldu',
+    'password_generated_detail' => 'Yeni bir şifre oluşturuldu ve alana yazıldı.',
+    'show_password' => 'Şifreyi göster',
+    'hide_password' => 'Şifreyi gizle',
 
     'placeholder' => [
         'select_role' => 'Rol Seçin',

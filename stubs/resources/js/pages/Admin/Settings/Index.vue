@@ -16,6 +16,7 @@
                 timezone: string;
                 languages: string[];
                 logo_url: string | null;
+                welcome_message: string | null;
             };
             auth: {
                 registration: boolean;

@@ -3,6 +3,7 @@
 namespace App\Domain\Setting;
 
 use App\Models\Setting;
+use App\Support\HtmlSanitizer;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,17 @@ class SettingService
      * @var list<string>
      */
     private array $sensitiveKeys;
+
+    /**
+     * Keys that hold rich-text HTML and must be sanitized before storage.
+     * Centralising the rule here guarantees sanitization even if a future
+     * write path bypasses the FormRequest layer (e.g. tinker, command, job).
+     *
+     * @var list<string>
+     */
+    private const HTML_SAFE_KEYS = [
+        'general.welcome_message',
+    ];
 
     public function __construct()
     {
@@ -52,6 +64,7 @@ class SettingService
     {
         [$group, $key] = $this->parsePath($path);
 
+        $value = $this->normalizeValue($path, $value);
         $isSensitive = in_array($path, $this->sensitiveKeys, true);
 
         Setting::query()->updateOrCreate(
@@ -92,6 +105,7 @@ class SettingService
                 $path = "{$group}.{$key}";
                 [$g, $k] = $this->parsePath($path);
 
+                $value = $this->normalizeValue($path, $value);
                 $isSensitive = in_array($path, $this->sensitiveKeys, true);
 
                 Setting::query()->updateOrCreate(
@@ -139,6 +153,22 @@ class SettingService
             } catch (\Exception) {
                 $value = null;
             }
+        }
+
+        return $value;
+    }
+
+    /**
+     * Apply per-key normalization before persistence. Currently only HTML
+     * sanitization for rich-text keys; can grow into a small pipeline if
+     * other coercions are needed later.
+     */
+    private function normalizeValue(string $path, mixed $value): mixed
+    {
+        if (in_array($path, self::HTML_SAFE_KEYS, true) && is_string($value)) {
+            $cleaned = HtmlSanitizer::clean($value);
+
+            return $cleaned === '' ? null : $cleaned;
         }
 
         return $value;

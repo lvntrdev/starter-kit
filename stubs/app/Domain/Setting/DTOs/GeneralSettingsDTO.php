@@ -13,6 +13,7 @@ readonly class GeneralSettingsDTO extends BaseDTO
         public string $appName,
         public string $timezone,
         public string $languages,
+        public ?string $welcomeMessage,
     ) {}
 
     /**
@@ -24,11 +25,12 @@ readonly class GeneralSettingsDTO extends BaseDTO
             appName: $data['app_name'],
             timezone: $data['timezone'],
             languages: implode(',', $data['languages']),
+            welcomeMessage: $data['welcome_message'] ?? null,
         );
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, string|null>
      */
     public function toArray(): array
     {
@@ -36,6 +38,7 @@ readonly class GeneralSettingsDTO extends BaseDTO
             'app_name' => $this->appName,
             'timezone' => $this->timezone,
             'languages' => $this->languages,
+            'welcome_message' => $this->welcomeMessage,
         ];
     }
 }

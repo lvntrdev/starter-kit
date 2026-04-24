@@ -5,6 +5,50 @@ All notable changes to `lvntr/laravel-starter-kit` will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [13.4.2] - 2026-04-24
+
+Introduces a Tiptap-based `FB.editor()` FormBuilder field (paired with a server-side `HtmlSanitizer` utility), a crypto-safe password generator on `FB.password()`, and an admin dashboard welcome message authored through the editor on **Settings → General**. File upload gains an optional `folder_name` parameter so editor-scoped uploads stay grouped, and the FileManager surfaces a dedicated `too_large` error for 413 Payload Too Large responses. All changes are additive; no breaking changes. Existing consumer apps pick up the Vue components, `HtmlSanitizer`, and language keys via `php artisan sk:update`.
+
+### Added
+
+- **Shipped Tiptap-based `FB.editor()` FormBuilder input.** `EditorInput.vue`, `EditorColorPalette.vue` and `EditorImagePicker.vue` land under the shipped FormBuilder stub tree. Toolbar presets (`minimal` / `standard` / `full`), bubble menu, link / image / table / task list / text align / text color / text style and placeholder extensions. Image uploads route through the FileManager context with an optional folder-grouping parameter. Translations in `lang/{en,tr}/sk-editor.php`.
+
+- **Shipped `App\Support\HtmlSanitizer` utility.** Server-side companion to `FB.editor()`. Allowlist-based tag / attribute / URL scheme stripping; paired with the shipped `tests/Unit/HtmlSanitizerTest.php` regression suite.
+
+- **Shipped `FB.password().generator()` — crypto-safe password generator.** Opt-in fluent method on every password field. Defaults to 16 characters, mixed case + letters + digits + symbols — strictly harder than the shipped `Password::defaults()` so every generated value passes backend validation on first submit. Enabled on the shipped admin User form out of the box. New i18n keys: `generate_password`, `password_generated`, `password_generated_detail`, `show_password`, `hide_password`.
+
+- **Shipped admin dashboard welcome message.** Optional `general.welcome_message` setting authored through `FB.editor()` on **Settings → General**. `DashboardController` shares it as an Inertia prop; `Admin/Dashboard/Index.vue` renders it inside an `sk-prose` container. Sanitized on write (FormRequest `prepareForValidation`) and on read (controller defense-in-depth), so pre-existing hostile DB rows cannot surface.
+
+- **Shipped `POST /file-manager/files` — optional `folder_name` parameter.** Nullable string, `max:100`, strict regex (letters / digits / space / dash / underscore only). When supplied, `UploadFileAction::ensureManagedFolder` atomically ensures a root-level folder with that name exists in the current context and stores the upload inside it. Enables editor-scoped uploads to stay grouped (e.g. every welcome-message image goes under "Welcome Message") without the pre-release pattern of a read query writing to the DB.
+
+### Security
+
+- **Shipped `HtmlSanitizer` — URL scheme allowlist, not blocklist.** Relative URLs plus `http://`, `https://`, `mailto:` and `tel:` are permitted; `blob:`, `data:`, `file:`, `ftp:`, `javascript:` and `vbscript:` are rejected. Flipping from blocklist to allowlist means future schemes ship safe by default.
+
+- **Shipped `SettingService::normalizeValue()` — HTML sanitize on every write path.** `setValue()` and `setGroup()` run keys listed in a new `HTML_SAFE_KEYS` whitelist through `HtmlSanitizer::sanitize()` before hitting the database. Covers FormRequest, tinker, scheduled commands, queued jobs — no non-sanitized HTML can be persisted via the normal setting API.
+
+- **Shipped `DashboardController::index` — defense-in-depth read sanitize.** The stored welcome message is re-sanitized on read before it reaches Inertia. Historical rows written before the write-path sanitize landed are neutralised; a drifted DB value cannot reach the browser.
+
+- **Shipped `UploadFileAction::ensureManagedFolder` — concurrency-safe managed folder creation.** `DB::transaction` + `lockForUpdate` row-lock, `QueryException` refetch fallback for the unique-constraint race, and `withTrashed()->restore()` path for soft-deleted names. Closes the race where two parallel editor uploads could either deadlock on the same folder or resurrect a soft-deleted row and trip the unique index.
+
+- **Shipped `UploadFileRequest` — `folder_name` input strictly validated.** New field uses `nullable|string|max:100|regex:/^[\pL\pN _-]+$/u`; path-traversal and arbitrary-character content is rejected at validation time, not downstream.
+
+### Improved
+
+- **Shipped `useFileManager` composable — dedicated 413 error surfacing.** HTTP 413 (Payload Too Large) responses now render the new `too_large` translation (EN + TR) instead of a generic error. Every other non-200 includes the status code in the client-side message for faster triage.
+
+- **Shipped `FB.password()` default render path.** Default rendering is now `InputText` + a custom eye toggle. Fixes the long-standing issue where PrimeVue `<Password>`'s built-in eye icon disappeared inside `InputGroup` addons, and makes `password` / `password_confirmation` fields render identically. PrimeVue `<Password>` is still used when `.feedback()` is called (strength meter path).
+
+### Fixed
+
+- **Shipped `SettingsDefaultsQuery` — read path no longer writes.** The previous release's `resolveWelcomeMessageFolderId()` pass ran `FileFolder::firstOrCreate(...)` inside a pure read query. On installs with a soft-deleted "Welcome Message" folder the unique index rejected the insert and the admin saw a 500 on a settings-screen load. The folder ensure path now lives exclusively in `UploadFileAction::ensureManagedFolder` at upload time; the query is side-effect-free. The frontend `welcome_message_folder_id` Inertia prop binding was removed — the editor uses `folderName` directly.
+
+- **Shipped `EditorInput.vue` — `blob:` URL payload leak closed.** After a completed editor image upload, the parent `v-model` is now manually synced following `setContent({ emitUpdate: false })`. Stale `<img src="blob:...">` fragments from a just-replaced upload no longer travel to the server in the submitted HTML.
+
+### Upgrade
+
+No breaking changes. Fresh installs pick everything up via `sk:install`; existing consumer apps can run `composer update lvntr/laravel-starter-kit --with-all-dependencies && php artisan sk:update` to pick up the new shipped files (`EditorInput.vue`, `EditorColorPalette.vue`, `EditorImagePicker.vue`, `HtmlSanitizer.php`, `passwordGenerator.ts`, `sk-editor.php`, updated `SkFormInput.vue` / `useFileManager.ts` / `UploadFileAction.php`).
+
 ## [13.4.1] - 2026-04-22
 
 Bundles the API response envelope hardening (trace-id pipeline, centralised exception handler, leak-closing controller patches) with two new API client integrations (Postman + Apidog sync), an OAuth migration compatibility fix, and an install-time Passport personal access client provisioning step. Most changes are additive. Three behavioural breaks live in the response envelope — detailed with diffs in the consumer [UPGRADE guide](https://github.com/lvntrdev/laravel-starter-kit/blob/main/docs/UPGRADE.md). Existing installs must apply the guide; new installs pick everything up automatically.

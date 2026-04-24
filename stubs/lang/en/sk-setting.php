@@ -23,6 +23,8 @@ return [
         'logo_upload' => 'Upload Logo',
         'logo_remove' => 'Remove',
         'logo_remove_confirm' => 'Are you sure you want to remove the application logo?',
+        'welcome_message_placeholder' => 'Write a short welcome message…',
+        'welcome_message_hint' => 'Shown on the admin dashboard. Supports basic formatting and images.',
     ],
 
     'auth' => [

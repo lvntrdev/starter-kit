@@ -160,6 +160,7 @@ class FileManagerController extends Controller
                 context: $context,
                 files: $request->file('files') ?? [],
                 folderId: $request->input('folder_id'),
+                folderName: $request->input('folder_name'),
             );
         } catch (LogicException $e) {
             throw ApiException::unprocessable($e->getMessage());

@@ -63,5 +63,6 @@ return [
         'upload_invalid_type' => ':attribute yüklenemedi: bu dosya tipine izin verilmiyor. İzinli tipler: :types.',
         'upload_too_large' => ':attribute yüklenemedi: dosya çok büyük (en fazla :max).',
         'upload_invalid_file' => ':attribute yüklenemedi: geçersiz dosya.',
+        'too_large' => 'Dosya çok büyük — sunucu yükleme limitini aşıyor.',
     ],
 ];

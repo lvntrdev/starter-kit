@@ -50,6 +50,7 @@
                 FB.select().key('status').default('active').definitionOptions('userStatus'),
                 FB.password()
                     .key('password')
+                    .generator()
                     .required(!isEdit.value)
                     .toggleMask()
                     .hint(isEdit.value ? 'sk-user.password_hint' : undefined)

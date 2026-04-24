@@ -2,6 +2,14 @@
     import AdminLayout from '@/layouts/AdminLayout.vue';
     import { Head, usePage } from '@inertiajs/vue3';
 
+    interface Props {
+        welcomeMessage?: string | null;
+    }
+
+    withDefaults(defineProps<Props>(), {
+        welcomeMessage: null,
+    });
+
     const page = usePage();
     const user = computed(() => page.props.auth?.user);
 
@@ -333,6 +341,14 @@
                     <Button label="New Report" icon="pi pi-plus" size="small" />
                 </div>
             </header>
+
+            <!-- Welcome Message (from Settings > General) -->
+            <section
+                v-if="welcomeMessage"
+                class="rounded-xl border border-surface-200 bg-surface-0 p-5 dark:border-surface-700 dark:bg-surface-900"
+            >
+                <div class="sk-prose" v-html="welcomeMessage" />
+            </section>
 
             <!-- KPI Grid -->
             <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

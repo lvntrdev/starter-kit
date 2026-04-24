@@ -124,6 +124,7 @@ class SettingsDefaultsQuery
             'timezone' => $stored['timezone'] ?? config('app.display_timezone'),
             'languages' => explode(',', $stored['languages'] ?? $defaultLanguages),
             'logo_url' => $logoPath ? Storage::disk('public')->url($logoPath) : null,
+            'welcome_message' => $stored['welcome_message'] ?? null,
         ];
     }
 
