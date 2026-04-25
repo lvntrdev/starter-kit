@@ -23,6 +23,7 @@ return [
     'password_generated_detail' => 'A new password has been generated and filled in.',
     'show_password' => 'Show password',
     'hide_password' => 'Hide password',
+    'error' => 'Error',
 
     'placeholder' => [
         'select_role' => 'Select Role',

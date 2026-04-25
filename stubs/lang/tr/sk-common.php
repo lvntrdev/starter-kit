@@ -23,6 +23,7 @@ return [
     'password_generated_detail' => 'Yeni bir şifre oluşturuldu ve alana yazıldı.',
     'show_password' => 'Şifreyi göster',
     'hide_password' => 'Şifreyi gizle',
+    'error' => 'Hata',
 
     'placeholder' => [
         'select_role' => 'Rol Seçin',

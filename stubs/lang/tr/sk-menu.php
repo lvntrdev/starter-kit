@@ -8,6 +8,7 @@ return [
     'files' => 'Dosyalar',
     'system' => 'Sistem',
     'activity_logs' => 'Etkinlik Kayıtları',
+    'logs' => 'Loglar',
     'settings' => 'Ayarlar',
     'profile' => 'Profil',
     'logout' => 'Çıkış Yap',

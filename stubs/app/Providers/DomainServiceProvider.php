@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Domain\Logs\Events\LogFilesDeleted;
+use App\Domain\Logs\Listeners\LogActivityForLogFilesDeleted;
 use App\Domain\Role\Events\RoleCreated;
 use App\Domain\Role\Events\RoleDeleted;
 use App\Domain\Role\Events\RoleUpdated;
@@ -43,5 +45,8 @@ class DomainServiceProvider extends ServiceProvider
         Event::listen(RoleCreated::class, LogRoleCreated::class);
         Event::listen(RoleUpdated::class, LogRoleUpdated::class);
         Event::listen(RoleDeleted::class, LogRoleDeleted::class);
+
+        // ── Logs Events ──────────────────────────────────────────────────
+        Event::listen(LogFilesDeleted::class, LogActivityForLogFilesDeleted::class);
     }
 }

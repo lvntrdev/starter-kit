@@ -4,6 +4,7 @@ import activityLogs from '@/routes/activity-logs';
 import apiRoutes from '@/routes/api-routes';
 import dashboard from '@/routes/dashboard';
 import files from '@/routes/files';
+import logs from '@/routes/logs';
 import roles from '@/routes/roles';
 import settings from '@/routes/settings';
 import users from '@/routes/users';
@@ -47,6 +48,12 @@ export function useAdminMenu() {
             icon: 'pi pi-history',
             href: activityLogs.index.url(),
             permission: 'activity-logs.read',
+        },
+        {
+            title: 'sk-menu.logs',
+            icon: 'pi pi-file',
+            href: logs.index.url(),
+            role: 'system_admin',
         },
         {
             title: 'sk-menu.settings',

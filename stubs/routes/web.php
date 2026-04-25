@@ -28,7 +28,7 @@ Route::middleware(['auth', 'verified'])->group(function () use ($excludedFiles, 
 
     // Web route files inside this group are authenticated.
     // Some skip permission checks, but they are still not public.
-    $routesWithoutPermissionMiddleware = ['profile-route.php', 'service-route.php', 'file-manager-route.php'];
+    $routesWithoutPermissionMiddleware = ['profile-route.php', 'service-route.php', 'file-manager-route.php', 'log-route.php'];
     $permissionProtectedRouteFiles = [];
 
     foreach (File::files(__DIR__.'/web') as $file) {

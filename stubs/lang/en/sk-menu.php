@@ -8,6 +8,7 @@ return [
     'files' => 'Files',
     'system' => 'System',
     'activity_logs' => 'Activity Logs',
+    'logs' => 'Logs',
     'settings' => 'Settings',
     'profile' => 'Profile',
     'logout' => 'Logout',
