@@ -5,6 +5,28 @@ All notable changes to `lvntr/laravel-starter-kit` will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [13.4.3] - 2026-04-25
+
+Brings a richer vertical tab presentation through the `TB` builder (icon tile, description line, trailing badge or check) and an opt-in upper bound on the `?per_page=` query parameter handled by `DatatableQueryBuilder`. All changes are additive; no breaking changes. Existing consumer apps pick up the new shipped TabBuilder Vue components, the rewritten `_tabs.scss`, and the EN/TR `sk-setting.tab_descriptions` keys via `php artisan sk:update`; the package-tier `max_per_page` config is picked up by `composer update`.
+
+### Added
+
+- **Shipped `TB.item()` rich vertical tab fluent methods.** Four new fluent methods on the shipped TabBuilder: `.description(text)` for a secondary line under the label, `.iconColor(color)` for a colored icon tile preset (13 colors: `blue`, `amber`, `emerald`, `purple`, `teal`, `red`, `indigo`, `slate`, `pink`, `orange`, `cyan`, `green`, `yellow`), `.badge(value, severity?)` for a trailing badge (5 severities: `success`, `warn`, `info`, `danger`, `secondary`), and `.checked()` for a trailing green check (overrides `badge`). Vertical-only — ignored in horizontal layout. The shipped vertical sidebar now wraps in a PrimeVue Card when `.isCard(true)` is set at the tabs level. The shipped Settings → General page uses the new API as the canonical example.
+
+- **Package `config/starter-kit.php` — `datatable.max_per_page` ceiling + `STARTER_KIT_DATATABLE_MAX_PER_PAGE` env var.** Opt-in upper bound on `?per_page=` for `DatatableQueryBuilder`. Defaults to `100` when the config key is absent.
+
+### Security
+
+- **Shipped `DatatableQueryBuilder` — `?per_page=` upper bound enforced.** Previously a client could send `?per_page=99999` and force the builder to materialise an entire table into a single payload. The new ceiling silently clamps the value to `config('starter-kit.datatable.max_per_page')` (default 100) — legitimate callers under the cap are unaffected.
+
+### Improved
+
+- **Shipped `_tabs.scss` rewrite — modern vertical sidebar.** Card wrapper padding override, color-mix hover backgrounds, icon tile preset palette (13 colors), trailing badge and check styles. The pre-existing simple vertical layout remains accessible by omitting the new `description` / `iconColor` / `badge` fields.
+
+### Upgrade
+
+No breaking changes. Fresh installs pick everything up via `sk:install`; existing consumer apps can run `composer update lvntr/laravel-starter-kit && php artisan sk:update` to pick up the new shipped TabBuilder Vue components (`SkTabs.vue`, `core/builder.ts`, `core/types.ts`), the rewritten `_tabs.scss`, the EN/TR `sk-setting.tab_descriptions` language keys, and the `STARTER_KIT_DATATABLE_MAX_PER_PAGE` env var template.
+
 ## [13.4.2] - 2026-04-24
 
 Introduces a Tiptap-based `FB.editor()` FormBuilder field (paired with a server-side `HtmlSanitizer` utility), a crypto-safe password generator on `FB.password()`, and an admin dashboard welcome message authored through the editor on **Settings → General**. File upload gains an optional `folder_name` parameter so editor-scoped uploads stay grouped, and the FileManager surfaces a dedicated `too_large` error for 413 Payload Too Large responses. All changes are additive; no breaking changes. Existing consumer apps pick up the Vue components, `HtmlSanitizer`, and language keys via `php artisan sk:update`.
