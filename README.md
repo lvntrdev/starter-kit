@@ -85,6 +85,22 @@ Full step-by-step guide: [starter-kit.lvntr.dev/docs/install](https://starter-ki
 - Node.js 18+
 - MySQL or MariaDB
 
+## Compatibility & Versioning
+
+The package version major aligns with the supported Laravel major. Each
+Laravel major gets its own maintenance branch and `vN.x.y` tag stream;
+existing consumer constraints stay locked to their major and never
+receive breaking changes from a newer Laravel target.
+
+| Laravel | Constraint                                            | Branch  | Status      |
+|---------|-------------------------------------------------------|---------|-------------|
+| 13.x    | `composer require lvntr/laravel-starter-kit:^13.0`    | `13.x`  | active      |
+
+`main` tracks the currently active major (today: `13.x`). When a future
+Laravel release is targeted, `main` will move to that next-major dev
+stream and the previous major's `N.x` branch will continue to receive
+backports.
+
 ## Documentation
 
 Everything — installation, update flow, domain scaffolding, FormBuilder / DatatableBuilder / TabBuilder APIs, composables, file manager, roles & permissions, OAuth2 API, activity logs, settings — lives on the official site:

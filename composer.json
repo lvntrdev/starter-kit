@@ -59,6 +59,10 @@
       "providers": [
         "Lvntr\\StarterKit\\StarterKitServiceProvider"
       ]
+    },
+    "branch-alias": {
+      "dev-main": "13.x-dev",
+      "dev-13.x": "13.x-dev"
     }
   },
   "config": {
