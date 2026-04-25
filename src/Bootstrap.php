@@ -49,6 +49,9 @@ class Bootstrap
             'guest' => RedirectIfAuthenticated::class,
             'check.permission' => CheckResourcePermission::class,
             'turnstile' => ValidateTurnstile::class,
+            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
+            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         ]);
 
         $middleware->redirectTo(guests: '/login', users: '/dashboard');
