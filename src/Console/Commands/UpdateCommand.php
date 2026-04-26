@@ -132,6 +132,14 @@ class UpdateCommand extends Command
             $this->rewriteHelpersAutoload();
         }
 
+        // 4c. Merge stub package.json into the consumer's package.json so newly added
+        // npm dependencies (e.g. the @tiptap/* set added with EditorInput in v13.4.x)
+        // land automatically on `sk:update` instead of forcing every consumer to copy
+        // them by hand. Stub versions win for shared keys; user extras are preserved.
+        if (! $dryRun) {
+            $this->mergePackageJson();
+        }
+
         // 5. Run new migrations
         if (! $dryRun && ! empty($this->added) && $this->hasNewMigrations()) {
             if (confirm('New migrations found. Run them now?', default: true)) {
@@ -713,6 +721,72 @@ PHP;
         $this->line('  <fg=gray>Move your helpers to app/Helpers/custom.php and delete app/helpers.php manually.</>');
         $this->line('  <fg=gray>to_api() and format_date() are now provided by the package — drop them from your file.</>');
         $this->newLine();
+    }
+
+    /**
+     * Merge the stub package.json into the application's package.json.
+     *
+     * Mirrors the strategy used at install time: stub version wins for shared
+     * dependency versions, user-added dependencies (and any extra root-level
+     * keys) are preserved. We only record an "updated" entry when the merge
+     * actually changes the file on disk — re-running `sk:update` is otherwise
+     * a no-op for users whose package.json is already in sync.
+     */
+    private function mergePackageJson(): void
+    {
+        $stubPath = StarterKitServiceProvider::stubsPath('package.json');
+        $targetPath = base_path('package.json');
+
+        if (! $this->files->exists($stubPath)) {
+            return;
+        }
+
+        if (! $this->files->exists($targetPath)) {
+            $this->files->copy($stubPath, $targetPath);
+            $this->added[] = 'package.json';
+
+            return;
+        }
+
+        /** @var array<string, mixed>|null $stub */
+        $stub = json_decode($this->files->get($stubPath), true);
+        /** @var array<string, mixed>|null $current */
+        $current = json_decode($this->files->get($targetPath), true);
+
+        if (! is_array($stub) || ! is_array($current)) {
+            // Malformed JSON — fall back to stub to guarantee a working build.
+            $this->files->copy($stubPath, $targetPath);
+            $this->updated[] = 'package.json';
+
+            return;
+        }
+
+        // Stub keys win at the root level; user-added extra keys are preserved.
+        $merged = array_merge($current, $stub);
+
+        // For dependency sections, union the two maps so user extras survive
+        // while stub versions override any shared dependency versions.
+        foreach (['dependencies', 'devDependencies'] as $section) {
+            $stubSection = $stub[$section] ?? [];
+            $currentSection = $current[$section] ?? [];
+
+            if (! is_array($stubSection) || ! is_array($currentSection)) {
+                continue;
+            }
+
+            $mergedSection = array_merge($currentSection, $stubSection);
+            ksort($mergedSection);
+            $merged[$section] = $mergedSection;
+        }
+
+        $rendered = json_encode($merged, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)."\n";
+
+        if ($rendered === $this->files->get($targetPath)) {
+            return;
+        }
+
+        $this->files->put($targetPath, $rendered);
+        $this->updated[] = 'package.json (merged stub dependencies — run npm install)';
     }
 
     private function rewriteHelpersAutoload(): void
