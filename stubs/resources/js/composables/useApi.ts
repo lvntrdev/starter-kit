@@ -15,6 +15,7 @@
  *   await api.delete('/admin/users/1');
  */
 
+import { trans } from 'laravel-vue-i18n';
 import { useToast } from 'primevue/usetoast';
 
 /** Standard API response envelope returned by ApiResponse / to_api() */
@@ -84,7 +85,9 @@ async function request<T = unknown>(method: HttpMethod, url: string, payload?: u
         throw new ApiError(response.status, {
             success: false,
             status: response.status,
-            message: response.ok ? 'Sunucudan geçersiz yanıt alındı.' : `İstek başarısız oldu (${response.status}).`,
+            message: response.ok
+                ? trans('sk-message.invalid_response')
+                : trans('sk-message.request_failed', { status: String(response.status) }),
             data: null as unknown as T,
         });
     }
@@ -123,11 +126,11 @@ export function useApi(apiOptions: UseApiOptions = {}) {
                         ? error.message
                         : error instanceof Error && error.message
                           ? error.message
-                          : 'Ağ hatası. Lütfen tekrar deneyin.';
+                          : trans('sk-message.network_error');
 
                 toast.add({
                     severity: 'error',
-                    summary: 'Hata',
+                    summary: trans('sk-message.error_summary'),
                     detail,
                     group: 'bc',
                     life: 5000,

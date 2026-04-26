@@ -6,19 +6,17 @@ use App\Domain\User\Actions\CreateUserAction;
 use App\Domain\User\Actions\DeleteUserAction;
 use App\Domain\User\Actions\UpdateUserAction;
 use App\Domain\User\DTOs\UserDTO;
+use App\Domain\User\Queries\UserDatatableQuery;
 use App\Exceptions\ApiException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\User\StoreUserRequest;
 use App\Http\Requests\Api\User\UpdateUserRequest;
 use App\Http\Resources\Admin\User\UserResource;
 use App\Http\Responses\ApiResponse;
-use App\Http\Responses\DatatableQueryBuilder;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Spatie\QueryBuilder\AllowedFilter;
 
 /**
  * REST API controller for user management (mobile / external clients).
@@ -32,24 +30,14 @@ class UserController extends Controller
      * List users with search, sort, filters and pagination.
      *
      * GET /api/v1/users?filter[status]=active&sort=-created_at&per_page=15
+     *
+     * Delegates to the shared UserDatatableQuery so admin and API enforce
+     * the same role-hierarchy rule: non-system_admin callers cannot see
+     * users whose highest role outranks their own.
      */
-    public function index(): ApiResponse
+    public function index(Request $request, UserDatatableQuery $query): ApiResponse
     {
-        return DatatableQueryBuilder::for(User::class)
-            ->with(['roles'])
-            ->searchable(['first_name', 'last_name', 'email'])
-            ->sortable(['id', 'first_name', 'last_name', 'email', 'status', 'created_at'])
-            ->filterable([
-                AllowedFilter::exact('status'),
-                AllowedFilter::callback('name', fn (Builder $q, $value) => $q->where(function (Builder $inner) use ($value) {
-                    $escaped = '%'.str_replace(['%', '_'], ['\\%', '\\_'], (string) $value).'%';
-                    $inner->where('first_name', 'like', $escaped)
-                        ->orWhere('last_name', 'like', $escaped);
-                })),
-            ])
-            ->defaultSort('-created_at')
-            ->resource(UserResource::class)
-            ->response();
+        return $query->response($request->user());
     }
 
     /**

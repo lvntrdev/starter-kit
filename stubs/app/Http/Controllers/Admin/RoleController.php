@@ -82,9 +82,18 @@ class RoleController extends Controller
 
     /**
      * Return role data as JSON for dialog usage.
+     *
+     * Mirrors the row-level authorization that edit() / destroy() apply:
+     * the route-level roles.read permission is not enough on its own —
+     * a non-system_admin caller must also outrank the target role,
+     * otherwise this endpoint would leak details of protected roles.
      */
-    public function data(Role $role): ApiResponse
+    public function data(Role $role, CanManageRoleQuery $canManageQuery): ApiResponse
     {
+        if (! $canManageQuery->check(Auth::user(), $role)) {
+            abort(403);
+        }
+
         $role->load('permissions');
 
         return to_api(new RoleResource($role));

@@ -33,7 +33,15 @@ class UserDatatableQuery
 
         return DatatableQueryBuilder::for($query)
             ->searchable(['id', 'first_name', 'last_name', 'email'])
-            ->sortable(['id', AllowedSort::field('full_name', 'first_name'), 'email', 'status', 'created_at'])
+            ->sortable([
+                'id',
+                'first_name',
+                'last_name',
+                AllowedSort::field('full_name', 'first_name'),
+                'email',
+                'status',
+                'created_at',
+            ])
             ->filterable([
                 'status',
                 AllowedFilter::callback('role', function (Builder $q, $value) {

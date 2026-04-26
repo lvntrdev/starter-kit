@@ -36,4 +36,10 @@ return [
     'email_sent' => 'E-posta başarıyla gönderildi.',
     'email_failed' => 'E-posta gönderilemedi. Lütfen mail yapılandırmanızı kontrol edin.',
 
+    // İstemci taraflı HTTP hataları (useApi composable tarafından kullanılır)
+    'error_summary' => 'Hata',
+    'invalid_response' => 'Sunucudan geçersiz yanıt alındı.',
+    'request_failed' => 'İstek başarısız oldu (:status).',
+    'network_error' => 'Ağ hatası. Lütfen tekrar deneyin.',
+
 ];

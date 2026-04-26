@@ -89,21 +89,24 @@
     async function enableTwoFactor() {
         twoFactorProcessing.value = true;
 
-        if (!props.twoFactorEnabled) {
-            await axios.post('/user/two-factor-authentication');
-            // Wait for the new props to land before hitting the QR endpoint
-            // — otherwise Fortify may still report "not enabled" when we ask
-            // for the QR / secret key.
-            await new Promise<void>((resolve) => {
-                router.reload({
-                    only: ['twoFactorEnabled', 'twoFactorConfirmed'],
-                    onFinish: () => resolve(),
+        try {
+            if (!props.twoFactorEnabled) {
+                await axios.post('/user/two-factor-authentication');
+                // Wait for the new props to land before hitting the QR endpoint
+                // — otherwise Fortify may still report "not enabled" when we ask
+                // for the QR / secret key.
+                await new Promise<void>((resolve) => {
+                    router.reload({
+                        only: ['twoFactorEnabled', 'twoFactorConfirmed'],
+                        onFinish: () => resolve(),
+                    });
                 });
-            });
-        }
+            }
 
-        await loadQrAndSetupKey();
-        twoFactorProcessing.value = false;
+            await loadQrAndSetupKey();
+        } finally {
+            twoFactorProcessing.value = false;
+        }
     }
 
     async function loadQrAndSetupKey() {
@@ -132,15 +135,18 @@
     async function disableTwoFactor() {
         twoFactorProcessing.value = true;
 
-        await axios.delete('/user/two-factor-authentication');
+        try {
+            await axios.delete('/user/two-factor-authentication');
 
-        qrCodeSvg.value = '';
-        setupKey.value = '';
-        showRecoveryCodes.value = false;
-        recoveryCodes.value = [];
-        twoFactorProcessing.value = false;
+            qrCodeSvg.value = '';
+            setupKey.value = '';
+            showRecoveryCodes.value = false;
+            recoveryCodes.value = [];
 
-        router.reload({ only: ['twoFactorEnabled', 'twoFactorConfirmed'] });
+            router.reload({ only: ['twoFactorEnabled', 'twoFactorConfirmed'] });
+        } finally {
+            twoFactorProcessing.value = false;
+        }
     }
 
     async function fetchRecoveryCodes() {

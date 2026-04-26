@@ -36,4 +36,10 @@ return [
     'email_sent' => 'Email sent successfully.',
     'email_failed' => 'Failed to send email. Please check your mail configuration.',
 
+    // Client-side HTTP errors (used by useApi composable)
+    'error_summary' => 'Error',
+    'invalid_response' => 'The server returned an invalid response.',
+    'request_failed' => 'Request failed (:status).',
+    'network_error' => 'Network error. Please try again.',
+
 ];
