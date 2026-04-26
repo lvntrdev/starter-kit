@@ -5,6 +5,18 @@ All notable changes to `lvntr/laravel-starter-kit` will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [13.4.7] - 2026-04-26
+
+Single-fix patch — silences the `Duplicate extension names found: ['link']` warning Tiptap printed when `EditorInput` booted. Tiptap v3's `@tiptap/starter-kit` started bundling the Link extension by default, but our editor was still pushing `@tiptap/extension-link` through the optional `props.links` branch with our own `openOnClick: false, autolink: true` config — so two `link` registrations went into the same editor. The fix is a single config flag on the StarterKit call (`link: false`) so the bundled copy is disabled and our manual-push branch stays the single source of truth. Behaviour is identical for both `props.links === false` (no Link at all) and `props.links === true` (manual-push only); only the console noise is gone. Existing consumer apps run `composer update lvntr/laravel-starter-kit && php artisan sk:update` — no migration, no config, no breaking change.
+
+### Fixed
+
+- **Shipped `EditorInput.vue` — duplicate Link extension warning silenced.** Tiptap v3's `@tiptap/starter-kit` bundles the Link extension by default; the editor was also pushing `@tiptap/extension-link` through the optional `props.links` branch, so the editor booted with `Duplicate extension names found: ['link']` in the console. `StarterKit.configure({ heading: { levels: [2, 3, 4] }, link: false })` disables the bundled copy so our manual-push branch (with our own `openOnClick: false, autolink: true` config) is the only source. `props.links === false` cleanly removes Link entirely; `props.links === true` runs only the manual-push branch — same effective behaviour, no warning.
+
+### Upgrade
+
+No breaking changes. `composer update lvntr/laravel-starter-kit && php artisan sk:update` picks up the patch — the fix ships in the same shipped Vue file `sk:update` already tracks; no extra step needed.
+
 ## [13.4.6] - 2026-04-26
 
 Two related build/upgrade fixes that surface when consumers upgrade from a pre-`EditorInput` version of the kit (any 13.4.0 or earlier install) to 13.4.2+. The package's `package.json` is no longer declaring its `@tiptap/*` set as `peerDependencies` + `peerDependenciesMeta.optional` — those declarations were tripping Vite's optional-peer-dep stub fallback (`__vite-optional-peer-dep:@tiptap/extension-table:@lvntr/starter-kit:false`) when resolving from `vendor/lvntr/laravel-starter-kit/`, even on consumer apps that already had the deps installed at the project root. The result was `"Table" is not exported by …` at build time and `does not provide an export named 'BubbleMenu'` at runtime — both produced by Vite's stub module (`export default {}; throw …`) instead of the real package. And `sk:update` now mirrors `sk:install`'s `mergePackageJson()` step so the new `@tiptap/*` set lands in the consumer's `package.json` automatically on upgrade — previously only fresh installs picked them up, leaving every consumer who upgraded from `<13.4.2` to copy 16 dependency entries by hand. Stub-version-wins for shared keys, user extras preserved, idempotent on re-runs.
