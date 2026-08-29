@@ -1798,7 +1798,7 @@
                                         <template v-else-if="column.tag">
                                             <template
                                                 v-for="t in [resolveTag(row, column)]"
-                                                :key="column.key"
+                                                :key="t.label"
                                             >
                                                 <template v-if="t.label === undefined">-</template>
                                                 <Tag
