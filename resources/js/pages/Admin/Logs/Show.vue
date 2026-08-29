@@ -1,25 +1,16 @@
 <script setup lang="ts">
     import { computed, onMounted, reactive, ref } from 'vue';
-    import { Head, router } from '@inertiajs/vue3';
+    import { Head } from '@inertiajs/vue3';
     import { formatDateTime, formatTime } from '@lvntr/components/utils/datetime';
     import { trans } from 'laravel-vue-i18n';
     import { Button } from 'primevue';
     import { useToast } from 'primevue/usetoast';
     import AdminLayout from '@/layouts/AdminLayout.vue';
     import { useApi } from '@/composables/useApi';
-    import { useTheme } from '@/composables/useTheme';
     import logs from '@/routes/logs';
 
-    // Aura: başlık topbar'da; geri butonu dosya başlık çubuğunda (Yenile'nin
-    // sağında) durur — ayrı bir üst AdminPageHeader bloğu gösterilmez. Bu sayfa
-    // AdminLayout'un PARENT'ı olduğundan usePageHeader (provide/inject aşağı akar)
-    // burada çalışmaz; aura'yı doğrudan useTheme ile tespit ederiz.
-    const { theme } = useTheme();
-    const isAura = computed(() => theme.value === 'aura');
-
-    function goBack(): void {
-        router.visit(logs.index.url());
-    }
+    // Aura: başlık ve geri butonu topbar'da (AdminLayout `back-url`'ü oraya
+    // taşır) — bu sayfa ayrı bir geri afordansı çizmez.
 
     interface LogFileMeta {
         name: string;
@@ -279,14 +270,6 @@
                         text
                         :loading="loading"
                         @click="applyFilters"
-                    />
-                    <Button
-                        v-if="isAura"
-                        icon="pi pi-arrow-left"
-                        :label="$t('sk-button.back')"
-                        severity="secondary"
-                        variant="outlined"
-                        @click="goBack"
                     />
                 </div>
             </div>

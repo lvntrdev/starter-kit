@@ -48,15 +48,25 @@
 
     // Aura'da başlık HER sayfada topbar'da durur (geri butonu olsun olmasın).
     const showTitleInTopbar = computed(() => isAura.value && !!props.title);
+    // Aura + geri butonu VAR + başlık topbar'da → geri butonu da topbar'a, başlığın
+    // hemen SOLUNA gider. Aura'nın varsayılan geri-butonu konumu budur.
+    const backInTopbar = computed(() => showTitleInTopbar.value && hasBack.value);
     // Aura + geri butonu VAR + sayfa opt-in → ilk kart geri butonunu host eder
-    // (başlık topbar'da; kart kendi başlığını korur).
-    const titleInCard = computed(() => isAura.value && hasBack.value && props.headerInCard);
+    // (başlık topbar'da; kart kendi başlığını korur). Topbar geri butonunu
+    // host ettiğinde devre dışı kalır — tek bir geri afordansı kalsın.
+    const titleInCard = computed(
+        () => isAura.value && hasBack.value && props.headerInCard && !backInTopbar.value,
+    );
+    const slots = useSlots();
+    const hasPageActions = computed(() => !!slots['page-actions']);
     // AdminPageHeader bloğu: non-aura'da her zaman; aura'da yalnızca geri butonu
-    // varken VE karta gömülmüyorken (ör. Logs/Show) gösterilir.
+    // varken VE karta gömülmüyorken gösterilir. Geri butonu topbar'a taşındığında
+    // blok yalnızca sayfa aksiyonları için ayakta kalır (aksiyon yoksa hiç çizilmez).
     const showPageHeader = computed(() => {
         if (!isAura.value) return true;
         if (!hasBack.value) return false;
-        return !props.headerInCard;
+        if (props.headerInCard) return false;
+        return !backInTopbar.value || hasPageActions.value;
     });
 
     function goBack() {
@@ -151,6 +161,8 @@
         :sidebar-style="sidebarStyle"
         :page-title="showTitleInTopbar ? title : ''"
         :page-subtitle="showTitleInTopbar ? subtitle : ''"
+        :show-back="backInTopbar"
+        @back="goBack"
         @toggle-sidebar="toggle"
         @toggle-dark="toggleDark"
         @set-accent="setAccent"
@@ -163,7 +175,7 @@
       v-if="showPageHeader"
       :title="title"
       :subtitle="subtitle"
-      :back-url="backUrl"
+      :back-url="backInTopbar ? false : backUrl"
       :hide-title="showTitleInTopbar"
     >
       <template #actions>

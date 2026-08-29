@@ -128,9 +128,17 @@ html[data-sk-theme='aura'] .admin-header__tag--debug {
     color: #ffffff;
 }
 
-/* Page title in the topbar (back-button-less pages) — sits after the dev/debug
-   tags. Block only renders in aura (the layout passes `pageTitle` solely then),
-   but scoped per the runtime contract regardless. */
+/* Back button in the topbar — aura hosts the page title in the bar, so the back
+   affordance follows it and sits immediately to its LEFT. Reuses the header
+   icon-button skin; the negative margin tightens it against the title group
+   (which carries its own `ml-1`) so the pair reads as one unit. */
+html[data-sk-theme='aura'] .admin-header__back {
+    @apply -mr-1 shrink-0;
+}
+
+/* Page title in the topbar — sits after the dev/debug tags (and after the back
+   button when the page has one). Block only renders in aura (the layout passes
+   `pageTitle` solely then), but scoped per the runtime contract regardless. */
 html[data-sk-theme='aura'] .admin-header__page {
     @apply ml-1 flex flex-col justify-center;
 }
