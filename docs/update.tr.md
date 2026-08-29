@@ -132,6 +132,8 @@ Güncellemeyle yeni ayar grupları veya auth davranışları geldiyse şu ekranl
 - Ayarlar -> File Manager
 - Profil güvenlik sekmeleri
 
+Bu sürüm, `APP_KEY`'den bağımsız olarak hassas ayarlar ve 2FA secret'ları için adanmış bir `DATA_ENCRYPTION_KEY` ekliyor. **Mevcut bir kurulumun hiçbir işlem yapması gerekmiyor** — `DATA_ENCRYPTION_KEY` boş kalır, şifreleme tıpkı önceki gibi `APP_KEY` kullanmaya devam eder ve `composer update` / `sk:update` benimsemeyi zorlamaz. Adanmış anahtarı benimsemek opt-in'dir: `encryption:key` → `encryption:rekey` → `encryption:health` anlatımı için [Veri Şifreleme](encryption.tr.md) belgesine, bu kurulumu yeni bir sunucuya taşımak üzereyseniz [sunucu taşıma runbook'u](server-migration-runbook.tr.md)'na bakın.
+
 ## Dosya Güncelleme Stratejisi Özeti
 
 - Paket sahipli çekirdek yollar otomatik yenilenir — ancak yalnızca kopyanız kurulum/güncelleme anında kaydedilen hash ile hâlâ eşleşiyorsa. Buradaki tek girdi `app/Enums/PermissionEnum.php` ve ona eklediğiniz bir yetenek case'i ezilmek yerine korunur ve raporlanır. Paketin yeni case'lerini elle birleştirin (`vendor/lvntr/laravel-starter-kit/stubs/` altındaki aynı göreli yol ile karşılaştırın) ya da `--force` ile paket sürümünü alıp düzenlemelerinizi bırakın.

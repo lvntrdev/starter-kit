@@ -242,4 +242,69 @@ return [
         'csp_extra_origins' => [],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Data encryption (DataEncrypterFactory, DataCrypt)
+    |--------------------------------------------------------------------------
+    |
+    | The kit encrypts sensitive `settings.value` rows (mail password, storage
+    | secrets, Turnstile secret, API tokens) plus the Fortify 2FA secret and
+    | recovery codes. Historically ALL of that rode on APP_KEY, which means one
+    | `php artisan key:generate` during a server migration makes every one of
+    | those values permanently unreadable — and silently, because
+    | SettingService swallows the decrypt failure and returns null.
+    |
+    | DATA_ENCRYPTION_KEY decouples that data from APP_KEY. It is OPT-IN: leave
+    | it blank and the primary key stays APP_KEY, behaviourally identical to
+    | today. `php artisan encryption:key` adopts a dedicated key on an existing
+    | install. See docs/encryption.md and docs/server-migration-runbook.md.
+    |
+    | KEY RESOLUTION CONTRACT — implemented by DataEncrypterFactory, locked by
+    | tests/Feature/Encryption and tests/Feature/BackwardCompat:
+    |
+    |   DATA_ENCRYPTION_KEY blank -> primary = APP_KEY
+    |                                chain   = DATA_ENCRYPTION_PREVIOUS_KEYS
+    |   DATA_ENCRYPTION_KEY set   -> primary = DATA_ENCRYPTION_KEY
+    |                                chain   = DATA_ENCRYPTION_PREVIOUS_KEYS,
+    |                                          then APP_KEY LAST
+    |
+    | APP_KEY is appended to the read chain whenever it differs from the
+    | primary, so every row written before adoption keeps decrypting with no
+    | command run at all. Laravel's own APP_PREVIOUS_KEYS list rides along for
+    | the same reason: every encrypted setting and every Fortify 2FA column used
+    | to be read through the framework's `encrypter` binding, which honours it,
+    | so an install part-way through an APP_KEY rotation would otherwise lose
+    | those rows the moment it upgraded. The chain is ordered, empties are dropped and
+    | duplicates are removed. A malformed key is NEVER skipped silently — it
+    | throws and names the offending env var, because a silently skipped key
+    | during rotation looks exactly like data loss and pushes an operator into
+    | causing the real thing by clearing DATA_ENCRYPTION_PREVIOUS_KEYS.
+    |
+    | `cipher` deliberately has NO literal default here. Left null the factory
+    | falls back to `app.cipher`, then to DataEncrypterFactory::DEFAULT_CIPHER.
+    | Two reasons, both about not breaking a live app:
+    |   - An app that changed `app.cipher` (e.g. AES-128-CBC with a 16-byte
+    |     APP_KEY) would otherwise get a 256-bit cipher forced onto its 128-bit
+    |     APP_KEY and throw on every encrypted read.
+    |   - mergeConfigFrom is a SHALLOW merge, so an app whose published copy of
+    |     this file predates this block hides the whole `encryption` array and
+    |     reads null for every key below. A literal default here would make
+    |     those two populations resolve DIFFERENT ciphers. Every factory read
+    |     is null-safe for exactly that reason — do not add a literal default
+    |     the null path cannot reproduce (same discipline as
+    |     CheckResourcePermission::ALLOW_UNRESOLVED_DEFAULT above).
+    |
+    | When BOTH ciphers are set they must agree. APP_KEY always closes the
+    | read chain and one cipher serves the whole chain, so the factory refuses
+    | a DATA_ENCRYPTION_CIPHER that differs from `app.cipher` instead of
+    | decrypting APP_KEY-written rows with the wrong algorithm.
+    |
+    */
+
+    'encryption' => [
+        'key' => env('DATA_ENCRYPTION_KEY'),
+        'previous_keys' => env('DATA_ENCRYPTION_PREVIOUS_KEYS'),
+        'cipher' => env('DATA_ENCRYPTION_CIPHER'),
+    ],
+
 ];

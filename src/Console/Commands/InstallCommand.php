@@ -5,6 +5,7 @@ namespace Lvntr\StarterKit\Console\Commands;
 use App\Models\User;
 use Composer\Autoload\ClassLoader;
 use Illuminate\Console\Command;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Lvntr\StarterKit\Console\Commands\Concerns\MirrorsAiSkills;
 use Lvntr\StarterKit\StarterKitServiceProvider;
+use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
 use PhpParser\Error;
 use PhpParser\Node;
 use PhpParser\Node\Stmt;
@@ -268,6 +270,16 @@ class InstallCommand extends Command
             // written into an already-seeded .env.
             $this->step('Ensuring .env file', function () use ($isFirstInstall) {
                 $this->ensureEnvFile($isFirstInstall);
+
+                // The dedicated data key is generated HERE, not at the end of
+                // the install: step 8 runs the seeders, and _03_SettingSeeder
+                // encrypts mail/storage secrets through SettingService. A key
+                // created after that leaves those rows written under APP_KEY
+                // while .env advertises a dedicated key — the app then looks
+                // protected, and the first `key:generate` on a server move
+                // destroys exactly the values this feature exists to keep.
+                // Guarded and first-install-only, so a re-run is a no-op.
+                $this->ensureDataEncryptionKey(base_path('.env'), $isFirstInstall);
             });
 
             // 2. Database configuration (writes DB_* into the now-seeded .env)
@@ -437,12 +449,21 @@ class InstallCommand extends Command
                 $this->installFrontend();
             }
 
-            // 12b. Finalize the application key as the last setup action. ensureAppKey
-            // is guarded — it generates APP_KEY only when the .env value is blank, so
-            // an existing key (e.g. on re-install) is preserved and already-encrypted
-            // data / sessions stay decryptable.
-            $this->step('Finalizing application key', function () {
+            // 12b. Finalize the encryption keys as the last setup action. Both
+            // helpers are guarded — they generate only when the .env value is blank,
+            // so an existing key (e.g. on re-install) is preserved and
+            // already-encrypted data / sessions stay decryptable. The order matters:
+            // key:generate rewrites .env, so the dedicated-key helper must read the
+            // file AFTER it, never from a body captured before.
+            //
+            // The dedicated key normally already exists by now — it is generated
+            // back at step 1c, before the seeders write anything encrypted. This
+            // call is the safety net for the path where step 1c could not write
+            // it (unsupported cipher at that moment, an APP_KEY guard abort); it
+            // is a no-op whenever the key is already there.
+            $this->step('Finalizing encryption keys', function () use ($isFirstInstall) {
                 $this->ensureAppKey(base_path('.env'));
+                $this->ensureDataEncryptionKey(base_path('.env'), $isFirstInstall);
             });
 
             // 13. Save stub hashes for update tracking
@@ -943,10 +964,23 @@ class InstallCommand extends Command
      * .env.example wholesale) and no one else. An existing app opts in by
      * writing the line itself — see docs/UPGRADE.md.
      *
+     * The two DATA_ENCRYPTION_* keys are here for the same reason in a harsher
+     * currency. Merging a BLANK DATA_ENCRYPTION_KEY line would be inert, but
+     * merging the pair hands an installed app a placeholder that reads as
+     * "adoption is configured" while nothing has been rekeyed, and it puts an
+     * empty DATA_ENCRYPTION_PREVIOUS_KEYS next to it — the exact line whose
+     * clearing is the one irreversible operator action in this feature. An
+     * existing app adopts a dedicated key through `php artisan encryption:key`,
+     * which preserves the current key in the previous-key list first; it never
+     * arrives as a side effect of re-running the installer. See
+     * docs/encryption.md and docs/server-migration-runbook.md.
+     *
      * @var list<string>
      */
     private const FIRST_INSTALL_ONLY_ENV_KEYS = [
         'STARTER_KIT_ALLOW_UNRESOLVED_ROUTES',
+        DataEncrypterFactory::PRIMARY_ENV_KEY,
+        DataEncrypterFactory::PREVIOUS_ENV_KEY,
     ];
 
     /**
@@ -1032,6 +1066,156 @@ class InstallCommand extends Command
         }
 
         $this->callSilently('key:generate', ['--force' => true]);
+    }
+
+    /**
+     * Seed a dedicated DATA_ENCRYPTION_KEY, on a FIRST install only.
+     *
+     * WHY THIS IS NOT JUST A BLANK CHECK. The blank check alone is not the
+     * safety property here — $isFirstInstall is. On a re-install of a populated
+     * app the key is blank too (FIRST_INSTALL_ONLY_ENV_KEYS keeps the merge
+     * from ever writing the line), and generating one there would silently move
+     * the WRITE key off APP_KEY on a live install. That does not lose data —
+     * DataEncrypterFactory keeps APP_KEY last in the read chain — but it splits
+     * the ciphertext across two keys behind the operator's back, with no
+     * `encryption:rekey` run and nothing in DATA_ENCRYPTION_PREVIOUS_KEYS to
+     * describe the split. Adoption on an existing app is an explicit
+     * `php artisan encryption:key`, which preserves the current key first.
+     *
+     * On a first install the reasoning inverts: ensureEnvFile() has just copied
+     * .env.example wholesale, so there is no prior key and no encrypted row,
+     * and a key generated here is the one every value will ever have been
+     * written with. Nothing is added to DATA_ENCRYPTION_PREVIOUS_KEYS on
+     * purpose — a fresh install has no retired key, and copying APP_KEY in
+     * there would duplicate that secret into a second env var and keep it a
+     * valid data key forever, including after APP_KEY is rotated.
+     *
+     * APP_KEY is never touched: the rewrite is compared against the original
+     * before the write, and a mismatch aborts with nothing on disk. The key is
+     * written to .env and never printed, logged or echoed.
+     */
+    private function ensureDataEncryptionKey(string $envPath, bool $isFirstInstall): void
+    {
+        if (! $isFirstInstall || ! $this->files->exists($envPath)) {
+            return;
+        }
+
+        $content = $this->files->get($envPath);
+
+        // A non-blank value already in the file wins — a re-run or a resumed
+        // first install that already generated a key must keep it, or every row
+        // written in between becomes unreadable. The LAST assignment is read,
+        // not the first: Laravel's dotenv repository only protects variables
+        // defined OUTSIDE the file, so a later duplicate line inside .env is
+        // what the running app ends up with.
+        $existing = preg_match_all(
+            $this->envAssignmentPattern(DataEncrypterFactory::PRIMARY_ENV_KEY),
+            $content,
+            $matches,
+        ) > 0 ? trim((string) end($matches[1])) : '';
+
+        if ($existing !== '') {
+            return;
+        }
+
+        $cipher = (new DataEncrypterFactory)->cipher();
+
+        // Encrypter::generateKey() falls back to 32 bytes for a cipher it does
+        // not know, which writes a key every later read rejects. Probe with NUL
+        // bytes (no real material on this path) and skip rather than write a
+        // key that would break the app; the factory then stays on the APP_KEY
+        // fallback, which is the pre-feature behaviour.
+        if (! Encrypter::supported(str_repeat("\0", 16), $cipher)
+            && ! Encrypter::supported(str_repeat("\0", 32), $cipher)) {
+            $this->components->warn(
+                'Cipher ['.$cipher.'] is not supported, so no '.DataEncrypterFactory::PRIMARY_ENV_KEY
+                .' was generated. The app falls back to '.DataEncrypterFactory::APP_ENV_KEY
+                .'; fix the cipher and run `php artisan encryption:key`.'
+            );
+
+            return;
+        }
+
+        $value = 'base64:'.base64_encode(Encrypter::generateKey($cipher));
+
+        $line = DataEncrypterFactory::PRIMARY_ENV_KEY.'='.$value;
+
+        $updated = $this->replaceOrAppendEnvLine($content, DataEncrypterFactory::PRIMARY_ENV_KEY, $line);
+
+        // Fail closed on the candidate body, before it reaches disk. APP_KEY is
+        // what keeps every pre-adoption row readable; a rewrite that moved it
+        // would be silent, irreversible data loss.
+        if ($this->appKeyLines($content) !== $this->appKeyLines($updated)) {
+            $this->components->warn(
+                'Skipped writing '.DataEncrypterFactory::PRIMARY_ENV_KEY.': the rewrite would have '
+                .'modified an '.DataEncrypterFactory::APP_ENV_KEY.' line. Nothing was written.'
+            );
+
+            return;
+        }
+
+        $this->files->put($envPath, $updated);
+
+        // The install process has ALREADY booted with this key absent, so the
+        // seeders that run later in this same run would otherwise encrypt every
+        // sensitive setting under APP_KEY while the file on disk advertises a
+        // dedicated key. Push the new value into the live config and drop the
+        // memoised encrypter so the rest of THIS run writes with it.
+        config(['starter-kit.encryption.key' => $value]);
+
+        StarterKitServiceProvider::flushDataEncrypter();
+    }
+
+    /**
+     * Replace every uncommented assignment of $key with $line, filling a
+     * commented placeholder if that is all there is, appending otherwise.
+     *
+     * Every occurrence is rewritten, not just the first: phpdotenv lets a later
+     * duplicate win, so leaving a stale line behind would hand the app a key
+     * this method did not choose. preg_replace_callback keeps key material from
+     * ever being read as a backreference.
+     */
+    private function replaceOrAppendEnvLine(string $content, string $key, string $line): string
+    {
+        $assignment = $this->envAssignmentPattern($key);
+
+        if (preg_match($assignment, $content) === 1) {
+            return (string) preg_replace_callback($assignment, static fn (): string => $line, $content);
+        }
+
+        $commented = '%^[ \t]*#[ \t]*(?:export[ \t]+)?'.preg_quote($key, '%').'[ \t]*=.*$%m';
+
+        if (preg_match($commented, $content) === 1) {
+            return (string) preg_replace_callback($commented, static fn (): string => $line, $content, 1);
+        }
+
+        return rtrim($content, "\n")."\n".$line."\n";
+    }
+
+    /**
+     * Pattern matching an uncommented assignment of $key, capturing its value.
+     */
+    private function envAssignmentPattern(string $key): string
+    {
+        return '%^[ \t]*(?:export[ \t]+)?'.preg_quote($key, '%').'[ \t]*=(.*)$%m';
+    }
+
+    /**
+     * Every APP_KEY assignment line, commented ones included, verbatim.
+     *
+     * Scoped to assignments so prose naming the key cannot trip the guard.
+     *
+     * @return list<string>
+     */
+    private function appKeyLines(string $content): array
+    {
+        preg_match_all(
+            '%^[ \t]*#?[ \t]*(?:export[ \t]+)?'.preg_quote(DataEncrypterFactory::APP_ENV_KEY, '%').'[ \t]*=.*$%m',
+            $content,
+            $matches,
+        );
+
+        return $matches[0];
     }
 
     /**

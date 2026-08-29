@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Lvntr\StarterKit\Console\Doctor\Checks\ActivityLogSecretsCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\ConfigCacheCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\DatabaseConnectionCheck;
+use Lvntr\StarterKit\Console\Doctor\Checks\DataEncryptionKeyCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\FileManagerDiskCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\LogChannelCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\LogStackCheck;
@@ -91,6 +92,7 @@ class DoctorCommand extends Command
             new ScheduleConfiguredCheck,
             new TimezoneStorageCheck,
             new ActivityLogSecretsCheck,
+            new DataEncryptionKeyCheck,
             new PermissionResourcesDriftCheck,
             new UnresolvedRouteCheck,
             new MailDriverCheck,

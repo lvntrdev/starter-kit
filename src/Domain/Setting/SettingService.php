@@ -4,8 +4,8 @@ namespace Lvntr\StarterKit\Domain\Setting;
 
 use App\Models\Setting;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Lvntr\StarterKit\Support\Encryption\DataCrypt;
 use Lvntr\StarterKit\Support\HtmlSanitizer;
 
 /**
@@ -83,7 +83,7 @@ class SettingService
         Setting::query()->updateOrCreate(
             ['group' => $group, 'key' => $key],
             [
-                'value' => $isSensitive && $value !== null ? Crypt::encryptString((string) $value) : $value,
+                'value' => $isSensitive && $value !== null ? DataCrypt::encryptString((string) $value) : $value,
                 'encrypted' => $isSensitive,
             ],
         );
@@ -115,7 +115,7 @@ class SettingService
         Setting::query()->firstOrCreate(
             ['group' => $group, 'key' => $key],
             [
-                'value' => $isSensitive && $value !== null ? Crypt::encryptString((string) $value) : $value,
+                'value' => $isSensitive && $value !== null ? DataCrypt::encryptString((string) $value) : $value,
                 'encrypted' => $isSensitive,
             ],
         );
@@ -154,7 +154,7 @@ class SettingService
                 Setting::query()->updateOrCreate(
                     ['group' => $g, 'key' => $k],
                     [
-                        'value' => $isSensitive && $value !== null ? Crypt::encryptString((string) $value) : $value,
+                        'value' => $isSensitive && $value !== null ? DataCrypt::encryptString((string) $value) : $value,
                         'encrypted' => $isSensitive,
                     ],
                 );
@@ -230,7 +230,7 @@ class SettingService
     {
         if ($encrypted && $value !== null) {
             try {
-                return Crypt::decryptString((string) $value);
+                return DataCrypt::decryptString((string) $value);
             } catch (\Exception) {
                 return null;
             }

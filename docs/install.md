@@ -84,6 +84,13 @@ TURNSTILE_SECRET_KEY=
 SESSION_ENCRYPT=true
 SESSION_SECURE_COOKIE=true
 
+# Dedicated key for sensitive settings (settings.value) and 2FA secrets,
+# independent of APP_KEY. `php artisan key:generate` never touches these.
+# Generated automatically on a FIRST install; carried together with .env on
+# every server migration (see docs/server-migration-runbook.md).
+DATA_ENCRYPTION_KEY=
+DATA_ENCRYPTION_PREVIOUS_KEYS=
+
 # Passport OAuth2 keys — the recommended production pattern is to load these
 # via env instead of committing the key files at storage/oauth-*.key.
 # Run `php artisan passport:keys` once, move the generated strings into these
@@ -95,6 +102,8 @@ SESSION_SECURE_COOKIE=true
 `STARTER_KIT_ALLOW_UNRESOLVED_ROUTES=false` reaches a **new** `.env` only. An existing app upgrading the package keeps the permissive default and is never flipped by a release — see [Upgrade Notes](UPGRADE.md#unresolved-route-fail-closed-is-opt-in-for-an-existing-install). If a route of yours starts returning 403 after a fresh install, `php artisan sk:doctor --only=unresolved-routes` names every route whose permission cannot be derived; give the route a `resource.action` name, list it under `permissions.unrestricted_routes` in `config/starter-kit.php` if it is deliberately permission-free, or set the key back to `true` while you sort it out.
 
 Do not set `APP_TIMEZONE` to the site's regional timezone: it controls Laravel's storage timezone. Set `APP_DISPLAY_TIMEZONE` instead, or choose the site fallback in **Settings → General** after installation. See [Timezones](timezone.md) for per-user overrides and the complete resolution chain.
+
+`DATA_ENCRYPTION_KEY` and `DATA_ENCRYPTION_PREVIOUS_KEYS` protect sensitive settings values and 2FA secrets independently of `APP_KEY` — a fresh install generates the key automatically, and no action is required. What matters is `.env` discipline going forward: a server migration must carry both keys along with the rest of `.env`, and `php artisan key:generate` must never be treated as a substitute. See [Data Encryption](encryption.md) for the full key-resolution contract and rotation commands, and the [server migration runbook](server-migration-runbook.md) before moving to a new server.
 
 ## 2. Require The Package
 

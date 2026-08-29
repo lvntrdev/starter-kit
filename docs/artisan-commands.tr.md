@@ -22,6 +22,9 @@ Bu döküman starter kit için komut referansıdır. DDD ile ilgili mimari notla
 | `php artisan apidog:sync`                 | Scramble OpenAPI spec'ini Apidog'a gönderir                      |
 | `php artisan sk:redact-activity-secrets`  | Mevcut aktivite kayıtlarından kimlik bilgilerini geri döndürülemez biçimde kaldırır |
 | `php artisan file-manager:purge-trash`    | Eski Dosya Yöneticisi çöpünü kalıcı olarak siler                 |
+| `php artisan encryption:key`              | Adanmış bir `DATA_ENCRYPTION_KEY` üretir, eski anahtarı korur    |
+| `php artisan encryption:rekey`            | Ayarları ve 2FA secret'larını birincil şifreleme anahtarına taşır |
+| `php artisan encryption:health`           | Her şifreli değerin hangi anahtara ihtiyaç duyduğunu raporlar (salt-okunur) |
 
 ## `sk:doctor`
 
@@ -62,6 +65,7 @@ Kontroller (ad → `--only` seçicisi):
 | Activity Log Secrets   | `activity-log-secrets`   |
 | Permission Matrix      | `permission-matrix`      |
 | Unresolved Routes      | `unresolved-routes`      |
+| Data Encryption Key    | `data-encryption-key`    |
 
 `ActivityLogSecretsCheck`, bir `activity_log` satırı hâlâ parola hash'i, token veya secret içeriyorsa FAIL döndürür. Bu durum, paket güncellenip (yeni satırlardaki sızıntı anında kapanır) `php artisan migrate` çalıştırılmadığında, yani geçmiş satırlar hiç temizlenmediğinde ortaya çıkar. Veritabanını yedekleyip `php artisan migrate` ya da `php artisan sk:redact-activity-secrets` çalıştırın; kaldırma geri döndürülemez. Aktivite kaydı tablosunun bulunmaması veya JSON payload kolonu olmaması OK, decode edilemeyen JSON payload WARN, veritabanı hatası ise başarı değil WARN sonucu verir.
 
@@ -72,6 +76,8 @@ Kontrol, tam temizlik geçişi değil **sınırlı ve salt-okunur bir sondadır*
 `TimezoneStorageCheck`, `config('app.timezone')` tam olarak `UTC` değilse FAIL döndürür. Bu ayar doğruysa varsayılan bağlantıdan ayrıca `SELECT @@session.time_zone` değerini okur. MySQL/MariaDB bağlantısında yalnız `+00:00` ve `UTC` başarılıdır; `SYSTEM` ve diğer tüm değerler FAIL döndürür, çünkü uygulama satırları tutarlı okurken bile `TIMESTAMP` değerleri diskte offset'li olabilir. Sorgu hatası veya eksik sonuç hiçbir zaman başarı sayılmaz, WARN döndürür. Diğer veritabanı sürücüleri oturum kontrolünü uygulanamaz olarak belirten OK sonucu verir. Gösterim yapılandırmasını `APP_DISPLAY_TIMEZONE` ile ayrı tutun; bağlantı sözleşmesi ve mevcut veri dönüşüm rehberi için [Saat Dilimleri](timezone.tr.md) belgesine bakın.
 
 `UnresolvedRouteCheck`, kitin `check.permission` middleware'ini taşıdığı hâlde hiçbir izin türetilemeyen her route için FAIL döndürür — ability map'in tanıdığı bir `<resource>.<action>` adı yok, açık bir `check.permission:<perm>` argümanı yok, muafiyet listesinde de kaydı yok. Böyle bir route controller'ına **yetkilendirilmeden** ulaşır. Varsayılan olarak middleware onu geçiriyor ve kısıtlanmış bir uyarı logluyor; **hiçbir sürüm bunu mevcut bir kurulum için değiştirmiyor**. `STARTER_KIT_ALLOW_UNRESOLVED_ROUTES=false` (config `starter-kit.permissions.allow_unresolved`) vermek listelenen her route'u 403'e çevirir — opt-in budur ve yeni kurulan bir proje bu satırla zaten geliyor. Kontrol bu ayardan bağımsız olarak FAIL raporlar; bu bilinçlidir — görevi, mevcut yapılandırmanın neye izin verdiğini değil, dönüşün neyi reddedeceğini göstermektir. Paketin gönderdiği route'lar `CheckResourcePermission` içindeki route-adı haritası sayesinde kendiliğinden çözülür; yani bu kontrolün listelediği şey sizin kendi route'larınız ve adını değiştirdiğiniz kit route'larıdır. Her birini ya haritada karşılığı olan bir `<resource>.<action>` adına çevirerek, ya açık bir izin argümanıyla kapıya alarak, ya da bilinçli olarak izinsizse `starter-kit.permissions.unrestricted_routes` altında tanımlayarak düzeltin. Sıralı yol için [UPGRADE.tr.md](UPGRADE.tr.md) belgesine bakın.
+
+`DataEncryptionKeyCheck` yalnızca config okur — ne tablo taraması ne şifre çözme — ve asla FAIL döndürmez. Adanmış anahtar yapılandırılmamışsa (`DATA_ENCRYPTION_KEY` boş) WARN döner: hassas ayarlar ve 2FA secret'ları hâlâ `APP_KEY` ile şifrelidir ve bir sunucu taşımasında çalıştırılacak `php artisan key:generate` bunları okunamaz hale getirir. Adanmış anahtar varken `DATA_ENCRYPTION_PREVIOUS_KEYS` boş değilse WARN döner: rotasyon yarım kalmıştır. Adanmış anahtar varken önceki-anahtar listesi boşsa OK döner. Bkz. [Veri Şifreleme](encryption.tr.md) ve aşağıdaki `encryption:key` / `encryption:rekey` / `encryption:health`.
 
 Çıkış kodları:
 
@@ -359,6 +365,55 @@ php artisan sk:redact-activity-secrets --all
 | `--all` | Hassas anahtar ön filtresini kullanmak yerine tüm satırları tarar |
 
 Komut idempotent'tir ve eski bir yedek geri yüklendikten sonra yeniden çalıştırılmalıdır. Bir JSON payload'ı decode edilemezse sayılır, uyarıyla bildirilir ve değiştirilmeden bırakılır; hâlâ kimlik bilgisi içerebileceği için o satırı elle inceleyin.
+
+## `encryption:key`
+
+Adanmış bir `DATA_ENCRYPTION_KEY` üretir ve mevcut birincil anahtarı `DATA_ENCRYPTION_PREVIOUS_KEYS` içinde korur. Tam benimseme ve rotasyon anlatımı için [Veri Şifreleme](encryption.tr.md) belgesine bakın.
+
+```bash
+php artisan encryption:key
+php artisan encryption:key --show
+php artisan encryption:key --force
+```
+
+| Flag | Amaç |
+| --- | --- |
+| `--show` | Yeni üretilen anahtarı yazdırır, `.env`'e hiçbir şey yazmaz |
+| `--force` | Ortam production gibi görünse bile çalışır |
+
+Varsayılan bir çalıştırma sırasıyla: (1) mevcut birincil anahtarı çözer (`DATA_ENCRYPTION_KEY`, ya da ilk benimsemede `APP_KEY`); (2) yeni rastgele bir anahtar üretir; (3) eski birinciyi `DATA_ENCRYPTION_PREVIOUS_KEYS`'in başına ekler; (4) ancak ondan sonra yeni `DATA_ENCRYPTION_KEY`'i yazar. `APP_KEY`'e hiçbir yolda dokunulmaz. Komut, `--force` verilmeden production ortamında çalışmayı reddeder. Bitince `encryption:rekey`, ardından `encryption:health` çalıştırın; `DATA_ENCRYPTION_PREVIOUS_KEYS`'i yalnızca health OK raporladıktan sonra temizleyin.
+
+## `encryption:rekey`
+
+Ayarları ve 2FA secret'larını birincil şifreleme anahtarına yeniden şifreler. Bunu bir bakım penceresinde çalıştırmadan önce [sunucu taşıma runbook'u](server-migration-runbook.tr.md)'nu okuyun.
+
+```bash
+php artisan encryption:rekey
+php artisan encryption:rekey --dry-run
+php artisan encryption:rekey --only=settings
+php artisan encryption:rekey --chunk=500
+```
+
+| Flag | Amaç |
+| --- | --- |
+| `--dry-run` | Her şifre çözme denemesini yapar, özetini yazdırır ama tek bir bayt yazmaz |
+| `--only=<yüzey>` | Çalışmayı `settings` veya `two-factor` ile sınırlar (birleştirmek için virgülle ayırın) |
+| `--chunk=<satır>` | Her turda okunan, kilitlenen ve yeniden yazılan satır sayısı (varsayılan 200, en fazla 2000) |
+
+Her satır, çözümleme zincirindeki her anahtara sırayla denenir. Satırı çözen ilk anahtar, birincil anahtarla yeniden şifreler ve geri yazar; zaten birincil anahtarda olan bir satır yazılmadan atlanır. **Hiçbir** anahtarla çözülemeyen bir satır bayt bayt değiştirilmeden bırakılır, sayılır ve özet içinde kimliğiyle (`settings.key` / `users.id`) listelenir — asla null'lanmaz, silinmez veya üzerine yazılmaz.
+
+## `encryption:health`
+
+Her şifreli değerin hangi anahtara ihtiyaç duyduğunu ve `DATA_ENCRYPTION_PREVIOUS_KEYS`'in temizlenip temizlenemeyeceğini raporlar. Salt-okunur — hiçbir anahtar materyali asla yazdırılmaz.
+
+```bash
+php artisan encryption:health
+php artisan encryption:health --json
+```
+
+- `--json`, `sk:doctor --json` ile aynı şekli taklit eden makine okunabilir bir rapor üretir
+
+Kararlar: her şey birincil anahtardaysa ve çözülemeyen yoksa → "`DATA_ENCRYPTION_PREVIOUS_KEYS` temizlenebilir" (çıkış `0`); hâlâ önceki bir anahtarda satır varsa → "Önce `encryption:rekey` çalıştırın; `DATA_ENCRYPTION_PREVIOUS_KEYS`'i TEMİZLEMEYİN"; çözülemeyen satır varsa → en yüksek sesli hata, etkilenen satırları ve eksik anahtarı adlandırır. Tam taranamayan bir yüzey (eksik tablo, sorgu hatası) kararı yalnızca aşağı çeker, asla yukarı çekmez.
 
 ## `file-manager:purge-trash`
 

@@ -9,16 +9,22 @@ use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\CommandFinished;
+use Illuminate\Container\Container;
+use Illuminate\Contracts\Encryption\Encrypter as EncrypterContract;
+use Illuminate\Contracts\Encryption\StringEncrypter;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Translation\FileLoader;
 use Inertia\Inertia;
+use Laravel\Fortify\Fortify;
 use Laravel\Passport\Passport;
 use Lvntr\StarterKit\Domain\ActivityLog\Queries\ActivityLogDatatableQuery;
 use Lvntr\StarterKit\Domain\ApiClient\Actions\CreateApiClientAction;
@@ -101,6 +107,7 @@ use Lvntr\StarterKit\Http\Middleware\SecurityHeaders;
 use Lvntr\StarterKit\Http\Middleware\SetLocale;
 use Lvntr\StarterKit\Http\Middleware\ValidateTurnstile;
 use Lvntr\StarterKit\Http\Responses\ApiResponse;
+use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
 use Lvntr\StarterKit\Support\HtmlSanitizer;
 use Lvntr\StarterKit\Support\MediaPathGenerator;
 use Lvntr\StarterKit\Support\Scramble\ApiResponseExtension;
@@ -184,6 +191,65 @@ class StarterKitServiceProvider extends ServiceProvider
         // the framework's `translation.loader` so the vendor lang dir is inserted
         // BETWEEN the framework defaults and the consumer's app/lang path.
         $this->registerNamespacelessKitTranslations();
+
+        $this->registerDataEncryption();
+    }
+
+    /**
+     * Bind the data-at-rest encrypter.
+     *
+     * Two singletons:
+     *   - DataEncrypterFactory::class — owns the memoised key chain and cipher,
+     *     so flushDataEncrypter() has a single place to clear.
+     *   - DataEncrypterFactory::BINDING — the Encrypter itself. DataCrypt is the
+     *     facade over it and the Fortify shim resolves it by that name.
+     *
+     * Both are LAZY on purpose. Nothing here reads a key, so a request that
+     * touches no encrypted value never builds an Encrypter. Resolving eagerly
+     * would turn "no APP_KEY yet" (fresh clone, `composer install` before .env,
+     * `package:discover`) and "malformed DATA_ENCRYPTION_KEY" into a boot-time
+     * fatal on every command and every request, instead of an error confined to
+     * the paths that actually touch ciphertext.
+     */
+    private function registerDataEncryption(): void
+    {
+        $this->app->singleton(DataEncrypterFactory::class);
+
+        $this->app->singleton(
+            DataEncrypterFactory::BINDING,
+            static fn ($app): Encrypter => $app->make(DataEncrypterFactory::class)->make(),
+        );
+    }
+
+    /**
+     * Drop every memoised copy of the data encrypter so the next use re-reads
+     * the key configuration.
+     *
+     * Callers: the encryption commands after they rewrite .env, an Octane worker
+     * whose config was reloaded, and any test that swaps DATA_ENCRYPTION_KEY
+     * mid-run. All four caches must go together — the factory's own chain, both
+     * container instances, and the facade's resolved instance. Leaving one
+     * behind lets reads and writes land on different keys, which is
+     * indistinguishable from data loss at the call site.
+     */
+    public static function flushDataEncrypter(): void
+    {
+        // Deliberately NOT Container::getInstance(): that call CREATES a bare
+        // container and installs it globally when none is set, which would
+        // replace the running Application for the rest of the process. Read the
+        // facade's application instead, which is null-safe.
+        $app = Facade::getFacadeApplication();
+
+        if ($app instanceof Container) {
+            if ($app->resolved(DataEncrypterFactory::class)) {
+                $app->make(DataEncrypterFactory::class)->flush();
+            }
+
+            $app->forgetInstance(DataEncrypterFactory::class);
+            $app->forgetInstance(DataEncrypterFactory::BINDING);
+        }
+
+        Facade::clearResolvedInstance(DataEncrypterFactory::BINDING);
     }
 
     /**
@@ -669,6 +735,7 @@ class StarterKitServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->applyVendorConfigDefaults();
+        $this->app->booted(fn () => $this->configureDataEncryption());
         $this->registerRouteModelBindings();
         $this->configureModels();
         $this->configurePassport();
@@ -775,6 +842,133 @@ class StarterKitServiceProvider extends ServiceProvider
         }
 
         Model::shouldBeStrict(! $this->app->isProduction());
+    }
+
+    /**
+     * Point Fortify's two-factor encryption at the kit's data encrypter.
+     *
+     * COVERAGE — Fortify funnels every 2FA read and write through
+     * `Fortify::currentEncrypter()`: EnableTwoFactorAuthentication and
+     * ConfirmTwoFactorAuthentication (secret), GenerateNewRecoveryCodes and the
+     * TwoFactorAuthenticatable trait's recoveryCodes()/replaceRecoveryCode()
+     * (codes), TwoFactorLoginRequest, TwoFactorSecretKeyController,
+     * RecoveryCodeController, and the kit's own
+     * stubs/app/Domain/Auth/Actions/TwoFactorChallengeAction. Setting it once
+     * here moves all of them onto DATA_ENCRYPTION_KEY without editing a stub.
+     *
+     * PRECEDENCE — Fortify::$encrypter is process-global static state, so the
+     * decision of who wins has to be explicit rather than incidental:
+     *
+     *   1. A consumer that already called `Fortify::encryptUsing()` wins. Its
+     *      existing two_factor_secret / two_factor_recovery_codes rows are
+     *      encrypted with THAT encrypter; overwriting it would lock every 2FA
+     *      user out of their own account on the next login. The check reads the
+     *      public static directly instead of `currentEncrypter()`, because
+     *      currentEncrypter() falls through to the Crypt facade and would both
+     *      resolve the app encrypter at boot and throw when APP_KEY is absent.
+     *   2. A consumer that called `Model::encryptUsing()` wins for the same
+     *      reason: Fortify falls back to it today, so that app's 2FA columns
+     *      are already written with it.
+     *   3. Otherwise the kit installs its own shim. The check runs from an
+     *      `$app->booted()` callback — after EVERY provider, package and
+     *      application alike, has booted — so a consumer that calls
+     *      `Fortify::encryptUsing()` or `Model::encryptUsing()` in its own
+     *      boot() is seen and left alone. Package providers boot BEFORE
+     *      application providers: a boot()-time check would install the shim
+     *      first, and because currentEncrypter() prefers Fortify's own static
+     *      over Model::$encrypter, a Model encrypter set later in that same
+     *      boot would be silently outranked — locking every 2FA row written
+     *      with it. The register()-time case is covered by the same guard.
+     *
+     * Nothing here resolves a key — see dataEncrypterProxy().
+     */
+    private function configureDataEncryption(): void
+    {
+        if (! class_exists(Fortify::class)) {
+            return;
+        }
+
+        if (Fortify::$encrypter !== null || Model::$encrypter !== null) {
+            return;
+        }
+
+        Fortify::encryptUsing($this->dataEncrypterProxy());
+    }
+
+    /**
+     * A stateless shim that forwards to the `sk.data_encrypter` singleton,
+     * resolved at CALL time rather than captured at boot.
+     *
+     * Two properties are load-bearing, and handing Fortify a resolved Encrypter
+     * would forfeit both:
+     *
+     *   - Lazy. boot() must not read key material. A malformed
+     *     DATA_ENCRYPTION_KEY, or no APP_KEY at all, would otherwise fail every
+     *     request and every artisan command rather than only the paths that
+     *     touch ciphertext.
+     *   - Never stale. Fortify::$encrypter is static and outlives a container
+     *     rebind — an Octane worker reload, or a test/command that swaps the key
+     *     through flushDataEncrypter(). A captured instance there would keep
+     *     writing 2FA secrets under the OLD key while SettingService wrote under
+     *     the new one: a split-key corruption that surfaces only as a login
+     *     failure, long after the change. Resolving per call cannot drift.
+     *
+     * It holds no key material, so it is also safe to serialize.
+     */
+    private function dataEncrypterProxy(): EncrypterContract
+    {
+        return new class implements EncrypterContract, StringEncrypter
+        {
+            public function encrypt(#[\SensitiveParameter] $value, $serialize = true)
+            {
+                return $this->encrypter()->encrypt($value, $serialize);
+            }
+
+            public function decrypt($payload, $unserialize = true)
+            {
+                return $this->encrypter()->decrypt($payload, $unserialize);
+            }
+
+            public function encryptString(#[\SensitiveParameter] $value)
+            {
+                return $this->encrypter()->encryptString($value);
+            }
+
+            public function decryptString($payload)
+            {
+                return $this->encrypter()->decryptString($payload);
+            }
+
+            public function getKey()
+            {
+                return $this->encrypter()->getKey();
+            }
+
+            public function getAllKeys()
+            {
+                return $this->encrypter()->getAllKeys();
+            }
+
+            public function getPreviousKeys()
+            {
+                return $this->encrypter()->getPreviousKeys();
+            }
+
+            /**
+             * Keep key material out of dd()/dump()/var_dump() output.
+             *
+             * @return array<string, string>
+             */
+            public function __debugInfo(): array
+            {
+                return ['encrypter' => DataEncrypterFactory::BINDING.' (resolved per call; key material withheld)'];
+            }
+
+            private function encrypter(): Encrypter
+            {
+                return app(DataEncrypterFactory::BINDING);
+            }
+        };
     }
 
     /**
@@ -1061,6 +1255,18 @@ class StarterKitServiceProvider extends ServiceProvider
                 Console\Commands\EnvSyncCommand::class,
                 Console\Commands\SeedPermissionsCommand::class,
                 Console\Commands\RedactActivityLogSecretsCommand::class,
+
+                // Data-encryption key lifecycle. Deliberately INSIDE the
+                // runningInConsole() block, unlike DoctorCommand: encryption:key
+                // rewrites .env and encryption:rekey rewrites every encrypted
+                // row, so neither may become reachable through
+                // Artisan::call() from a web request the way sk:doctor is.
+                // encryption:health is read-only but stays with them — it
+                // reports which key opens which row, which is reconnaissance
+                // that has no business on an HTTP surface.
+                Console\Commands\EncryptionKeyCommand::class,
+                Console\Commands\EncryptionRekeyCommand::class,
+                Console\Commands\EncryptionHealthCommand::class,
             ];
 
             // Register the vendor PurgeFileManagerTrashCommand only when the

@@ -132,6 +132,8 @@ If the update introduced new settings groups or auth behavior, also review these
 - Settings -> File Manager
 - Profile security tabs
 
+This release adds a dedicated `DATA_ENCRYPTION_KEY` for sensitive settings and 2FA secrets, independent of `APP_KEY`. **An existing install needs no action** — `DATA_ENCRYPTION_KEY` stays empty, encryption keeps using `APP_KEY` exactly as before, and nothing about `composer update` / `sk:update` forces adoption. Adopting the dedicated key is opt-in: see [Data Encryption](encryption.md) for the `encryption:key` → `encryption:rekey` → `encryption:health` walkthrough, and the [server migration runbook](server-migration-runbook.md) if you are about to move this install to a new server.
+
 ## File Update Strategy Summary
 
 - Package-owned core paths are refreshed automatically — but only when your copy still matches the hash recorded at install/update time. `app/Enums/PermissionEnum.php` is the one entry here, and an ability case you added to it is preserved and reported instead of overwritten. Merge the package's new cases by hand (diff against the same relative path under `vendor/lvntr/laravel-starter-kit/stubs/`) or re-run with `--force` to take the package version and discard your edits.

@@ -67,6 +67,7 @@ It is designed for teams who want to skip re-building the same admin screens on 
     - Datatable bulk actions with cross-page selection
     - Safe upgrade flow via `sk:update` (hash-tracked, preserves your edits)
     - System health check via `sk:doctor`
+    - Dedicated data-encryption key for sensitive settings & 2FA secrets, independent of `APP_KEY` — generate/rotate/verify with `encryption:key`, `encryption:rekey`, `encryption:health`
     - Light & Dark themes with instant-switch built-in `main` and `aura` kit themes (no rebuild)
 
 ## How to use it?

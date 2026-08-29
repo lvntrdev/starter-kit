@@ -84,6 +84,13 @@ TURNSTILE_SECRET_KEY=
 SESSION_ENCRYPT=true
 SESSION_SECURE_COOKIE=true
 
+# APP_KEY'den bağımsız, hassas ayarlar (settings.value) ve 2FA secret'ları için
+# adanmış anahtar. `php artisan key:generate` bunlara hiç dokunmaz. İlk kurulumda
+# otomatik üretilir; her sunucu taşımasında .env ile birlikte taşınmalıdır
+# (bkz. docs/server-migration-runbook.tr.md).
+DATA_ENCRYPTION_KEY=
+DATA_ENCRYPTION_PREVIOUS_KEYS=
+
 # Passport OAuth2 anahtarları — production için önerilen desen, anahtarları
 # storage/oauth-*.key dosyalarına commit etmek yerine env üzerinden yüklemek.
 # Bir kez `php artisan passport:keys` çalıştırın, üretilen string'leri bu env
@@ -95,6 +102,8 @@ SESSION_SECURE_COOKIE=true
 `STARTER_KIT_ALLOW_UNRESOLVED_ROUTES=false` yalnızca **yeni** bir `.env` dosyasına yazılır. Paketi güncelleyen mevcut bir uygulama izin veren varsayılanla kalır; hiçbir sürüm bu değeri sizin yerinize çevirmez — bkz. [Yükseltme Notları](UPGRADE.tr.md#çözülemeyen-routelarda-fail-closed-mevcut-kurulum-için-opt-in). Temiz kurulumdan sonra bir route'unuz 403 dönmeye başlarsa `php artisan sk:doctor --only=unresolved-routes` izni türetilemeyen tüm route'ları listeler; route'a `resource.action` biçiminde bir isim verin, bilerek izinsiz bırakılacaksa `config/starter-kit.php` içindeki `permissions.unrestricted_routes` listesine ekleyin ya da düzeltene kadar anahtarı `true` yapın.
 
 `APP_TIMEZONE` değerini sitenin bölgesel saat dilimine ayarlamayın: bu değişken Laravel'in saklama saat dilimini yönetir. Bunun yerine `APP_DISPLAY_TIMEZONE` kullanın veya kurulumdan sonra **Ayarlar → Genel** bölümünden site fallback'ini seçin. Kullanıcı override'ları ve tam çözüm zinciri için [Saat Dilimleri](timezone.tr.md) belgesine bakın.
+
+`DATA_ENCRYPTION_KEY` ve `DATA_ENCRYPTION_PREVIOUS_KEYS`, hassas ayar değerlerini ve 2FA secret'larını `APP_KEY`'den bağımsız olarak korur — temiz bir kurulum anahtarı otomatik üretir, herhangi bir işlem gerekmez. Önemli olan bundan sonraki `.env` disiplinidir: bir sunucu taşıması her iki anahtarı da `.env`'in geri kalanıyla birlikte taşımalı, `php artisan key:generate` asla bunun yerine geçmemelidir. Tam anahtar-çözümleme sözleşmesi ve rotasyon komutları için [Veri Şifreleme](encryption.tr.md) belgesine, yeni bir sunucuya geçmeden önce [sunucu taşıma runbook'u](server-migration-runbook.tr.md)'na bakın.
 
 ## 2. Paketi Ekleyin
 

@@ -13,6 +13,7 @@ use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Lvntr\StarterKit\Console\Commands\DoctorCommand;
+use Lvntr\StarterKit\Console\Doctor\Checks\DataEncryptionKeyCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\LogStackCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\NodeVersionCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\QueueWorkerCheck;
@@ -21,6 +22,7 @@ use Lvntr\StarterKit\Console\Doctor\Checks\TimezoneStorageCheck;
 use Lvntr\StarterKit\Console\Doctor\DoctorCheck;
 use Lvntr\StarterKit\Console\Doctor\DoctorReport;
 use Lvntr\StarterKit\Console\Doctor\DoctorStatus;
+use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
 
 /*
 | NodeVersionCheck
@@ -420,4 +422,144 @@ test('LogStackCheck kanali olmayan stack icin OK doner ve mesaji bozulmaz', func
 
     expect($report->isOk())->toBeTrue()
         ->and($report->message)->toContain('no channel resolved');
+});
+
+/*
+| DataEncryptionKeyCheck — is the data-at-rest encryption hostage to APP_KEY?
+|
+| Three states, and the direction of each one matters more than its wording:
+|
+|   warn — no DATA_ENCRYPTION_KEY. This is the kit's HISTORICAL DEFAULT, so it
+|          must never be a fail: a red sk:doctor on a perfectly working app
+|          trains operators to ignore the whole report.
+|   warn — a dedicated key IS in use but DATA_ENCRYPTION_PREVIOUS_KEYS still
+|          holds something: the rotation is unfinished and the old key still has
+|          to travel with the app.
+|   ok   — a dedicated key with an empty previous list; key:generate cannot
+|          reach the encrypted settings or the 2FA secrets.
+|
+| Plus the fail path: a chain that does not resolve at all, where every
+| encrypted read is ALREADY throwing.
+|
+| The check is config-only by design — it must not touch a table or decrypt
+| anything, so these tests never build one.
+*/
+
+function skDekKey(string $seed): string
+{
+    return 'base64:'.base64_encode(substr(hash('sha256', $seed, true), 0, 32));
+}
+
+/**
+ * @param  string|array<int, string>|null  $previousKeys
+ */
+function skDekConfigure(?string $primary, string|array|null $previousKeys = null, ?string $appKey = 'app'): void
+{
+    config()->set('app.key', $appKey === null ? null : skDekKey($appKey));
+    config()->set('app.cipher', 'AES-256-CBC');
+    config()->set('app.previous_keys', []);
+    config()->set('starter-kit.encryption.key', $primary === null ? null : skDekKey($primary));
+    config()->set('starter-kit.encryption.previous_keys', $previousKeys);
+    config()->set('starter-kit.encryption.cipher', null);
+
+    // The check flushes the memoised chain itself; this keeps a factory built
+    // earlier in the same process from disagreeing about the config.
+    app(DataEncrypterFactory::class)->flush();
+}
+
+test('DataEncryptionKeyCheck dedicated key yokken warn döner ve fail üretmez', function () {
+    skDekConfigure(primary: null);
+
+    $report = (new DataEncryptionKeyCheck)->run();
+
+    expect($report->name)->toBe('Data Encryption Key')
+        ->and($report->isWarn())->toBeTrue()
+        ->and($report->isFail())->toBeFalse()
+        ->and($report->message)->toContain('No '.DataEncrypterFactory::PRIMARY_ENV_KEY)
+        ->and($report->message)->toContain('key:generate')
+        ->and($report->message)->toContain('silent')
+        ->and($report->hint)->toContain('encryption:key')
+        ->and($report->hint)->toContain('server-migration-runbook');
+});
+
+test('DataEncryptionKeyCheck dedicated key varken bekleyen previous key için warn döner', function () {
+    skDekConfigure(primary: 'primary', previousKeys: skDekKey('retired'));
+
+    $report = (new DataEncryptionKeyCheck)->run();
+
+    expect($report->isWarn())->toBeTrue()
+        ->and($report->message)->toContain(DataEncrypterFactory::PREVIOUS_ENV_KEY)
+        ->and($report->message)->toContain('rotation is unfinished')
+        ->and($report->hint)->toContain('encryption:rekey')
+        ->and($report->hint)->toContain('encryption:health')
+        // Never the key material itself — only the env var name.
+        ->and($report->message)->not->toContain(skDekKey('retired'))
+        ->and($report->hint)->not->toContain(skDekKey('retired'));
+});
+
+test('DataEncryptionKeyCheck previous key listesi dizi biçiminde verilse de warn döner', function () {
+    skDekConfigure(primary: 'primary', previousKeys: [skDekKey('retired')]);
+
+    expect((new DataEncryptionKeyCheck)->run()->isWarn())->toBeTrue();
+});
+
+test('DataEncryptionKeyCheck dedicated key + boş previous key listesi için OK döner', function (string|array|null $previousKeys) {
+    skDekConfigure(primary: 'primary', previousKeys: $previousKeys);
+
+    $report = (new DataEncryptionKeyCheck)->run();
+
+    // The OK message must NOT claim `key:generate` is harmless: this check
+    // reads config only and has never looked at a row, so a value written
+    // under APP_KEY before adoption is invisible to it. It points at
+    // `encryption:health`, which does read the rows, instead.
+    expect($report->isOk())->toBeTrue()
+        ->and($report->message)->toContain('no previous keys pending')
+        ->and($report->message)->toContain('encryption:health')
+        ->and($report->message)->not->toContain('cannot reach');
+})->with([
+    'null' => [null],
+    'empty string' => [''],
+    'whitespace' => ['   '],
+    'empty array' => [[]],
+    'array of blanks' => [['', '  ']],
+]);
+
+test('DataEncryptionKeyCheck çözülemeyen anahtar zinciri için fail döner', function () {
+    // Both env vars empty: every encrypted read is already throwing, so this IS
+    // a failure rather than a warning.
+    skDekConfigure(primary: null, appKey: null);
+
+    $report = (new DataEncryptionKeyCheck)->run();
+
+    expect($report->isFail())->toBeTrue()
+        ->and($report->message)->toContain('could not be resolved')
+        ->and($report->message)->toContain(DataEncrypterFactory::PRIMARY_ENV_KEY)
+        ->and($report->hint)->toContain('Do NOT clear '.DataEncrypterFactory::PREVIOUS_ENV_KEY);
+});
+
+test('DataEncryptionKeyCheck bozuk bir anahtar için fail döner ve anahtar materyalini sızdırmaz', function () {
+    config()->set('app.key', skDekKey('app'));
+    config()->set('app.cipher', 'AES-256-CBC');
+    config()->set('app.previous_keys', []);
+    config()->set('starter-kit.encryption.key', 'base64:not-valid-base64!!');
+    config()->set('starter-kit.encryption.previous_keys', null);
+    config()->set('starter-kit.encryption.cipher', null);
+    app(DataEncrypterFactory::class)->flush();
+
+    $report = (new DataEncryptionKeyCheck)->run();
+
+    expect($report->isFail())->toBeTrue()
+        ->and($report->message)->toContain(DataEncrypterFactory::PRIMARY_ENV_KEY)
+        ->and($report->message)->not->toContain('not-valid-base64');
+});
+
+test('DataEncryptionKeyCheck sk:doctor --only seçicisiyle tek başına çalışır', function () {
+    skDekConfigure(primary: 'primary');
+
+    Artisan::call('sk:doctor', ['--json' => true, '--only' => 'data-encryption-key']);
+    $decoded = json_decode(Artisan::output(), true);
+
+    expect($decoded['checks'])->toHaveCount(1)
+        ->and($decoded['checks'][0]['name'])->toBe('Data Encryption Key')
+        ->and($decoded['checks'][0]['status'])->toBe('ok');
 });

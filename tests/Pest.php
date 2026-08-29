@@ -60,6 +60,13 @@ uses(TestCase::class)->in('Feature/Exceptions');
 // DB gerektirmeyen diğer Feature testleri
 uses(TestCase::class)->in('Feature/BackwardCompat');
 
+// Data-at-rest şifreleme testleri (DataEncrypterFactory anahtar zinciri +
+// container/Fortify wiring): anahtar çözümü saf bir config fonksiyonudur, DB
+// gerektirmez. NOT: Pest bir dosyayı yalnız TEK bir base class'a bağlar — aynı
+// dosya iki uses() hedefine düşerse TestCaseAlreadyInUse fırlatır; bu yüzden
+// DB isteyen şifreleme regresyonu kendi tablolarını inline kurar.
+uses(TestCase::class)->in('Feature/Encryption');
+
 // Doctor testleri: DB gerektirmiyor, basit TestCase yeterli
 uses(TestCase::class)->in('Feature/Doctor');
 

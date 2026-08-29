@@ -22,6 +22,9 @@ This document is the command reference for the starter kit. Architectural notes 
 | `php artisan apidog:sync`                 | Push the Scramble OpenAPI spec to Apidog                     |
 | `php artisan sk:redact-activity-secrets`  | Irreversibly remove credentials from existing activity logs  |
 | `php artisan file-manager:purge-trash`    | Permanently delete old File Manager trash                    |
+| `php artisan encryption:key`              | Generate a dedicated `DATA_ENCRYPTION_KEY`, preserving the old key |
+| `php artisan encryption:rekey`            | Re-encrypt settings and 2FA secrets onto the primary data-encryption key |
+| `php artisan encryption:health`           | Report which key each encrypted value needs (read-only)      |
 
 ## `sk:doctor`
 
@@ -62,6 +65,7 @@ Checks (name → `--only` selector):
 | Activity Log Secrets   | `activity-log-secrets`   |
 | Permission Matrix      | `permission-matrix`      |
 | Unresolved Routes      | `unresolved-routes`      |
+| Data Encryption Key    | `data-encryption-key`    |
 
 `ActivityLogSecretsCheck` returns FAIL when an `activity_log` row still contains a password hash, token, or secret. That happens when the package was updated (which closes the leak for new rows immediately) without running `php artisan migrate`, so the historical rows were never cleaned. Back up the database and run `php artisan migrate` or `php artisan sk:redact-activity-secrets`; removal is irreversible. A missing activity-log table or a table without JSON payload columns is OK, an undecodable JSON payload is WARN, and a database error is WARN rather than a pass.
 
@@ -72,6 +76,8 @@ The check is a **bounded, read-only probe**, not the full cleanup pass. It reads
 `TimezoneStorageCheck` returns FAIL when `config('app.timezone')` is not exactly `UTC`. When that setting is correct, it also reads `SELECT @@session.time_zone` from the default connection. For a MySQL/MariaDB connection, only `+00:00` and `UTC` pass; `SYSTEM` and every other value FAIL because `TIMESTAMP` rows can be offset on disk even while the application reads them back consistently. A query failure or missing result returns WARN, never a pass. Other database drivers report OK with the session check marked inapplicable. Keep display configuration separate through `APP_DISPLAY_TIMEZONE`, and see [Timezones](timezone.md) for the connection contract and existing-data conversion guide.
 
 `UnresolvedRouteCheck` returns FAIL for every route that carries the kit's `check.permission` middleware without any permission being derivable from it — no `<resource>.<action>` name the ability map recognises, no explicit `check.permission:<perm>` argument, and no entry in the exempt list. Such a route reaches its controller **unauthorized**. By default the middleware lets it through and logs a throttled warning, and **no release changes that for an existing install**. Setting `STARTER_KIT_ALLOW_UNRESOLVED_ROUTES=false` (config `starter-kit.permissions.allow_unresolved`) turns every listed route into a 403 — that is the opt-in, and a newly installed project already ships with it. The check reports FAIL regardless of that setting, deliberately — its job is to show what the flip will deny, not what the current configuration allows. Routes the package ships resolve on their own through a route-name map inside `CheckResourcePermission`, so what this check lists is your own routes plus any kit route you renamed. Fix each one by renaming it to a mapped `<resource>.<action>`, gating it with an explicit permission argument, or — when it is deliberately permission-free — declaring it under `starter-kit.permissions.unrestricted_routes`. See [UPGRADE.md](UPGRADE.md) for the ordered path.
+
+`DataEncryptionKeyCheck` reads config only — no table scan, no decryption — and never returns FAIL. No dedicated key configured (`DATA_ENCRYPTION_KEY` empty) is WARN: sensitive settings and 2FA secrets are still encrypted with `APP_KEY`, and a `php artisan key:generate` on a server migration will make them unreadable. A dedicated key with a non-empty `DATA_ENCRYPTION_PREVIOUS_KEYS` is WARN: rotation is unfinished. A dedicated key with an empty previous-key list is OK. See [Data Encryption](encryption.md) and `encryption:key` / `encryption:rekey` / `encryption:health` below.
 
 Exit codes:
 
@@ -359,6 +365,55 @@ php artisan sk:redact-activity-secrets --all
 | `--all` | Scan every row instead of using the sensitive-key prefilter |
 
 The command is idempotent and should be re-run after restoring an older backup. If a JSON payload cannot be decoded, it is counted, reported with a warning, and left unchanged; inspect that row manually because it may still contain a credential.
+
+## `encryption:key`
+
+Generates a dedicated `DATA_ENCRYPTION_KEY`, preserving the current primary key in `DATA_ENCRYPTION_PREVIOUS_KEYS`. See [Data Encryption](encryption.md) for the full adoption and rotation walkthrough.
+
+```bash
+php artisan encryption:key
+php artisan encryption:key --show
+php artisan encryption:key --force
+```
+
+| Flag | Purpose |
+| --- | --- |
+| `--show` | Print a freshly generated key and write nothing to `.env` |
+| `--force` | Run even when the environment looks like production |
+
+A default run: (1) resolves the current primary key (`DATA_ENCRYPTION_KEY`, or `APP_KEY` on first adoption); (2) generates a new random key; (3) prepends the old primary to `DATA_ENCRYPTION_PREVIOUS_KEYS`; (4) only then writes the new `DATA_ENCRYPTION_KEY`. `APP_KEY` is never touched, on any path. The command refuses to run under a production environment without `--force`. After it finishes, run `encryption:rekey`, then `encryption:health`, and clear `DATA_ENCRYPTION_PREVIOUS_KEYS` only after health reports OK.
+
+## `encryption:rekey`
+
+Re-encrypts settings and 2FA secrets onto the primary data-encryption key. Read the [server migration runbook](server-migration-runbook.md) before running this during a maintenance window.
+
+```bash
+php artisan encryption:rekey
+php artisan encryption:rekey --dry-run
+php artisan encryption:rekey --only=settings
+php artisan encryption:rekey --chunk=500
+```
+
+| Flag | Purpose |
+| --- | --- |
+| `--dry-run` | Perform every decrypt attempt and print the summary without writing a single byte |
+| `--only=<surface>` | Limit the run to `settings` or `two-factor` (comma-separated to combine) |
+| `--chunk=<rows>` | Rows read, locked and rewritten per round trip (default 200, maximum 2000) |
+
+Each row is tried against every key in the resolution chain, in order. The first key that decrypts it re-encrypts and writes back with the primary key; a row already on the primary key is skipped with no write. A row that decrypts with **no** key is left byte-for-byte untouched, counted, and listed by identifier (`settings.key` / `users.id`) in the summary — it is never nulled, deleted, or overwritten.
+
+## `encryption:health`
+
+Reports which key each encrypted value needs and whether `DATA_ENCRYPTION_PREVIOUS_KEYS` can be cleared. Read-only — no key material is ever printed.
+
+```bash
+php artisan encryption:health
+php artisan encryption:health --json
+```
+
+- `--json` emits a machine-readable report mirroring `sk:doctor --json`'s shape
+
+Verdicts: everything on the primary key and nothing undecryptable → "Safe to clear `DATA_ENCRYPTION_PREVIOUS_KEYS`" (exit `0`); any row still on a previous key → "Run `encryption:rekey` first; do NOT clear `DATA_ENCRYPTION_PREVIOUS_KEYS`"; any undecryptable row → the loudest failure, naming the affected rows and the missing key. A surface that could not be fully scanned (missing table, query error) only ever downgrades the verdict, never upgrades it.
 
 ## `file-manager:purge-trash`
 
