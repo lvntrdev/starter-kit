@@ -20,6 +20,36 @@ export type TabIconColor =
 
 export type TabBadgeSeverity = 'success' | 'warn' | 'info' | 'danger' | 'secondary';
 
+/**
+ * Which panels are mounted: 'active' keeps only the current tab in the DOM
+ * (lazy), 'all' mounts every panel up front and keeps it alive across switches.
+ */
+export type TabPanelMode = 'active' | 'all';
+
+/** History entry written when the active tab changes. */
+export type TabHistoryMode = 'push' | 'replace';
+
+/**
+ * How the URL is updated on a tab switch: 'server' issues an Inertia visit
+ * (the page component re-resolves server side), 'client' rewrites the URL
+ * without any request.
+ */
+export type TabUrlMode = 'server' | 'client';
+
+/** Payload emitted when the active tab changes. */
+export interface TabChangePayload {
+    key: string;
+    /** The key that was active before this change, or null on the first change. */
+    previousKey: string | null;
+    tab: TabItemConfig;
+}
+
+/** The instance surface `<SkTabs>` exposes to a template ref. */
+export interface SkTabsExposed {
+    activeTab: string;
+    isActive: (key: string) => boolean;
+}
+
 export interface TabItemConfig {
     key: string;
     label: string;
@@ -54,4 +84,12 @@ export interface TabBuilderConfig {
     cardTitle?: string;
     cardSubtitle?: string;
     isCard?: boolean;
+    /** Panel mounting strategy. Unset keeps today's behaviour. */
+    panels?: TabPanelMode;
+    /** History entry written on a switch. Defaults to 'replace' when unset. */
+    history?: TabHistoryMode;
+    /** URL update strategy. Defaults to 'server' when unset. */
+    urlMode?: TabUrlMode;
+    /** Mirror the active tab in the URL query. Defaults to true when unset. */
+    syncUrl?: boolean;
 }

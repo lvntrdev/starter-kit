@@ -2,6 +2,32 @@
 
 Starter kit'e yeni eklenen özellikler ve iyileştirmeler burada listelenir.
 
+## Yayınlanmamış
+
+### Eklendi
+
+- **`TabIconColor` ve `TabBadgeSeverity` artık TabBuilder core barrel'ından export ediliyor** (`@lvntr/components/TabBuilder/core`), zaten export edilen `TabBuilderConfig`, `TabItemConfig` ve `TabLayout` ile aynı şekilde — bir sekmenin icon rengine veya badge severity'sine karşı tip yazan bir consumer artık doğrudan internal `./types` modülüne girmek zorunda değil.
+- **`TB.tabs()` panel mount etme ve URL davranışı için beş yeni chainable seçenek kazandı: `.lazy()`, `.keepAlive()`, `.history('push' | 'replace')`, `.urlMode('server' | 'client')` ve `.syncUrl(boolean)`.** `.lazy()` yalnızca aktif paneli mount eder (yatay düzende bu PrimeVue'nun kendi lazy modudur), `.keepAlive()` ise her paneli mount edip inaktif olanları gizleyerek sekme bazlı state'i korur; `.history()` bir geçişin mevcut history girdisini mi değiştireceğini (varsayılan) yoksa yeni bir girdi mi push edeceğini belirler; `.urlMode('client')` varsayılan Inertia visit'i yerine sunucuya istek atmadan URL'i günceller; `.syncUrl(false)` URL senkronizasyonunu tamamen kaldırır. Bkz. [tabs.tr.md](tabs.tr.md).
+- **`SkTabs` artık `v-model` destekliyor ve bir `change` event'i emit ediyor.** Opsiyonel `modelValue` prop'u, aktif sekme anahtarını hem URL hem local modda iki yönlü bağlar — mount sırasında bir URL deep link'i farklı bir gelen `modelValue`'nun önüne geçer; `change`, mount sonrası (ilk mount hariç) her geçişte `{ key, previousKey, tab }` ile tetiklenir.
+- **`SkTabs` bir `empty` slot'u kazandı**; `.permission()`/`.role()`/`.visible()` yüzünden tüm sekmeler elenmişse, sidebar veya tab şeridi olmadan tek başına render edilir.
+- **Dikey `SkTabs` artık gerçek bir ARIA tablist'i.** Sidebar nav'ı `role="tablist"`/`aria-orientation="vertical"` taşır, her sekme butonu `aria-selected`/`aria-controls`/`aria-disabled` ve roving `tabindex` ile `role="tab"`'tır, panel ise `role="tabpanel"` ile sarmalanır; Arrow Up/Down, Home/End enabled sekmeler arasında odağı taşır, Enter/Space seçer.
+- **`TabsBuilder.build()` artık yinelenen sekme key'lerini doğruluyor ve immutable bir snapshot döndürüyor.** Yinelenen bir key development build'lerinde hata fırlatıyor, production'da ise sessiz kalmak yerine bir `console.error` basıyor; `TabItemBuilder.build()` artık yalnızca eksik değil, yalnızca boşluktan oluşan bir key'i de reddediyor; her `build()` çağrısı config'in ve sekmelerinin taze bir kopyasını döndürüyor, böylece aynı builder üzerinde sonraki bir `.addTabs()` ya da döndürülen config'i mutate etmek, zaten build edilmiş bir config'i artık etkileyemez.
+- **`TabPanelMode`, `TabHistoryMode`, `TabUrlMode`, `TabChangePayload` ve `SkTabsExposed` artık TabBuilder core barrel'ından export ediliyor** (`@lvntr/components/TabBuilder/core`), mevcut `TabBuilderConfig`, `TabItemConfig`, `TabLayout`, `TabIconColor` ve `TabBadgeSeverity` export'larıyla birlikte.
+- **`useUrlTab()` artık `tabs` argümanı için düz bir dizinin yanı sıra bir `ref` veya bir getter da kabul ediyor, ayrıca yeni bir `{ history: 'push' | 'replace' }` üçüncü argümanı eklendi.** Değer her erişimde `toValue()` ile okunuyor; `history: 'push'`, her geçişe varsayılan `'replace'` yerine kendi history girdisini veriyor.
+
+### Değişti
+
+- **Dikey `SkTabs` sekme butonları artık açık bir role taşımamak yerine `role="tab"` taşıyor, panel içeriği de kart gövdesi içinde yeni bir `role="tabpanel"` `<div>` ile sarmalanıyor.** Bir sekme butonunu `getByRole('button')` ile seçen bir test `getByRole('tab')`'a geçmeli; kart gövdesi altında direkt-child selector'a dayanan özel CSS'in bir kontrolü hak edebilir.
+- **`TabsBuilder.build()` artık development build'lerinde yinelenen bir sekme key'inde hata fırlatıyor, production'da ise sessiz kalmak yerine aynı mesajı `console.error` ile basıyor.** Yinelenen key'ler daha önce slot çözümlemesini ve URL seçimini sessizce bozuyordu — ikinci sekme birincinin içeriğini render ediyor ve `?tab=` ile asla erişilemiyordu.
+- **`SkTabs` artık `@/composables`'daki yayınlanmış `useUrlTab` kopyasını import etmiyor; bunun yerine kendi internal, eşdeğer bir aktif-sekme state'ine sahip.** Bu bir version-skew riskini ortadan kaldırıyor (`sk:publish --tag=composables`, bir uygulamayı shipped bileşenin beklediğinden daha eski bir `useUrlTab` ile bırakabiliyordu), ama yayınlanmış `useUrlTab.ts`'ini özellikle `SkTabs` davranışını değiştirmek için elle düzenlemiş bir proje bu düzenlemenin artık etkili olmadığını görecek — `useUrlTab()`'ın kendisi, onu doğrudan çağıran uygulama kodu için etkilenmiyor.
+
+### Düzeltildi
+
+- **Dikey `SkTabs` sekme butonları artık kapsayan bir formu submit etmiyor.** Sidebar nav `<button>`'ının açık bir `type`'ı yoktu, bu yüzden tarayıcılar onu `type="submit"` sayıyordu — bir `<form>` içindeki bir sekmeye tıklamak, yalnızca sekme değiştirmek yerine formu submit edebiliyordu. Artık `type="button"` olarak ayarlanıyor.
+- **Mount sonrası değişen bir sekmenin `visible`/`disabled` durumu artık URL'e senkron aktif sekmeyi doğru şekilde belirliyor.** `useUrlTab()` mount anında alınmış sabit bir sekme listesi snapshot'ını kapsıyordu; bu yüzden sonradan görünür hale gelen bir sekmeye `?tab=` ile ulaşılamıyordu ve gizlenen ya da disable edilen aktif bir sekme arayüzü artık listede olmayan bir sekmede bırakıyordu. Seçilebilir liste artık canlı `visible`/`disabled` durumuyla senkron tutulan reactive bir dizi — yeni görünür hale gelen bir sekme anında seçilebilir oluyor, gizlenen veya disable edilen aktif bir sekme ise ilk seçilebilir sekmeye düşüyor.
+- **Disabled bir sekme artık `?tab=` üzerinden aktive edilemiyor ve disabled bir ilk sekme artık parametresiz varsayılan olmuyor.** `useUrlTab()` artık hem URL parametresini hem de "parametre yok" varsayılanını tüm liste yerine seçilebilir (disabled olmayan) sekme listesine göre çözüyor.
+- **Zaten aktif olan sekmeyi tekrar seçmek artık bir Inertia visit'i tetiklemiyor ve `#hash` artık sekme geçişinde korunuyor.** Aktif sekmeye tekrar tıklamak (veya onu programatik olarak mevcut değerine atamak) hâlâ `router.visit()`'i çağırıyordu; artık no-op. Sekme değiştirmek ayrıca mevcut URL'deki `#hash`'i düşürmek yerine koruyor.
+
 ## 2026-08-25 — v13.6.16
 
 ### Düzeltildi

@@ -165,6 +165,9 @@ const tabConfig = TB.tabs()
 
 The slot name must match `tab.key` exactly. The active tab is synchronized to the URL through `queryParam` (default `tab`). Permission/role gating hides the tab completely — it does not disable it.
 
+- Inside an `AppDialog`, call `.syncUrl(false)` on the tab config — a dialog isn't a routable page, so its tabs shouldn't fight the host page's own `?tab=` query param.
+- Vertical `SkTabs` tab buttons carry `role="tab"`, not `role="button"` — select them in tests with `getByRole('tab')`, not `getByRole('button')`.
+
 ---
 
 ## §3.5 — Back button (Aura) — a standalone box is FORBIDDEN
@@ -203,10 +206,11 @@ button must be consumed by a **child component living inside AdminLayout's slot*
 </AdminLayout>
 ```
 
-On `SkTabs` pages the back button sits in the active tab's card (SkTabs renders one tab at a time).
-Omit `:header-in-card="true"` and Aura prints the standalone "← Back" box — which is exactly what
-this rule forbids. Reference: `Product/Edit.vue` (component tabs), `Account/Show.vue` (inline tab +
-`HeaderBackButton`).
+On `SkTabs` pages the back button sits in the active tab's card (vertical layout mounts only the
+active tab and unmounts it on switch; horizontal layout keeps every panel mounted and toggles
+visibility instead). Omit `:header-in-card="true"` and Aura prints the standalone "← Back" box —
+which is exactly what this rule forbids. Reference: `Product/Edit.vue` (component tabs),
+`Account/Show.vue` (inline tab + `HeaderBackButton`).
 
 ---
 

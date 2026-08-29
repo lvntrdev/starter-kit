@@ -135,7 +135,7 @@ return useMenuBuilder(allItems);
 
 ### useUrlTab()
 
-Keeps a tab selection in sync with a query string key such as `?tab=security`.
+Keeps a tab selection in sync with a query string key such as `?tab=security`. `tabs` accepts a plain array (a `reactive` one included — mutations are tracked live, so a tab list that changes after mount, e.g. one filtered by permission, stays in sync), a `ref`, or a getter (`MaybeRefOrGetter<TabDefinition[]>`), read through `toValue()` on every access. Setting the active tab to its current value is a no-op (no navigation fires); setting it to the list's first entry removes the query param instead of writing it; any `#hash` on the current URL is preserved across the switch. An optional third argument, `{ history: 'push' | 'replace' }`, controls the history entry written on a switch — `'replace'` (default) overwrites the current entry, `'push'` gives each switch its own. `SkTabs` no longer builds on this composable directly — it owns an internal, equivalent active-tab state so its behavior never depends on whichever copy of `useUrlTab` an app has published.
 
 ### useRefreshBus()
 

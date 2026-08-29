@@ -1,6 +1,27 @@
 // resources/js/tab-builder/builder.ts
 
-import type { TabBadgeSeverity, TabBuilderConfig, TabIconColor, TabItemConfig, TabLayout } from './types';
+import type {
+    TabBadgeSeverity,
+    TabBuilderConfig,
+    TabHistoryMode,
+    TabIconColor,
+    TabItemConfig,
+    TabLayout,
+    TabUrlMode,
+} from './types';
+
+/**
+ * A copy of a tab item whose array-valued fields are copied too. A spread alone
+ * is shallow, so `permission`/`role` would stay SHARED with the builder's
+ * private config: pushing to a built config's `permission` array would silently
+ * re-gate every later `build()` — and every sibling config already handed out.
+ */
+function cloneTab(tab: TabItemConfig): TabItemConfig {
+    const clone = { ...tab };
+    if (Array.isArray(clone.permission)) clone.permission = [...clone.permission];
+    if (Array.isArray(clone.role)) clone.role = [...clone.role];
+    return clone;
+}
 
 export class TabItemBuilder {
     private config: Partial<TabItemConfig> = {};
@@ -77,14 +98,33 @@ export class TabItemBuilder {
     }
 
     build(): TabItemConfig {
-        if (!this.config.key) {
-            throw new Error('Tab item must have a key');
+        // A whitespace-only key is as unusable as a missing one: it addresses no
+        // slot and produces a `?tab=%20` URL nobody can link to. The message keeps
+        // its original prefix so existing assertions still match.
+        if (!this.config.key || this.config.key.trim() === '') {
+            throw new Error('Tab item must have a key (non-empty string)');
         }
         if (!this.config.label) {
             this.config.label = this.config.key;
         }
-        return this.config as TabItemConfig;
+        // A copy, not the live config: the same item builder may be built twice
+        // (or reused across two tab configs), and a shared object would let a
+        // later chained call mutate a config that was already handed out.
+        return cloneTab(this.config as TabItemConfig);
     }
+}
+
+/** Keys appearing more than once, in first-seen order and reported once each. */
+function findDuplicateKeys(tabs: TabItemConfig[]): string[] {
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+    for (const tab of tabs) {
+        if (seen.has(tab.key)) {
+            duplicates.add(tab.key);
+        }
+        seen.add(tab.key);
+    }
+    return [...duplicates];
 }
 
 export class TabsBuilder {
@@ -134,6 +174,41 @@ export class TabsBuilder {
         return this;
     }
 
+    /** Mount only the active panel. `lazy(false)` clears the setting entirely. */
+    lazy(value: boolean = true): this {
+        if (value) {
+            this.config.panels = 'active';
+        } else {
+            delete this.config.panels;
+        }
+        return this;
+    }
+
+    /** Mount every panel and keep it alive. `keepAlive(false)` clears the setting. */
+    keepAlive(value: boolean = true): this {
+        if (value) {
+            this.config.panels = 'all';
+        } else {
+            delete this.config.panels;
+        }
+        return this;
+    }
+
+    history(mode: TabHistoryMode): this {
+        this.config.history = mode;
+        return this;
+    }
+
+    urlMode(mode: TabUrlMode): this {
+        this.config.urlMode = mode;
+        return this;
+    }
+
+    syncUrl(value: boolean = true): this {
+        this.config.syncUrl = value;
+        return this;
+    }
+
     addTabs(...tabs: TabItemBuilder[]): this {
         this.config.tabs.push(...tabs.map((t) => t.build()));
         return this;
@@ -143,6 +218,25 @@ export class TabsBuilder {
         if (this.config.tabs.length === 0) {
             throw new Error('TabBuilder must have at least one tab');
         }
-        return { ...this.config };
+
+        const duplicates = findDuplicateKeys(this.config.tabs);
+        if (duplicates.length > 0) {
+            // Duplicate keys silently break slot resolution and URL selection: the
+            // second tab renders the first one's content and can never be reached
+            // by `?tab=`. Loud in development, non-fatal in production — a shipped
+            // screen must not blank out over a config mistake, and de-duplicating
+            // behind the developer's back would only hide it.
+            const message = `TabBuilder has duplicate tab keys: ${duplicates.map((key) => `"${key}"`).join(', ')}`;
+            if (import.meta.env.DEV) {
+                throw new Error(message);
+            }
+            console.error(message);
+        }
+
+        // A snapshot, not a view: `build()` may be called before further `addTabs`
+        // calls on the same builder, and the returned config is handed straight to
+        // a component. Copying the array and its items keeps an already-built
+        // config frozen against both later chaining and consumer mutation.
+        return { ...this.config, tabs: this.config.tabs.map((tab) => cloneTab(tab)) };
     }
 }

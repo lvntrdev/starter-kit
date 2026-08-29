@@ -2,6 +2,32 @@
 
 Newly added features and improvements to the starter kit are listed here.
 
+## Unreleased
+
+### Added
+
+- **`TabIconColor` and `TabBadgeSeverity` are now exported from the TabBuilder core barrel** (`@lvntr/components/TabBuilder/core`), matching the already-exported `TabBuilderConfig`, `TabItemConfig`, and `TabLayout` — a consumer typing against a tab's icon color or badge severity no longer needs to reach into the internal `./types` module directly.
+- **`TB.tabs()` gained five chainable options for panel mounting and URL behavior: `.lazy()`, `.keepAlive()`, `.history('push' | 'replace')`, `.urlMode('server' | 'client')`, and `.syncUrl(boolean)`.** `.lazy()` mounts only the active panel (PrimeVue's own lazy mode on horizontal layout) while `.keepAlive()` keeps every panel mounted and hides inactive ones, preserving per-tab state; `.history()` controls whether a switch replaces the current history entry (default) or pushes a new one; `.urlMode('client')` rewrites the URL with no server request instead of the default Inertia visit; `.syncUrl(false)` drops URL sync entirely. See [tabs.md](tabs.md).
+- **`SkTabs` now supports `v-model` and emits a `change` event.** The optional `modelValue` prop two-way-binds the active tab key in both URL and local mode — a URL deep link wins over a different incoming `modelValue` on mount; `change` fires on every switch after mount (not the initial mount) with `{ key, previousKey, tab }`.
+- **`SkTabs` gained an `empty` slot**, rendered alone — no sidebar, no tab strip — when every tab is filtered out by `.permission()`/`.role()`/`.visible()`.
+- **Vertical `SkTabs` is now a proper ARIA tablist.** The sidebar nav is `role="tablist"`/`aria-orientation="vertical"`, each tab button is `role="tab"` with `aria-selected`/`aria-controls`/`aria-disabled` and roving `tabindex`, and the panel is wrapped in `role="tabpanel"`; Arrow Up/Down, Home/End move focus between enabled tabs and Enter/Space select.
+- **`TabsBuilder.build()` now validates duplicate tab keys and returns an immutable snapshot.** A duplicate key throws in development builds and logs a `console.error` in production instead of staying silent; `TabItemBuilder.build()` also now rejects a whitespace-only key, not just a missing one; every `build()` call returns a fresh copy of the config and its tabs, so a later `.addTabs()` on the same builder or mutating the returned config can no longer affect an already-built config.
+- **`TabPanelMode`, `TabHistoryMode`, `TabUrlMode`, `TabChangePayload`, and `SkTabsExposed` are now exported from the TabBuilder core barrel** (`@lvntr/components/TabBuilder/core`), alongside the existing `TabBuilderConfig`, `TabItemConfig`, `TabLayout`, `TabIconColor`, and `TabBadgeSeverity` exports.
+- **`useUrlTab()` now accepts a `ref` or a getter for its `tabs` argument, in addition to a plain array, and a new `{ history: 'push' | 'replace' }` third argument.** The value is read through `toValue()` on every access; `history: 'push'` gives each switch its own history entry instead of the default `'replace'`.
+
+### Changed
+
+- **Vertical `SkTabs` tab buttons now carry `role="tab"` instead of no explicit role, and the panel content is wrapped in a new `role="tabpanel"` `<div>` inside the card body.** A test selecting a tab button with `getByRole('button')` must switch to `getByRole('tab')`; custom CSS relying on a direct-child selector under the card body may need a look.
+- **`TabsBuilder.build()` now throws on a duplicate tab key in development builds, and logs the same message via `console.error` in production instead of staying silent.** Duplicate keys used to silently break slot resolution and URL selection — the second tab rendered the first one's content and could never be reached via `?tab=`.
+- **`SkTabs` no longer imports the published `useUrlTab` copy from `@/composables`; it now owns an equivalent active-tab state internally.** This removes a version-skew risk (`sk:publish --tag=composables` could leave an app on an older `useUrlTab` than the shipped component expects), but a project that hand-edited its published `useUrlTab.ts` specifically to change `SkTabs`' behavior will no longer see that edit take effect — `useUrlTab()` itself is unaffected for app code that calls it directly.
+
+### Fixed
+
+- **Vertical `SkTabs` tab buttons no longer submit an enclosing form.** The sidebar nav `<button>` had no explicit `type`, so browsers defaulted it to `type="submit"` — clicking a tab inside a `<form>` could submit the form instead of just switching tabs. It now sets `type="button"`.
+- **A tab's `visible`/`disabled` state changing after mount now correctly drives the URL-synced active tab.** `useUrlTab()` used to close over a fixed snapshot of the tab list taken at mount, so a tab that became visible later couldn't be reached via `?tab=`, and an active tab that became hidden or disabled left the UI pointed at a tab no longer in the list. The selectable list is now a reactive array kept in sync with the live `visible`/`disabled` state, so a newly visible tab is immediately selectable and a hidden or disabled active tab falls back to the first selectable tab.
+- **A disabled tab can no longer be activated from `?tab=`, and a disabled first tab is no longer the param-less default.** `useUrlTab()` now resolves both the URL parameter and the "no parameter" fallback against the selectable (non-disabled) tab list instead of the full list.
+- **Re-selecting the already-active tab no longer fires an Inertia visit, and `#hash` now survives a tab switch.** Clicking the active tab again (or re-assigning it to its current value) used to still call `router.visit()`; it is now a no-op. Switching tabs also preserves any `#hash` present on the current URL instead of dropping it.
+
 ## 2026-08-25 — v13.6.16
 
 ### Fixed

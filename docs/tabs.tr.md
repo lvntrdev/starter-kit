@@ -7,6 +7,8 @@ Starter kit, çok bölümlü ekranları temiz tutmak için `SkTabs` ve fluent `T
 ```ts
 import { TB } from '@lvntr/components/TabBuilder/core';
 import SkTabs from '@lvntr/components/TabBuilder/SkTabs.vue';
+import type { TabIconColor, TabBadgeSeverity } from '@lvntr/components/TabBuilder/core';
+import type { TabChangePayload, SkTabsExposed, TabPanelMode, TabHistoryMode, TabUrlMode } from '@lvntr/components/TabBuilder/core';
 ```
 
 ## Temel Örnek
@@ -54,6 +56,11 @@ const tabConfig = TB.tabs()
 - `cardSubtitle(string)`
 - `isCard(boolean)`
 - `addTabs(...tabs)`
+- `lazy(value = true)` — yalnızca aktif paneli mount eder (`panels: 'active'`); `lazy(false)` override'ı temizler
+- `keepAlive(value = true)` — her paneli mount edip geçişler arasında canlı tutar (`panels: 'all'`); `keepAlive(false)` override'ı temizler
+- `history('push' | 'replace')` — sekme geçişinde yazılan history girdisi; varsayılan `replace`
+- `urlMode('server' | 'client')` — `server` bir Inertia visit'i üzerinden senkronize eder (varsayılan), `client` sunucuya istek atmadan URL'i günceller
+- `syncUrl(boolean)` — aktif sekmeyi URL query string'inde yansıtır; varsayılan `true`
 
 ## Tab Item API
 
@@ -77,9 +84,37 @@ TB.item().key('billing').label('Faturalama').permission('billing.view', 'billing
 TB.item().key('admin-tools').label('Yönetici Araçları').role('admin', 'superadmin'),
 ```
 
+## Bileşen Prop'ları ve Event'leri
+
+- `config: TabBuilderConfig` — build edilmiş config (zorunlu)
+- `v-model` (`modelValue?: string`) — aktif sekme anahtarı için opsiyonel iki yönlü binding. URL modunda mount sırasında bir deep link (örn. `?tab=security`), farklı bir `modelValue`'nun önüne geçer; local modda (`.syncUrl(false)`) ise `modelValue` başlangıç seçimini besler. Her iki durumda da `modelValue` yazmak, bir tıklamanın kullandığı aynı setter'dan geçer.
+- `@update:modelValue="(key: string) => …"` — çözümlenen aktif anahtar `modelValue`'dan farklı olduğunda, mount sonrası dahil her seferinde tetiklenir
+- `@change="(payload: TabChangePayload) => …"` — mount **sonrasındaki** her sekme değişiminde tetiklenir (ilk mount bir değişiklik sayılmaz); payload `{ key, previousKey, tab }` şeklindedir — daha önce çözümlenebilen bir sekme yoksa `previousKey` `null` olur
+- `#empty` slot'u — `.permission()`/`.role()`/`.visible()` yüzünden tüm sekmeler elenmişse, sidebar veya tab şeridi olmadan tek başına render edilir
+- expose edilen instance (`SkTabsExposed`, template ref üzerinden) — `{ activeTab: string; isActive: (key: string) => boolean }`
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import type { TabChangePayload } from '@lvntr/components/TabBuilder/core';
+
+const activeTab = ref('general');
+
+function onTabChange(payload: TabChangePayload) {
+    console.log(payload.previousKey, '→', payload.key);
+}
+</script>
+
+<template>
+    <SkTabs :config="tabConfig" v-model="activeTab" @change="onTabChange">
+        <!-- ... -->
+    </SkTabs>
+</template>
+```
+
 ## Zengin Dikey Tab Görünümü
 
-Dikey tab'lar daha zengin bir sidebar sunabilir — renkli icon tile, description satırı, trailing badge veya check işareti. Tab'lar seviyesindeki `.isCard(true)` ile sidebar PrimeVue Card içine sarılır:
+Dikey tab'lar daha zengin bir sidebar sunabilir — renkli icon tile, description satırı, trailing badge veya check işareti. Sidebar zaten her zaman bir kart içinde render edilir; `.isCard(true)` bunun yerine aktif sekmenin **içerik** panelinin kart mı yoksa şeffaf, kenara yaslı bir panel mi olacağını belirler — `SkTabs` içindeki `tabIsCard()` fonksiyonunun okuduğu aynı flag:
 
 ```vue
 <script setup lang="ts">
@@ -118,21 +153,51 @@ const tabConfig = TB.tabs()
 
 - dikey veya yatay düzen
 - icon tile, description, badge ve check işareti ile zengin dikey sidebar
-- `useUrlTab()` ile query string senkronizasyonu
+- varsayılan olarak query string senkronizasyonu, `.syncUrl(false)` ile tamamen local (URL'siz) state
 - role ve permission bazlı görünürlük
 - sekme bazlı disabled mantığı
 - hem sekme hem de konteyner seviyesinde başlık ve alt başlıkla opsiyonel card sarmalayıcı
+- host tarafında tepki vermek için opsiyonel `v-model` binding'i ve bir `change` event'i
+- her sekme elendiğinde gösterilecek bir `empty` slot'u
+- dikey düzende tam klavye/ARIA desteği
 
 ## Dahili Davranışlar
 
 `SkTabs` şu özellikleri hazır getirir:
 
-- `useUrlTab()` ile query string senkronizasyonu
+- varsayılan olarak query string senkronizasyonu; `.syncUrl(false)` aktif sekmeyi tamamen local tutar
 - dikey sidebar modu
 - dikey düzende `sidebar-header` ve `sidebar-footer` slot'ları
 - sekme anahtarına göre slot tabanlı içerik
+- **lifecycle**: varsayılanlar değişmedi — dikey düzen yalnızca aktif paneli mount eder ve geçişte unmount eder, yatay düzen tüm panelleri bir kez mount edip görünürlüğü toggler; bu yüzden sekme bazlı local state varsayılan olarak yalnızca yatay düzende geçişten sağ çıkar. `.lazy()` her iki düzeni de yalnızca-aktif mount moduna zorlar (yatay düzende bu, PrimeVue'nun kendi `lazy` modudur); `.keepAlive()` her iki düzeni de her paneli mount edip canlı tutmaya zorlar — unmount yerine gizler (dikey düzende sekme bazlı state'i geçişler arasında korumak için kullanışlıdır)
+- **URL senkronizasyonu**: `?tab=` görünür ve enabled bir sekmeyi adlandırmalı, aksi halde ilk seçilebilir sekme kazanır; disabled bir sekme URL'den asla aktive edilemez; aktif sekmeyi tekrar seçmek no-op'tur; `#hash` geçişler arasında korunur. `.urlMode('server')` (varsayılan) sayfayı yeniden çözümleyen bir Inertia visit'i üzerinden senkronize eder; `.urlMode('client')` sunucuya istek atmadan URL'i günceller. `.history('replace')` (varsayılan) her geçişte mevcut history girdisini değiştirir, `.history('push')` her geçişe kendi girdisini verir. `.syncUrl(false)` URL senkronizasyonunu tamamen kaldırır — aktif sekme yalnızca component state'inde (ve `v-model`'de) yaşar
+- **erişilebilirlik (dikey düzen)**: tab listesi `aria-orientation="vertical"` ile `role="tablist"`'tır, her sekme butonu `aria-selected`/`aria-controls`/`aria-disabled` ve roving `tabindex` (aktif sekmede `0`, diğerlerinde `-1`) ile `role="tab"`'tır; panel ise `role="tabpanel"` ile sarmalanır. Arrow Down/Up, enabled sekmeler arasında odağı taşır (uçlarda başa/sona sarar), Home/End ilk/son enabled sekmeye atlar — yalnızca odak, manuel aktivasyon — Enter/Space ise butonun native click'i üzerinden seçim yapar. Yatay düzen PrimeVue'nun kendi erişilebilirliğini korur
+- **builder doğrulaması**: `TB.item()…build()` boş veya yalnızca boşluktan oluşan bir key'de hata fırlatır; `TB.tabs()…build()` hiç sekme eklenmemişse hata fırlatır, development build'lerinde yinelenen bir sekme key'inde de hata fırlatır (production'da aynı mesajı `console.error` ile basar, dedupe yapmadan); her `build()` çağrısı taze bir snapshot döndürür — böylece aynı builder üzerindeki sonraki `.addTabs()` çağrıları veya döndürülen config'in mutate edilmesi, zaten build edilmiş bir config'i asla etkilemez
+- aynı sayfadaki birden fazla `SkTabs` örneği farklı `.queryParam()` değerlerine ihtiyaç duyar
+- `.permission()`/`.role()` filtrelemesi yalnızca sunum amaçlıdır — asıl veriyi sunucu tarafında yetkilendirin, gizli sekmenin verisini sayfa prop'larına serileştirmeyin
 
 Gerektiğinde parent bileşenler aktif sekmeye `defineExpose` üzerinden erişebilir.
+
+## Sekmeler Dialog İçinde
+
+Bir dialog route'lanabilir bir sayfa değildir, bu yüzden sekmelerini URL query string'ine senkronlamak host sayfanın kendi `?tab=` parametresiyle çakışabilir (ya da basitçe anlamsızdır). Bunun yerine `.syncUrl(false)` çağırıp aktif sekmeyi `v-model` ile yönetin:
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+
+const activeTab = ref('general');
+const tabConfig = TB.tabs().syncUrl(false).addTabs(/* … */).build();
+</script>
+
+<template>
+    <AppDialog>
+        <SkTabs :config="tabConfig" v-model="activeTab">
+            <!-- ... -->
+        </SkTabs>
+    </AppDialog>
+</template>
+```
 
 ## En Uygun Kullanım
 

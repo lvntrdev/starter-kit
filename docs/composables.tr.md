@@ -135,7 +135,7 @@ return useMenuBuilder(allItems);
 
 ### useUrlTab()
 
-Sekme seçimini `?tab=security` gibi bir query string anahtarı ile senkron tutar.
+Sekme seçimini `?tab=security` gibi bir query string anahtarı ile senkron tutar. `tabs` argümanı düz bir dizi (bir `reactive` dizi dahil — değişiklikler canlı izlenir, böylece mount sonrası değişen bir sekme listesi, örn. permission'a göre filtrelenen, senkron kalır), bir `ref` veya bir getter (`MaybeRefOrGetter<TabDefinition[]>`) kabul eder; her erişimde `toValue()` ile okunur. Aktif sekmeyi zaten seçili olduğu değere ayarlamak no-op'tur (navigasyon tetiklenmez); listenin ilk öğesine ayarlamak query parametresini yazmak yerine kaldırır; mevcut URL'deki `#hash` geçiş boyunca korunur. Opsiyonel üçüncü bir argüman olan `{ history: 'push' | 'replace' }`, geçişte yazılan history girdisini kontrol eder — `'replace'` (varsayılan) mevcut girdinin üzerine yazar, `'push'` her geçişe kendi girdisini verir. `SkTabs` artık doğrudan bu composable'ın üzerine kurulu değildir — kendi internal, işlevsel olarak eşdeğer bir aktif-sekme state'ine sahiptir; böylece davranışı bir uygulamanın yayınladığı `useUrlTab` kopyasına bağlı kalmaz.
 
 ### useRefreshBus()
 
