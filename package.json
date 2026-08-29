@@ -3,7 +3,8 @@
   "description": "Vue 3 components for Lvntr Starter Kit (FormBuilder, DatatableBuilder, TabBuilder, FileManager, Skeleton, UI)",
   "type": "module",
   "scripts": {
-    "lang:build": "node resources/js/lang/sk-lang-build.mjs"
+    "lang:build": "node resources/js/lang/sk-lang-build.mjs",
+    "lint:lib": "stubs/node_modules/.bin/eslint --config stubs/eslint.config.js resources/js/components/Lvntr-Starter-Kit --quiet"
   },
   "main": "resources/js/components/Lvntr-Starter-Kit/index.ts",
   "exports": {

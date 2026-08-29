@@ -136,6 +136,9 @@ jobs:
         working-directory: stubs
         run: npm run lint:ci
 
+      - name: Lint (ESLint) — package library
+        run: npm run lint:lib
+
       - name: Test (Vitest)
         working-directory: stubs
         run: npm run test --if-present
