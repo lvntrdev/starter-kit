@@ -17,6 +17,7 @@
 
     interface Props {
         roleOptions: { label: string; value: string; color: string | null }[];
+        timezones: string[];
     }
 
     const props = defineProps<Props>();
@@ -40,21 +41,31 @@
     // ── Create dialog ─────────────────────────────────────────────────────────────
 
     function openCreateDialog() {
-        dialog.open(UserForm, { inDialog: true, roleOptions: props.roleOptions }, trans('sk-user.create'), {
-            icon: 'pi pi-user-plus',
-            subtitle: 'Yeni kullanıcı oluştur',
-            refreshKey: REFRESH_KEY,
-        });
+        dialog.open(
+            UserForm,
+            { inDialog: true, roleOptions: props.roleOptions, timezones: props.timezones },
+            trans('sk-user.create'),
+            {
+                icon: 'pi pi-user-plus',
+                subtitle: 'Yeni kullanıcı oluştur',
+                refreshKey: REFRESH_KEY,
+            },
+        );
     }
 
     // ── Edit dialog ───────────────────────────────────────────────────────────────
 
     function openEditDialog(userId: string) {
-        dialog.open(UserForm, { userId, inDialog: true, roleOptions: props.roleOptions }, trans('sk-user.edit'), {
-            icon: 'pi pi-user-edit',
-            subtitle: 'Kullanıcı bilgilerini güncelle',
-            refreshKey: REFRESH_KEY,
-        });
+        dialog.open(
+            UserForm,
+            { userId, inDialog: true, roleOptions: props.roleOptions, timezones: props.timezones },
+            trans('sk-user.edit'),
+            {
+                icon: 'pi pi-user-edit',
+                subtitle: 'Kullanıcı bilgilerini güncelle',
+                refreshKey: REFRESH_KEY,
+            },
+        );
     }
 
     // ── Delete ────────────────────────────────────────────────────────────────────

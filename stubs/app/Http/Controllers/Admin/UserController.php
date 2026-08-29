@@ -46,6 +46,11 @@ class UserController extends Controller
     {
         return Inertia::render('Admin/Users/Index', [
             'roleOptions' => $roleOptions->get(Auth::user()),
+            // The create/edit dialogs mount UserForm outside the page tree, so
+            // they cannot read the Create/Edit page props. Without this the
+            // timezone select falls back to its empty default and offers only
+            // the "site default" entry.
+            'timezones' => \DateTimeZone::listIdentifiers(),
         ]);
     }
 
