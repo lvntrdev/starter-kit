@@ -9,6 +9,7 @@
         TitleFieldConfig,
         ToggleSwitchFieldConfig,
     } from './core';
+    import { controlId, describedById } from './core/ids';
     import SkFormInput from './SkFormInput.vue';
     import SkIcon from '../ui/SkIcon.vue';
     import SkCard from '../ui/SkCard.vue';
@@ -168,6 +169,18 @@
     function rowIconIsClass(icon: string | undefined): boolean {
         if (!icon) return false;
         return ICON_CLASS_PREFIXES.some((p) => icon.startsWith(p));
+    }
+
+    /**
+     * True when one of the error / option-error / hint <small> elements renders for a
+     * field. Mirrors the v-if chain in the template exactly, so `aria-describedby` is
+     * only emitted while its target element actually exists in the DOM.
+     */
+    function hasDescription(field: FieldConfig): boolean {
+        const ctx = props.ctx;
+        if (ctx.activeErrors[field.key] && !ctx.isTranslatableField(field)) return true;
+        if (ctx.optionError(field)) return true;
+        return !!field.hint;
     }
 
     function toggleDescription(field: FieldConfig): string {
@@ -399,7 +412,7 @@
                         <template v-else>{{ asToggleRow(field).rowIcon }}</template>
                     </span>
 
-                    <label :for="field.key" class="sk-fb__secrow-body">
+                    <label :for="controlId(field)" class="sk-fb__secrow-body">
                         <span v-if="!field.hideLabel" class="sk-fb__secrow-title">
                             {{ ctx.displayLabel(field) }}
                         </span>
@@ -423,6 +436,7 @@
                                 :options="ctx.getOptions(field)"
                                 :loading="ctx.isLoading(field)"
                                 :translatable-errors="ctx.translatableErrorsFor(field)"
+                                :described="hasDescription(field)"
                                 @update="(v) => ctx.setValue(field.key, v)"
                             />
                         </slot>
@@ -431,20 +445,22 @@
 
                 <small
                     v-if="ctx.activeErrors[field.key] && !ctx.isTranslatableField(field)"
+                    :id="describedById(field)"
                     class="sk-fb__error"
                 >{{ ctx.activeErrors[field.key] }}</small>
                 <small
                     v-else-if="ctx.optionError(field)"
+                    :id="describedById(field)"
                     class="sk-fb__error"
                 >{{ $t('sk-common.options_load_error') }}</small>
-                <small v-else-if="field.hint" class="sk-fb__hint">{{ $t(field.hint) }}</small>
+                <small v-else-if="field.hint" :id="describedById(field)" class="sk-fb__hint">{{ $t(field.hint) }}</small>
             </div>
 
             <!-- Checkbox / Toggle: inline-label row -->
             <div v-else-if="ctx.hasInlineLabel(field)" class="sk-fb__field-vertical">
                 <div class="sk-fb__inline-row">
                     <template v-if="ctx.isControlRight(field) && !field.hideLabel">
-                        <label :for="field.key" class="sk-fb__label sk-fb__label--inline">
+                        <label :for="controlId(field)" class="sk-fb__label sk-fb__label--inline">
                             <SkIcon
                                 v-if="field.labelIcon && labelIconPosition(field) === 'left'"
                                 :icon="field.labelIcon"
@@ -474,12 +490,13 @@
                             :options="ctx.getOptions(field)"
                             :loading="ctx.isLoading(field)"
                             :translatable-errors="ctx.translatableErrorsFor(field)"
+                            :described="hasDescription(field)"
                             @update="(v) => ctx.setValue(field.key, v)"
                         />
                     </slot>
 
                     <template v-if="!ctx.isControlRight(field) && !field.hideLabel">
-                        <label :for="field.key" class="sk-fb__label sk-fb__label--inline">
+                        <label :for="controlId(field)" class="sk-fb__label sk-fb__label--inline">
                             <SkIcon
                                 v-if="field.labelIcon && labelIconPosition(field) === 'left'"
                                 :icon="field.labelIcon"
@@ -498,13 +515,15 @@
 
                 <small
                     v-if="ctx.activeErrors[field.key] && !ctx.isTranslatableField(field)"
+                    :id="describedById(field)"
                     class="sk-fb__error"
                 >{{ ctx.activeErrors[field.key] }}</small>
                 <small
                     v-else-if="ctx.optionError(field)"
+                    :id="describedById(field)"
                     class="sk-fb__error"
                 >{{ $t('sk-common.options_load_error') }}</small>
-                <small v-else-if="field.hint" class="sk-fb__hint">{{ $t(field.hint) }}</small>
+                <small v-else-if="field.hint" :id="describedById(field)" class="sk-fb__hint">{{ $t(field.hint) }}</small>
             </div>
 
             <!-- Regular fields: label on top OR inline -->
@@ -516,7 +535,7 @@
                 <div v-if="ctx.hasInlineFieldLabel(field)" class="sk-fb__field-row">
                     <label
                         v-if="!field.hideLabel && !ctx.isTranslatableField(field)"
-                        :for="field.key"
+                        :for="controlId(field)"
                         class="sk-fb__label sk-fb__label--field-inline"
                     >
                         <SkIcon
@@ -548,6 +567,7 @@
                                 :options="ctx.getOptions(field)"
                                 :loading="ctx.isLoading(field)"
                                 :translatable-errors="ctx.translatableErrorsFor(field)"
+                                :described="hasDescription(field)"
                                 :translatable-label="!field.hideLabel"
                                 @update="(v) => ctx.setValue(field.key, v)"
                             />
@@ -558,7 +578,7 @@
                 <template v-else>
                     <label
                         v-if="!field.hideLabel && !ctx.isTranslatableField(field)"
-                        :for="field.key"
+                        :for="controlId(field)"
                         class="sk-fb__label"
                     >
                         <SkIcon
@@ -589,6 +609,7 @@
                             :options="ctx.getOptions(field)"
                             :loading="ctx.isLoading(field)"
                             :translatable-errors="ctx.translatableErrorsFor(field)"
+                            :described="hasDescription(field)"
                             :translatable-label="!field.hideLabel"
                             @update="(v) => ctx.setValue(field.key, v)"
                         />
@@ -597,13 +618,15 @@
 
                 <small
                     v-if="ctx.activeErrors[field.key] && !ctx.isTranslatableField(field)"
+                    :id="describedById(field)"
                     class="sk-fb__error"
                 >{{ ctx.activeErrors[field.key] }}</small>
                 <small
                     v-else-if="ctx.optionError(field)"
+                    :id="describedById(field)"
                     class="sk-fb__error"
                 >{{ $t('sk-common.options_load_error') }}</small>
-                <small v-else-if="field.hint" class="sk-fb__hint">{{ $t(field.hint) }}</small>
+                <small v-else-if="field.hint" :id="describedById(field)" class="sk-fb__hint">{{ $t(field.hint) }}</small>
             </div>
         </template>
 
@@ -611,7 +634,7 @@
         <div v-else class="sk-fb__field-horizontal">
             <label
                 v-if="!field.hideLabel"
-                :for="field.key"
+                :for="controlId(field)"
                 class="sk-fb__label sk-fb__label--horizontal"
             >
                 <SkIcon
@@ -644,6 +667,7 @@
                             :options="ctx.getOptions(field)"
                             :loading="ctx.isLoading(field)"
                             :translatable-errors="ctx.translatableErrorsFor(field)"
+                            :described="hasDescription(field)"
                             @update="(v) => ctx.setValue(field.key, v)"
                         />
                     </slot>
@@ -664,19 +688,22 @@
                         :options="ctx.getOptions(field)"
                         :loading="ctx.isLoading(field)"
                         :translatable-errors="ctx.translatableErrorsFor(field)"
+                        :described="hasDescription(field)"
                         @update="(v) => ctx.setValue(field.key, v)"
                     />
                 </slot>
 
                 <small
                     v-if="ctx.activeErrors[field.key] && !ctx.isTranslatableField(field)"
+                    :id="describedById(field)"
                     class="sk-fb__error"
                 >{{ ctx.activeErrors[field.key] }}</small>
                 <small
                     v-else-if="ctx.optionError(field)"
+                    :id="describedById(field)"
                     class="sk-fb__error"
                 >{{ $t('sk-common.options_load_error') }}</small>
-                <small v-else-if="field.hint" class="sk-fb__hint">{{ $t(field.hint) }}</small>
+                <small v-else-if="field.hint" :id="describedById(field)" class="sk-fb__hint">{{ $t(field.hint) }}</small>
             </div>
         </div>
     </template>

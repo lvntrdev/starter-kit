@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, shallowMount } from '@vue/test-utils';
+import { flushPromises, mount, shallowMount } from '@vue/test-utils';
 import { defineComponent, h, nextTick } from 'vue';
 import { FB } from '../core';
 import type { ExistingMedia, FormBuilderConfig } from '../core';
@@ -24,16 +24,26 @@ import type { ExistingMedia, FormBuilderConfig } from '../core';
  */
 
 const apiGet = vi.fn();
+const apiDelete = vi.fn();
 const toastAdd = vi.fn();
+const confirmAccept = vi.fn((onAccept: () => void) => onAccept());
 
 vi.mock('@/composables/useApi', () => ({
-    useApi: () => ({ get: apiGet, post: vi.fn(), put: vi.fn(), delete: vi.fn() }),
+    useApi: () => ({ get: apiGet, post: vi.fn(), put: vi.fn(), delete: apiDelete }),
 }));
 vi.mock('@/composables/useDefinition', () => ({
     useDefinition: () => ({ load: vi.fn(), options: () => [], find: () => undefined }),
 }));
 vi.mock('@/composables/useCan', () => ({
     useCan: () => ({ can: () => true }),
+}));
+// Only exercised by the full-mount (real SkFormInput) tests below — the
+// shallow-mounted post-save tests above never render SkFormInput at all.
+vi.mock('@/composables/useConfirm', () => ({
+    useConfirm: () => ({ confirmDelete: confirmAccept, confirmAction: vi.fn() }),
+}));
+vi.mock('@/composables/useDialog', () => ({
+    useDialog: () => ({ open: vi.fn(), close: vi.fn() }),
 }));
 vi.mock('primevue/usetoast', () => ({
     useToast: () => ({ add: toastAdd }),
@@ -106,13 +116,37 @@ function upload(): File {
     return new File(['image'], 'a.png', { type: 'image/png' });
 }
 
-function mountForm(config: FormBuilderConfig) {
+function mountForm(config: FormBuilderConfig, props: Record<string, unknown> = {}) {
     const wrapper = shallowMount(SkForm, {
+        props: { config, ...props },
+        global: { mocks: { $t: (key: string) => key }, stubs: { SkCard: SkCardStub } },
+    });
+    mountedWrappers.push(wrapper);
+    return wrapper;
+}
+
+/**
+ * Full mount — SkFormInput (and its upload-zone/existing-media DOM) renders
+ * for real, unlike `mountForm()` above which shallow-mounts and never
+ * exercises the actual pick/drop/remove interaction code.
+ */
+function mountFull(config: FormBuilderConfig) {
+    const wrapper = mount(SkForm, {
         props: { config },
         global: { mocks: { $t: (key: string) => key }, stubs: { SkCard: SkCardStub } },
     });
     mountedWrappers.push(wrapper);
     return wrapper;
+}
+
+/** A `File` of an exact byte size, for `maxFileSize` boundary tests. */
+function sizedFile(name: string, bytes: number): File {
+    return new File([new Uint8Array(bytes)], name, { type: 'image/png' });
+}
+
+/** jsdom's file input has no real `files` setter — this is the standard workaround. */
+function setInputFiles(input: HTMLInputElement, files: File[]): void {
+    Object.defineProperty(input, 'files', { value: files, configurable: true });
 }
 
 function remoteMultipleConfig(): FormBuilderConfig {
@@ -215,6 +249,39 @@ describe('SkForm — file-upload cleanup after a successful save', () => {
         expect(toastAdd).not.toHaveBeenCalled();
     });
 
+    it('a reload() issued from the success listener does not leave dataLoading stuck after the silent refresh', async () => {
+        // A host that refreshes the form from its `@success` handler starts a
+        // LOADING request, and the post-save silent refresh immediately
+        // supersedes it. The loading request must still own — and clear — the
+        // spinner when it settles, while the newest request keeps the data write.
+        apiGet
+            .mockResolvedValueOnce({ record: { attachments: [11], media: [media(11)] } })
+            .mockResolvedValueOnce({ record: { attachments: [99], media: [media(99)] } })
+            .mockResolvedValueOnce({ record: { attachments: [11, 22], media: [media(11), media(22)] } });
+        let form: { reload: () => Promise<void> } | null = null;
+        const wrapper = mountForm(remoteMultipleConfig(), {
+            onSuccess: () => {
+                void form?.reload();
+            },
+        });
+        form = wrapper.vm as unknown as { reload: () => Promise<void> };
+        await flushPromises();
+
+        wrapper.vm.setValue('attachments', [11, upload()]);
+        await nextTick();
+        wrapper.vm.submit();
+        await flushPromises();
+
+        // Mount load, the listener's reload(), the post-save silent refresh.
+        expect(apiGet).toHaveBeenCalledTimes(3);
+        expect(wrapper.vm.dataLoading).toBe(false);
+        expect(wrapper.find('.sk-fb__skeleton').exists()).toBe(false);
+        // The superseded reload payload (99) must never land: the refresh was
+        // issued last, so the data-write ordering guard belongs to it.
+        expect(wrapper.vm.remoteData?.attachments).toEqual([11, 22]);
+        expect(wrapper.vm.currentValues.attachments).toEqual([11, 22]);
+    });
+
     it('does not refetch dataUrl after saving a form without file fields', async () => {
         apiGet.mockResolvedValueOnce({ record: { name: 'Before' } });
         const config = FB.form()
@@ -258,5 +325,138 @@ describe('SkForm — file-upload cleanup after a successful save', () => {
         expect(wrapper.vm.currentValues.attachment).toBe(file);
         expect(wrapper.vm.currentValues.title).toBe('Edited while saving');
         expect(wrapper.vm.isDirty).toBe(true);
+    });
+});
+
+/**
+ * Full-mount interaction tests — these exercise SkFormInput's actual pick /
+ * drop / limit / remove code (`addFiles`, `handleDrop`, `removeExistingFile`),
+ * which the shallow-mounted suite above never renders.
+ */
+describe('SkForm — file-upload interaction (full mount)', () => {
+    beforeEach(() => {
+        apiGet.mockReset();
+        apiDelete.mockReset();
+        toastAdd.mockClear();
+        confirmAccept.mockClear();
+    });
+
+    afterEach(() => {
+        for (const wrapper of mountedWrappers.splice(0)) {
+            wrapper.unmount();
+        }
+    });
+
+    it('two successive selections in multiple mode emit each existing id ONCE', async () => {
+        const config = FB.form()
+            .initialData({ attachments: [11], media: [media(11)] })
+            .submit({ url: '/api/form', method: 'put' })
+            .addFields(FB.fileUpload().key('attachments').label('Attachments').multiple().existingMediaKey('media'))
+            .build();
+        const wrapper = mountFull(config);
+        const input = wrapper.get('input[type="file"]').element as HTMLInputElement;
+
+        const first = upload();
+        setInputFiles(input, [first]);
+        input.dispatchEvent(new Event('change'));
+        await nextTick();
+
+        const second = upload();
+        setInputFiles(input, [second]);
+        input.dispatchEvent(new Event('change'));
+        await nextTick();
+
+        const value = wrapper.vm.currentValues.attachments as unknown[];
+        expect(value.filter((v) => v === 11)).toHaveLength(1);
+        expect(value).toContain(first);
+        expect(value).toContain(second);
+    });
+
+    it('maxFileSize/fileLimit reject only the offending files with ONE toast', async () => {
+        const config = FB.form()
+            .initialData({ attachments: [] })
+            .submit({ url: '/api/form', method: 'put' })
+            .addFields(
+                FB.fileUpload()
+                    .key('attachments')
+                    .label('Attachments')
+                    .multiple()
+                    .maxFileSize(1000)
+                    .fileLimit(1),
+            )
+            .build();
+        const wrapper = mountFull(config);
+        const input = wrapper.get('input[type="file"]').element as HTMLInputElement;
+
+        const ok = sizedFile('ok.png', 500);
+        const tooLarge = sizedFile('big.png', 2000);
+        const alsoOk = sizedFile('ok2.png', 500);
+        setInputFiles(input, [ok, tooLarge, alsoOk]);
+        input.dispatchEvent(new Event('change'));
+        await nextTick();
+
+        // `ok` survives the size filter and then the fileLimit(1) slice keeps
+        // only it — both problems fold into a SINGLE toast call.
+        expect(toastAdd).toHaveBeenCalledTimes(1);
+        expect(wrapper.vm.currentValues.attachments).toEqual([ok]);
+    });
+
+    it('a drop event feeds the same addFiles() path as the picker', async () => {
+        const config = FB.form()
+            .initialData({ attachment: null })
+            .submit({ url: '/api/form', method: 'put' })
+            .addFields(FB.fileUpload().key('attachment').label('Attachment'))
+            .build();
+        const wrapper = mountFull(config);
+        const file = upload();
+
+        await wrapper.get('.sk-fb__upload-zone').trigger('drop', { dataTransfer: { files: [file] } });
+
+        expect(wrapper.vm.currentValues.attachment).toBe(file);
+    });
+
+    it('deferExistingRemoval emits the value without the id and never calls api.delete', async () => {
+        const config = FB.form()
+            .initialData({ attachments: [11], media: [media(11)] })
+            .submit({ url: '/api/form', method: 'put' })
+            .addFields(
+                FB.fileUpload()
+                    .key('attachments')
+                    .label('Attachments')
+                    .multiple()
+                    .existingMediaKey('media')
+                    .deferExistingRemoval(),
+            )
+            .build();
+        const wrapper = mountFull(config);
+
+        await wrapper.get('.sk-fb__file-remove').trigger('click');
+        await flushPromises();
+
+        expect(confirmAccept).toHaveBeenCalledTimes(1);
+        expect(apiDelete).not.toHaveBeenCalled();
+        expect(wrapper.vm.currentValues.attachments).toEqual([]);
+        expect(wrapper.find('.sk-fb__file-item').exists()).toBe(false);
+    });
+
+    it('immediate mode (deferExistingRemoval unset) surfaces a delete-failure toast and keeps the media listed', async () => {
+        apiDelete.mockRejectedValueOnce(new Error('delete failed'));
+        const config = FB.form()
+            .initialData({ attachments: [11], media: [media(11)] })
+            .submit({ url: '/api/form', method: 'put' })
+            .addFields(
+                FB.fileUpload().key('attachments').label('Attachments').multiple().existingMediaKey('media'),
+            )
+            .build();
+        const wrapper = mountFull(config);
+
+        await wrapper.get('.sk-fb__file-remove').trigger('click');
+        await flushPromises();
+
+        expect(apiDelete).toHaveBeenCalledTimes(1);
+        expect(toastAdd).toHaveBeenCalledTimes(1);
+        expect(wrapper.find('.sk-fb__file-item').exists()).toBe(true);
+        // The keep-list must not have been touched by the failed delete either.
+        expect(wrapper.vm.currentValues.attachments).toEqual([11]);
     });
 });

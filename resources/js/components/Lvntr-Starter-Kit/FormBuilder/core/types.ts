@@ -346,14 +346,35 @@ export interface FileUploadFieldConfig extends BaseFieldConfig {
     multiple?: boolean;
     /** Accepted file types (e.g. 'image/*', '.pdf,.doc'). */
     accept?: string;
-    /** Maximum file size in bytes (default: 10MB). */
+    /**
+     * Maximum size of a SINGLE file, in bytes. Unset = no client-side size check
+     * at all (there is no implicit default); the server limits still apply.
+     * When set, oversized files are rejected on select/drop with a toast.
+     */
     maxFileSize?: number;
-    /** Maximum number of files when multiple is true. */
+    /**
+     * Maximum number of files when `multiple` is true, counting the existing
+     * media that is still attached plus the newly picked files. Unset = no
+     * client-side count check.
+     */
     fileLimit?: number;
     /** Existing media items to display in edit mode. */
     existingMedia?: ExistingMedia[];
     /** Key in initialData/remoteData to auto-populate existingMedia (e.g. 'identity_document_media'). */
     existingMediaKey?: string;
+    /**
+     * Defer deletion of existing media to the save request (default: false).
+     *
+     * `false` (default) — removing an existing file fires `DELETE /media/{id}`
+     * immediately, so it is gone even if the form is never submitted.
+     *
+     * `true` — removal only drops the item from the rendered list and from the
+     * emitted keep-list; nothing is deleted until the form is saved. Requires
+     * the server side to sync against that keep-list (`HasMediaCollections::
+     * syncMediaCollection` deletes the ids missing from it) — without such a
+     * sync the file is never deleted at all.
+     */
+    deferExistingRemoval?: boolean;
 }
 
 export interface ColorSelectorFieldConfig extends BaseFieldConfig {
@@ -509,6 +530,15 @@ export interface FormBuilderConfig {
      * then populates fields from the response using dataKey.
      */
     dataUrl?: string;
+    /**
+     * Refetch `dataUrl` when it changes after mount. Default: false (mount-only).
+     *
+     * Off by default because a config rebuilt on every parent render would
+     * otherwise refetch continuously and wipe in-progress edits. Turn it on for a
+     * persistent form whose record genuinely changes (a dialog reused for a
+     * different id).
+     */
+    reloadOnDataUrlChange?: boolean;
     /**
      * Key to extract from the dataUrl response (e.g. 'user').
      * If not set, the entire response is used as initialData.

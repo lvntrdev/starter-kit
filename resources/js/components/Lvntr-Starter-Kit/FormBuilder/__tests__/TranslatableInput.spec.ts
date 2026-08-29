@@ -11,6 +11,8 @@ import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 
 import TranslatableInput from '../inputs/TranslatableInput.vue';
+import { FB } from '../core';
+import { resolveContentLocales } from '../core/locales';
 import type { TranslatableTextFieldConfig } from '../core/types';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -24,13 +26,35 @@ class ResizeObserverStub {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 globalThis.ResizeObserver = ResizeObserverStub as any;
 
-vi.mock('@inertiajs/vue3', () => ({
+vi.mock('@inertiajs/vue3', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@inertiajs/vue3')>()),
     usePage: () => ({
         props: {
             availableLocales: { tr: 'Türkçe', en: 'English' },
         },
     }),
 }));
+
+// SkForm's own composable surface, mocked the same way as SkForm.fileUpload.spec.ts —
+// only needed by the "same page props" contract test below, which mounts SkForm
+// alongside TranslatableInput.
+vi.mock('@/composables/useApi', () => ({
+    useApi: () => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() }),
+}));
+vi.mock('@/composables/useDefinition', () => ({
+    useDefinition: () => ({ load: vi.fn(), options: () => [], find: () => undefined }),
+}));
+vi.mock('@/composables/useCan', () => ({
+    useCan: () => ({ can: () => true }),
+}));
+vi.mock('primevue/usetoast', () => ({
+    useToast: () => ({ add: vi.fn() }),
+}));
+vi.mock('laravel-vue-i18n', () => ({
+    trans: (key: string) => key,
+}));
+
+const { default: SkForm } = await import('../SkForm.vue');
 
 // Mock EditorInput (heavy tiptap dependency)
 vi.mock('../inputs/EditorInput.vue', () => ({
@@ -371,5 +395,66 @@ describe('TranslatableInput — initial value normalization', () => {
         const inputs = wrapper.findAll('input');
         const enInput = inputs[inputs.length - 1];
         expect((enInput.element as HTMLInputElement).value).toBe('');
+    });
+});
+
+// ── Tests: resolveContentLocales (shared helper, pure function) ───────────────
+
+describe('resolveContentLocales', () => {
+    it('prefers availableContentLocales over availableLocales when both are present', () => {
+        const result = resolveContentLocales({
+            availableContentLocales: { tr: 'Türkçe' },
+            availableLocales: { tr: 'Türkçe', en: 'English' },
+        });
+
+        expect(result).toEqual([{ code: 'tr', name: 'Türkçe' }]);
+    });
+
+    it('falls back to availableLocales when availableContentLocales is absent', () => {
+        const result = resolveContentLocales({ availableLocales: { en: 'English' } });
+
+        expect(result).toEqual([{ code: 'en', name: 'English' }]);
+    });
+
+    it('falls back to availableLocales when availableContentLocales is an empty object', () => {
+        const result = resolveContentLocales({
+            availableContentLocales: {},
+            availableLocales: { en: 'English' },
+        });
+
+        expect(result).toEqual([{ code: 'en', name: 'English' }]);
+    });
+});
+
+// ── Tests: SkForm + TranslatableInput agree on the locale set ─────────────────
+
+describe('SkForm and TranslatableInput resolve the SAME locale set from identical page props', () => {
+    it('a translatable field default carries exactly the codes TranslatableInput renders as tabs', async () => {
+        // Both read `usePage().props` through `core/locales` — this mock (tr/en,
+        // no availableContentLocales) is the SAME one every test above uses.
+        const field = FB.translatableText().key('title').label('Title').build();
+        const formConfig = {
+            ...FB.form().submit({ url: '/api/form', method: 'put' }).build(),
+            fields: [field],
+        };
+
+        const formWrapper = mount(SkForm, {
+            props: { config: formConfig },
+            global: { mocks: { $t: (key: string) => key }, stubs: { SkFormFieldRenderer: true, SkCard: true } },
+        });
+        const defaultKeys = Object.keys(formWrapper.vm.currentValues.title as Record<string, string>).sort();
+        formWrapper.unmount();
+
+        const inputWrapper = mount(TranslatableInput, {
+            props: { field, modelValue: {} },
+            global: globalConfig,
+        });
+        const tabTexts = inputWrapper.findAll('button[role="tab"]').map((t) => t.text().toUpperCase());
+
+        expect(defaultKeys).toEqual(['en', 'tr']);
+        expect(tabTexts).toHaveLength(defaultKeys.length);
+        for (const key of defaultKeys) {
+            expect(tabTexts.some((t) => t.includes(key.toUpperCase()))).toBe(true);
+        }
     });
 });

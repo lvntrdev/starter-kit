@@ -20,6 +20,7 @@
         TranslatableTextareaFieldConfig,
         TranslatableEditorFieldConfig,
     } from './core';
+    import { controlId, describedById, passwordUsesWrapper } from './core/ids';
     import ColorSelector from './SkColorSelector.vue';
     import EditorInput from './inputs/EditorInput.vue';
     import TranslatableInput from './inputs/TranslatableInput.vue';
@@ -47,6 +48,12 @@
         translatableErrors?: Record<string, string>;
         /** Translatable alanlarda label'ı TranslatableInput bassın (dil seçici label yanında). */
         translatableLabel?: boolean;
+        /**
+         * True when SkFormFieldRenderer prints an error / option-error / hint <small>
+         * for this field. Drives `aria-describedby`; the renderer owns that state, so
+         * we take a boolean instead of reaching into it.
+         */
+        described?: boolean;
     }
 
     const props = withDefaults(defineProps<Props>(), {
@@ -56,6 +63,7 @@
         loading: false,
         translatableErrors: undefined,
         translatableLabel: false,
+        described: false,
     });
 
     const emit = defineEmits<{
@@ -95,6 +103,21 @@
         return props.field.required ? { 'aria-required': 'true', ...base } : base;
     });
 
+    /**
+     * Form-level disabled/invalid is a floor, not a default: `.props({ disabled: false })`
+     * can no longer unlock a read-only form, while `.props({ disabled: true })` still
+     * disables a single field. Bound AFTER `v-bind="extraProps"` in every control so the
+     * spread cannot win (Vue merges template props in source order).
+     */
+    const forcedDisabled = computed(() => props.disabled || !!props.field.componentProps?.disabled);
+    const forcedInvalid = computed(() => props.invalid || !!props.field.componentProps?.invalid);
+
+    /**
+     * `aria-describedby` target — only emitted while the renderer actually prints the
+     * matching <small>, otherwise the attribute would point at a missing element.
+     */
+    const describedBy = computed(() => (props.described ? describedById(props.field) : undefined));
+
     /** Translate option labels (and optional descriptions) via trans() so consumers can pass translation keys. */
     const translatedOptions = computed(() =>
         props.options.map((opt) => ({
@@ -111,7 +134,9 @@
      * consumer explicitly opts into its strength-meter feedback, since that
      * component owns its own absolute-positioned icons and fights InputGroup.
      */
-    const useCustomPasswordInput = computed(() => props.field.type === 'password' && !asPassword.value.feedback);
+    const useCustomPasswordInput = computed(
+        () => props.field.type === 'password' && !passwordUsesWrapper(props.field),
+    );
 
     // ── Icon support ─────────────────────────────────────────────────────────────
 
@@ -308,8 +333,13 @@
     // ── File Upload ───────────────────────────────────────────────────────────────
 
     const { confirmDelete } = useConfirm();
-    const api = useApi();
+    // `toast: false` — the one call on this instance (the immediate-mode media
+    // DELETE below) reports its own `upload_delete_failed` toast; on the default,
+    // useApi would add a second, generic toast for the same failure.
+    const api = useApi({ toast: false });
     const existingFiles = ref<ExistingMedia[]>([]);
+    /** Drag-and-drop hover state for the upload zone. */
+    const isDragOver = ref(false);
 
     watchEffect(() => {
         if (props.field.type === 'file-upload') {
@@ -348,74 +378,263 @@
         dialog.open(FilePreviewModal, { file }, file.name, width ? { width } : {});
     }
 
+    /**
+     * Client-side `accept` check, used for DROPPED files only.
+     *
+     * The native picker enforces `accept` itself; a drop does not go through the
+     * picker, so without this a drag-and-drop would bypass the restriction the
+     * field declares. Non-matching drops are ignored exactly as the file dialog
+     * ignores them (it never offers them in the first place).
+     */
+    function matchesAccept(file: File, accept?: string): boolean {
+        if (!accept) return true;
+        const patterns = accept
+            .split(',')
+            .map((p) => p.trim().toLowerCase())
+            .filter(Boolean);
+        if (!patterns.length) return true;
+
+        const name = file.name.toLowerCase();
+        const type = file.type.toLowerCase();
+
+        return patterns.some((pattern) => {
+            if (pattern.startsWith('.')) return name.endsWith(pattern);
+            if (pattern.endsWith('/*')) return type.startsWith(pattern.slice(0, -1));
+            return type === pattern;
+        });
+    }
+
+    /**
+     * Keep-list ids currently attached, deduplicated, in a stable order.
+     *
+     * Both sources are read on purpose:
+     *  - `existingFiles` alone was the old bug — the ids were prepended again on
+     *    every pick, so a second selection emitted each id twice.
+     *  - `props.value` alone would be wrong on the FIRST pick: SkForm seeds the
+     *    field from `initialData[key]` (`derivedDefaults`), and for a media field
+     *    that is normally empty — the ids live under `existingMediaKey`. An empty
+     *    keep-list makes a server-side sync delete every attached file.
+     * Removal (immediate or deferred) drops the id from BOTH, so the union only
+     * ever contains media that is still attached.
+     */
+    function currentKeepIds(): number[] {
+        const seen = new Set<number>();
+        const ids: number[] = [];
+
+        for (const media of existingFiles.value) {
+            if (seen.has(media.id)) continue;
+            seen.add(media.id);
+            ids.push(media.id);
+        }
+        for (const item of Array.isArray(props.value) ? (props.value as unknown[]) : []) {
+            if (typeof item !== 'number' || seen.has(item)) continue;
+            seen.add(item);
+            ids.push(item);
+        }
+
+        return ids;
+    }
+
+    /** Newly picked (not yet uploaded) files held in the current value. */
+    function currentNewFiles(): File[] {
+        if (asFileUpload.value.multiple) {
+            const val = Array.isArray(props.value) ? (props.value as unknown[]) : [];
+            return val.filter((item): item is File => item instanceof File);
+        }
+        return props.value instanceof File ? [props.value] : [];
+    }
+
+    /**
+     * Single entry point for both the picker and the drop zone.
+     *
+     * Limits are enforced ONLY when configured (`maxFileSize` per file,
+     * `fileLimit` on existing + new in multiple mode). Rejected files never
+     * disappear silently: the acceptable ones are still added and one toast
+     * reports everything that was skipped.
+     */
+    function addFiles(incoming: File[]): void {
+        if (props.disabled || !incoming.length) return;
+
+        const config = asFileUpload.value;
+        // `accept` filters BEFORE the single-file slice: a drop whose first item is
+        // the wrong type must not shadow an acceptable file behind it.
+        let candidates = incoming.filter((file) => matchesAccept(file, config.accept));
+        if (!config.multiple) candidates = candidates.slice(0, 1);
+        if (!candidates.length) return;
+
+        const problems: string[] = [];
+
+        if (config.maxFileSize) {
+            const maxSize = config.maxFileSize;
+            const tooLarge = candidates.filter((file) => file.size > maxSize);
+            if (tooLarge.length) {
+                candidates = candidates.filter((file) => file.size <= maxSize);
+                problems.push(
+                    trans('sk-common.upload_file_too_large', {
+                        size: formatFileSize(maxSize),
+                        files: tooLarge.map((file) => file.name).join(', '),
+                    }),
+                );
+            }
+        }
+
+        const keepIds = currentKeepIds();
+        const heldFiles = currentNewFiles();
+
+        if (config.multiple && config.fileLimit) {
+            const room = config.fileLimit - keepIds.length - heldFiles.length;
+            if (candidates.length > room) {
+                candidates = room > 0 ? candidates.slice(0, room) : [];
+                problems.push(trans('sk-common.upload_file_limit', { limit: String(config.fileLimit) }));
+            }
+        }
+
+        if (problems.length) {
+            toast.add({
+                severity: 'warn',
+                summary: trans('sk-common.error'),
+                detail: problems.join(' '),
+                group: 'bc',
+                life: 5000,
+            });
+        }
+
+        if (!candidates.length) return;
+
+        if (config.multiple) {
+            emit('update', [...keepIds, ...heldFiles, ...candidates]);
+        } else {
+            emit('update', candidates[0]);
+        }
+    }
+
     function handleFileSelect(event: Event): void {
         const input = event.target as HTMLInputElement;
         if (!input.files?.length) return;
 
-        const config = asFileUpload.value;
-        const files = Array.from(input.files);
-
-        if (config.multiple) {
-            const currentFiles = (props.value as File[]) ?? [];
-            const keepIds = existingFiles.value.map((m) => m.id);
-            emit('update', [...keepIds, ...currentFiles, ...files]);
-        } else {
-            emit('update', files[0]);
-        }
+        addFiles(Array.from(input.files));
 
         input.value = '';
     }
 
+    function handleDragOver(): void {
+        if (props.disabled) return;
+        isDragOver.value = true;
+    }
+
+    function handleDragLeave(): void {
+        isDragOver.value = false;
+    }
+
+    function handleDrop(event: DragEvent): void {
+        isDragOver.value = false;
+        if (props.disabled) return;
+
+        const dropped = Array.from(event.dataTransfer?.files ?? []);
+        if (dropped.length) addFiles(dropped);
+    }
+
     function removeNewFile(index: number): void {
         confirmDelete(() => {
-            const config = asFileUpload.value;
-            if (config.multiple) {
-                const currentValue = (props.value as (File | number)[]) ?? [];
-                const newFiles = currentValue.filter((item): item is File => item instanceof File);
-                const keepIds = currentValue.filter((item): item is number => typeof item === 'number');
-                newFiles.splice(index, 1);
-                emit('update', [...keepIds, ...newFiles]);
+            if (asFileUpload.value.multiple) {
+                const files = currentNewFiles();
+                files.splice(index, 1);
+                emit('update', [...currentKeepIds(), ...files]);
             } else {
                 emit('update', null);
             }
-        }, 'Are you sure you want to remove this file?');
+        }, trans('sk-common.upload_confirm_remove_new'));
     }
 
+    /**
+     * Detaches an already-stored media item.
+     *
+     * Default (`deferExistingRemoval` unset/false): the file is deleted right
+     * away with `DELETE /media/{id}` — gone even if the form is never saved.
+     * Opt-in defer: nothing is requested here; the item only leaves the list and
+     * the emitted keep-list, and the save-side keep-list sync performs the
+     * deletion (see `FileUploadFieldConfig.deferExistingRemoval`).
+     */
     function removeExistingFile(media: ExistingMedia): void {
+        const config = asFileUpload.value;
+
+        function detach(): void {
+            existingFiles.value = existingFiles.value.filter((m) => m.id !== media.id);
+
+            if (config.multiple) {
+                const currentValue = Array.isArray(props.value) ? (props.value as unknown[]) : [];
+                emit(
+                    'update',
+                    currentValue.filter((item) => item !== media.id),
+                );
+            } else if (config.deferExistingRemoval) {
+                emit('update', null);
+            }
+        }
+
         confirmDelete(async () => {
+            if (config.deferExistingRemoval) {
+                detach();
+                return;
+            }
+
             try {
                 await api.delete(`/media/${media.id}`);
-                existingFiles.value = existingFiles.value.filter((m) => m.id !== media.id);
-
-                if (asFileUpload.value.multiple) {
-                    const currentValue = (props.value as (File | number)[]) ?? [];
-                    emit(
-                        'update',
-                        currentValue.filter((item) => item !== media.id),
-                    );
-                }
+                detach();
             } catch {
-                // silently fail
+                // The media is still attached — leave `existingFiles` alone and say so,
+                // instead of the silent no-op that made a failed delete look successful.
+                toast.add({
+                    severity: 'error',
+                    summary: trans('sk-common.error'),
+                    detail: trans('sk-common.upload_delete_failed'),
+                    group: 'bc',
+                    life: 5000,
+                });
             }
-        }, 'Are you sure you want to delete this file? This action cannot be undone.');
+        }, trans('sk-common.upload_confirm_delete_existing'));
     }
 
     const newFiles = computed<File[]>(() => {
         if (props.field.type !== 'file-upload') return [];
-        const config = asFileUpload.value;
+        return currentNewFiles();
+    });
 
-        if (config.multiple) {
-            const val = (props.value as (File | number)[]) ?? [];
-            return val.filter((item): item is File => item instanceof File);
+    /**
+     * One object URL per `File`, created on first preview and revoked when the
+     * file leaves the value or the component unmounts. The previews used to call
+     * `URL.createObjectURL` inside the computed, so every unrelated recompute
+     * minted another blob URL that stayed alive until a full page reload.
+     */
+    const objectUrls = new Map<File, string>();
+
+    function objectUrlFor(file: File): string {
+        let url = objectUrls.get(file);
+        if (!url) {
+            url = URL.createObjectURL(file);
+            objectUrls.set(file, url);
         }
+        return url;
+    }
 
-        return props.value instanceof File ? [props.value] : [];
+    watch(newFiles, (files) => {
+        const kept = new Set(files);
+        for (const [file, url] of objectUrls) {
+            if (kept.has(file)) continue;
+            URL.revokeObjectURL(url);
+            objectUrls.delete(file);
+        }
+    });
+
+    onBeforeUnmount(() => {
+        for (const url of objectUrls.values()) URL.revokeObjectURL(url);
+        objectUrls.clear();
     });
 
     const newFilePreviews = computed(() =>
         newFiles.value.map((file) => ({
             file,
-            url: URL.createObjectURL(file),
+            url: objectUrlFor(file),
             isImage: file.type.startsWith('image/'),
         })),
     );
@@ -449,10 +668,11 @@
                 v-model="stringVal"
                 :type="asInputText.inputType ?? 'text'"
                 :placeholder="asInputText.placeholder ? $t(asInputText.placeholder) : undefined"
-                :disabled="disabled"
-                :invalid="invalid"
                 class="w-full"
+                :aria-describedby="describedBy"
                 v-bind="extraProps"
+                :disabled="forcedDisabled"
+                :invalid="forcedInvalid"
             />
         </IconField>
         <InputText
@@ -461,10 +681,11 @@
             v-model="stringVal"
             :type="asInputText.inputType ?? 'text'"
             :placeholder="asInputText.placeholder ? $t(asInputText.placeholder) : undefined"
-            :disabled="disabled"
-            :invalid="invalid"
             class="w-full"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled"
+            :invalid="forcedInvalid"
         />
 
         <!-- InputNumber -->
@@ -489,10 +710,12 @@
                 :min-fraction-digits="asInputNumber.minFractionDigits"
                 :max-fraction-digits="asInputNumber.maxFractionDigits"
                 :use-grouping="asInputNumber.useGrouping ?? true"
-                :disabled="disabled"
-                :invalid="invalid"
                 class="w-full"
+                :input-id="controlId(field)"
+                :aria-describedby="describedBy"
                 v-bind="extraProps"
+                :disabled="forcedDisabled"
+                :invalid="forcedInvalid"
                 @input="numberVal = ($event.value ?? null) as number | null"
             />
         </IconField>
@@ -510,10 +733,12 @@
             :min-fraction-digits="asInputNumber.minFractionDigits"
             :max-fraction-digits="asInputNumber.maxFractionDigits"
             :use-grouping="asInputNumber.useGrouping ?? true"
-            :disabled="disabled"
-            :invalid="invalid"
             class="w-full"
+            :input-id="controlId(field)"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled"
+            :invalid="forcedInvalid"
             @input="numberVal = ($event.value ?? null) as number | null"
         />
 
@@ -525,9 +750,10 @@
             :length="asInputOtp.length ?? 6"
             :mask="asInputOtp.mask"
             :integer-only="asInputOtp.integerOnly"
-            :disabled="disabled"
-            :invalid="invalid"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled"
+            :invalid="forcedInvalid"
         />
 
         <!-- InputMask -->
@@ -547,10 +773,11 @@
                 :slot-char="asInputMask.slotChar ?? '_'"
                 :auto-clear="asInputMask.autoClear ?? false"
                 :unmask="asInputMask.unmask ?? false"
-                :disabled="disabled"
-                :invalid="invalid"
                 class="w-full"
+                :aria-describedby="describedBy"
                 v-bind="extraProps"
+                :disabled="forcedDisabled"
+                :invalid="forcedInvalid"
             />
         </IconField>
         <InputMask
@@ -562,10 +789,11 @@
             :slot-char="asInputMask.slotChar ?? '_'"
             :auto-clear="asInputMask.autoClear ?? false"
             :unmask="asInputMask.unmask ?? false"
-            :disabled="disabled"
-            :invalid="invalid"
             class="w-full"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled"
+            :invalid="forcedInvalid"
         />
 
         <!-- DatePicker -->
@@ -586,10 +814,12 @@
             :view="asDatePicker.view ?? 'date'"
             :inline="asDatePicker.inline ?? false"
             :placeholder="asDatePicker.placeholder ? $t(asDatePicker.placeholder) : undefined"
-            :disabled="disabled"
-            :invalid="invalid"
             class="w-full"
+            :input-id="controlId(field)"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled"
+            :invalid="forcedInvalid"
         />
 
         <!-- Select -->
@@ -609,11 +839,13 @@
             "
             :show-clear="asSelect.showClear"
             :filter="asSelect.filter"
-            :disabled="disabled || loading"
-            :invalid="invalid"
             :loading="loading"
             class="w-full"
+            :input-id="controlId(field)"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled || loading"
+            :invalid="forcedInvalid"
         />
 
         <!-- MultiSelect -->
@@ -633,11 +865,13 @@
                         : $t('sk-common.select')
             "
             :filter="asSelect.filter"
-            :disabled="disabled || loading"
-            :invalid="invalid"
             :loading="loading"
             class="w-full"
+            :input-id="controlId(field)"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled || loading"
+            :invalid="forcedInvalid"
         />
 
         <!-- Radio -->
@@ -662,8 +896,8 @@
                     :name="field.key"
                     :value="option.value"
                     :model-value="anyVal"
-                    :disabled="disabled"
                     v-bind="extraProps"
+                    :disabled="forcedDisabled"
                     @update:model-value="(v) => emit('update', v)"
                 />
                 <template v-if="controlPosition !== 'right'">
@@ -681,9 +915,10 @@
             v-model="boolVal"
             :input-id="field.key"
             :binary="true"
-            :disabled="disabled"
-            :invalid="invalid"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled"
+            :invalid="forcedInvalid"
         />
 
         <!-- CheckboxGroup -->
@@ -707,8 +942,8 @@
                     :input-id="`${field.key}_${option.value}`"
                     :value="option.value"
                     :model-value="(value as unknown[]) ?? []"
-                    :disabled="disabled"
                     v-bind="extraProps"
+                    :disabled="forcedDisabled"
                     @update:model-value="(v) => emit('update', v)"
                 />
                 <template v-if="controlPosition !== 'right'">
@@ -738,11 +973,12 @@
                 v-model="stringVal"
                 :type="passwordVisible ? 'text' : 'password'"
                 :placeholder="asPassword.placeholder ? $t(asPassword.placeholder) : undefined"
-                :disabled="disabled"
-                :invalid="invalid"
                 autocomplete="new-password"
                 class="w-full"
+                :aria-describedby="describedBy"
                 v-bind="extraProps"
+                :disabled="forcedDisabled"
+                :invalid="forcedInvalid"
             />
         </IconField>
         <InputText
@@ -751,11 +987,12 @@
             v-model="stringVal"
             :type="passwordVisible ? 'text' : 'password'"
             :placeholder="asPassword.placeholder ? $t(asPassword.placeholder) : undefined"
-            :disabled="disabled"
-            :invalid="invalid"
             autocomplete="new-password"
             class="w-full"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled"
+            :invalid="forcedInvalid"
         />
 
         <!-- Password (PrimeVue with strength feedback meter) -->
@@ -766,11 +1003,13 @@
             :placeholder="asPassword.placeholder ? $t(asPassword.placeholder) : undefined"
             :feedback="asPassword.feedback ?? false"
             :toggle-mask="asPassword.toggleMask ?? true"
-            :disabled="disabled"
-            :invalid="invalid"
             input-class="w-full"
             class="w-full"
+            :input-id="controlId(field)"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled"
+            :invalid="forcedInvalid"
         />
 
         <!-- SelectButton -->
@@ -781,9 +1020,10 @@
             :options="translatedOptions"
             :option-label="asSelect.optionLabel ?? 'label'"
             :option-value="asSelect.optionValue ?? 'value'"
-            :disabled="disabled || loading"
-            :invalid="invalid"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled || loading"
+            :invalid="forcedInvalid"
         />
 
         <!-- Textarea -->
@@ -794,10 +1034,11 @@
             :placeholder="asTextarea.placeholder ? $t(asTextarea.placeholder) : undefined"
             :rows="asTextarea.rows ?? 4"
             :auto-resize="asTextarea.autoResize ?? false"
-            :disabled="disabled"
-            :invalid="invalid"
             class="w-full"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled"
+            :invalid="forcedInvalid"
         />
 
         <!-- Editor (Tiptap rich text) -->
@@ -811,10 +1052,11 @@
             :image-upload="asEditor.imageUpload"
             :links="asEditor.links ?? false"
             :treat-empty-as-blank="asEditor.treatEmptyAsBlank ?? true"
-            :disabled="disabled"
-            :invalid="invalid"
             class="w-full"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled"
+            :invalid="forcedInvalid"
         />
 
         <!-- ToggleButton -->
@@ -826,9 +1068,10 @@
             :off-label="asToggleButton.offLabel ?? 'No'"
             :on-icon="asToggleButton.onIcon"
             :off-icon="asToggleButton.offIcon"
-            :disabled="disabled"
-            :invalid="invalid"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled"
+            :invalid="forcedInvalid"
         />
 
         <!-- ToggleSwitch -->
@@ -836,9 +1079,11 @@
             v-else-if="field.type === 'toggle-switch'"
             :id="field.key"
             v-model="boolVal"
-            :disabled="disabled"
-            :invalid="invalid"
+            :input-id="controlId(field)"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled"
+            :invalid="forcedInvalid"
         />
 
         <!-- FileUpload -->
@@ -847,17 +1092,29 @@
             <label
                 :for="field.key"
                 class="sk-fb__upload-zone"
-                :class="[invalid ? 'sk-fb__upload-zone--invalid' : '', disabled ? 'sk-fb__upload-zone--disabled' : '']"
+                :class="[
+                    invalid ? 'sk-fb__upload-zone--invalid' : '',
+                    disabled ? 'sk-fb__upload-zone--disabled' : '',
+                    isDragOver ? 'sk-fb__upload-zone--dragover' : '',
+                ]"
+                @dragenter.prevent="handleDragOver"
+                @dragover.prevent="handleDragOver"
+                @dragleave="handleDragLeave"
+                @drop.prevent="handleDrop"
             >
                 <div class="sk-fb__upload-inner">
                     <span class="sk-fb__upload-icon">
                         <i class="pi pi-cloud-upload" />
                     </span>
                     <span class="sk-fb__upload-text">
-                        {{ asFileUpload.multiple ? 'Drop files here or click to upload' : 'Click to select a file' }}
+                        {{
+                            asFileUpload.multiple
+                                ? trans('sk-common.upload_drop_hint')
+                                : trans('sk-common.upload_click_hint')
+                        }}
                     </span>
                     <span v-if="asFileUpload.maxFileSize" class="sk-fb__upload-hint">
-                        Maks. {{ formatFileSize(asFileUpload.maxFileSize) }}
+                        {{ trans('sk-common.upload_max_size', { size: formatFileSize(asFileUpload.maxFileSize) }) }}
                     </span>
                 </div>
                 <input
@@ -980,9 +1237,10 @@
             :tones="asColorSelector.tones"
             :format="asColorSelector.format"
             :default-tone="asColorSelector.defaultTone"
-            :disabled="disabled"
-            :invalid="invalid"
+            :aria-describedby="describedBy"
             v-bind="extraProps"
+            :disabled="forcedDisabled"
+            :invalid="forcedInvalid"
         />
 
         <!-- TranslatableInput (translatable-text / translatable-textarea / translatable-editor) -->

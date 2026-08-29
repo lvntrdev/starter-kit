@@ -13,6 +13,7 @@
         SectionFieldConfig,
         TranslatableTextFieldConfig,
     } from './core';
+    import { applyLocaleFilters, resolveContentLocales } from './core/locales';
     import type { SharedPageProps } from '@/types';
     import { useApi } from '@/composables/useApi';
     import { useCan } from '@/composables/useCan';
@@ -86,7 +87,13 @@
         }
     }
 
-    const api = useApi();
+    // `toast: false` — SkForm raises its OWN `data_load_error` / `options_load_error`
+    // toasts with the exact wording and toast group the form needs. Left on the
+    // default, useApi would fire a second, generic toast for the same failure, and
+    // `refreshRemoteData()` — deliberately silent — would surface an error the user
+    // must not see after a successful save. Only this instance is affected; a
+    // consumer's own `useApi()` keeps its default toasts.
+    const api = useApi({ toast: false });
     const toast = useToast();
     const { can } = useCan();
     const { options: definitionOptions, load: loadDefinitions } = useDefinition();
@@ -111,16 +118,40 @@
     }
 
     /**
+     * Generation counter shared by every `remoteData` writer. `reload()`, the
+     * `reloadOnDataUrlChange` watch and the post-save silent refresh can overlap
+     * (a dialog swapped from record A to B while A is still loading); only the
+     * newest request may write, so a slower, older response never puts record A
+     * back on screen — the same guard `fetchOptions` applies per field.
+     */
+    let remoteDataSeq = 0;
+
+    /**
+     * Owner token for the loading UI, bumped ONLY by `fetchRemoteData()`. The
+     * data write and the spinner have different owners: a silent
+     * `refreshRemoteData()` that supersedes a loading request — a host that
+     * calls `reload()` from its `success` listener, immediately followed by the
+     * post-save refresh — takes over the write, but must not orphan the
+     * spinner, since it never clears `dataLoading` itself. Keeping a separate
+     * counter lets the loading request still clear the spinner when it settles.
+     */
+    let loadingSeq = 0;
+
+    /**
      * Silent refresh used after a successful save. Updates `remoteData` without
      * touching the loading/error UI: the form is already on screen with valid
      * data, so flashing the skeleton — or worse, replacing a just-saved form
      * with the load-error panel — would be wrong. Returns `false` when the
-     * refresh failed, in which case the previous data is left untouched.
+     * refresh failed or was superseded by a newer request, in which case the
+     * previous data is left untouched.
      */
     async function refreshRemoteData(): Promise<boolean> {
         if (!props.config.dataUrl) return false;
+        const seq = ++remoteDataSeq;
         try {
-            remoteData.value = await requestRemoteData(props.config.dataUrl);
+            const data = await requestRemoteData(props.config.dataUrl);
+            if (seq !== remoteDataSeq) return false;
+            remoteData.value = data;
             return true;
         } catch {
             return false;
@@ -129,11 +160,16 @@
 
     async function fetchRemoteData(): Promise<void> {
         if (!props.config.dataUrl) return;
+        const seq = ++remoteDataSeq;
+        const loadSeq = ++loadingSeq;
         dataLoading.value = true;
         dataError.value = false;
         try {
-            remoteData.value = await requestRemoteData(props.config.dataUrl);
+            const data = await requestRemoteData(props.config.dataUrl);
+            if (seq !== remoteDataSeq) return;
+            remoteData.value = data;
         } catch {
+            if (seq !== remoteDataSeq) return;
             // Surface the failure instead of swallowing it: flag an in-form retry
             // state and notify the user via a toast.
             dataError.value = true;
@@ -145,9 +181,29 @@
                 life: 4000,
             });
         } finally {
-            dataLoading.value = false;
+            // A superseded LOADING request must not clear the spinner the newer
+            // loading request owns; a silent refresh never owns it, so being
+            // superseded by one still leaves this request responsible for it.
+            if (loadSeq === loadingSeq) dataLoading.value = false;
         }
     }
+
+    /**
+     * Opt-in refetch when `dataUrl` changes after mount.
+     *
+     * Default stays mount-only: a form whose config is rebuilt on every parent
+     * render (a computed `FB.form()...build()`) would otherwise refetch on each
+     * rebuild, and a same-URL rebuild must not wipe in-progress edits. Hosts that
+     * genuinely swap the record behind a persistent form (a dialog reused for a
+     * different id) opt in with `.reloadOnDataUrlChange()`.
+     */
+    watch(
+        () => props.config.dataUrl,
+        () => {
+            if (props.config.reloadOnDataUrlChange !== true) return;
+            void fetchRemoteData();
+        },
+    );
 
     /**
      * Collect all definitionKey values from select fields to preload them.
@@ -240,23 +296,26 @@
         );
     }
 
-    function sk_locale_keys_from_page(): string[] {
-        const page = usePage<SharedPageProps>();
-        return Object.keys(page.props.availableLocales ?? {});
-    }
-
-    function applyLocaleFilters(locales: string[], field: FieldConfig): string[] {
-        const cfg = field as Partial<TranslatableTextFieldConfig>;
-        let out = locales;
-        if (cfg.onlyLocales?.length) out = out.filter((l) => cfg.onlyLocales!.includes(l));
-        if (cfg.exceptLocales?.length) out = out.filter((l) => !cfg.exceptLocales!.includes(l));
-        return out;
-    }
-
+    /**
+     * Empty `{ locale: '' }` seed for a translatable field on a create form.
+     *
+     * Resolved through `core/locales` — the SAME helpers TranslatableInput uses —
+     * so the default carries exactly the locales the input renders. Reading
+     * `availableLocales` directly here (as this used to) produced admin-UI locales
+     * while the input rendered DB-backed content locales, so the payload could
+     * ship keys the user never saw.
+     *
+     * `usePage()` stays INSIDE the function on purpose: it is reached only when a
+     * translatable field exists, and the reactive page proxy still tracks inside
+     * the `derivedDefaults` computed that calls it.
+     */
     function buildTranslatableDefault(field: FieldConfig): Record<string, string> {
-        const locales = sk_locale_keys_from_page();
-        const filtered = applyLocaleFilters(locales, field);
-        return Object.fromEntries(filtered.map((l) => [l, '']));
+        const page = usePage<SharedPageProps>();
+        const locales = applyLocaleFilters(
+            resolveContentLocales(page.props),
+            field as Partial<TranslatableTextFieldConfig>,
+        );
+        return Object.fromEntries(locales.map((l) => [l.code, '']));
     }
 
     function translatableErrorsFor(field: FieldConfig): Record<string, string> | undefined {
@@ -267,6 +326,45 @@
             if (k.startsWith(prefix)) result[k] = String(v);
         }
         return Object.keys(result).length > 0 ? result : undefined;
+    }
+
+    // ── Date parsing (read side) ────────────────────────────────────────────────
+
+    /** `YYYY-MM-DD` with no time component. */
+    const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+    /**
+     * Parses a date string coming from the server into a Date.
+     *
+     * A date-only string is built as LOCAL midnight: `new Date('2024-03-10')`
+     * follows the ISO rule and parses it as UTC midnight, which renders as the
+     * PREVIOUS day anywhere west of UTC — and the write side
+     * (`toLocalDateStr`) then serialises that shifted day back, so a form
+     * round-trip silently moved the date. Building it component-wise keeps read
+     * and write on the same calendar day in every timezone.
+     *
+     * Strings carrying a time part are unambiguous (or explicitly offset), so
+     * they keep the native parse.
+     */
+    function parseDateString(value: string): Date {
+        if (!DATE_ONLY_PATTERN.test(value)) {
+            return new Date(value);
+        }
+        const [year, month, day] = value.split('-').map(Number);
+        return new Date(year, month - 1, day);
+    }
+
+    /**
+     * Normalises a date-picker value from remote/initial data.
+     * `range` / `multiple` fields carry an array — every string entry is converted
+     * the same way and `null` slots (an open-ended range) are preserved.
+     */
+    function toDatePickerValue(field: FieldConfig, value: unknown): unknown {
+        const mode = (field as DatePickerFieldConfig).selectionMode ?? 'single';
+        if ((mode === 'range' || mode === 'multiple') && Array.isArray(value)) {
+            return value.map((entry) => (typeof entry === 'string' ? parseDateString(entry) : entry));
+        }
+        return typeof value === 'string' ? parseDateString(value) : value;
     }
 
     /**
@@ -282,8 +380,8 @@
                 .map((f) => {
                     let fromData = initial[f.key];
                     if (fromData !== undefined && fromData !== null) {
-                        if (f.type === 'date-picker' && typeof fromData === 'string') {
-                            fromData = new Date(fromData);
+                        if (f.type === 'date-picker') {
+                            fromData = toDatePickerValue(f, fromData);
                         }
                         return [f.key, fromData];
                     }
@@ -303,7 +401,27 @@
     const isEditMode = computed(() => ['put', 'patch'].includes(props.config.submit?.method ?? ''));
 
     /**
-     * Shallow equality for plain value records — Date instances compared by time.
+     * Value equality used by the record comparison below.
+     *
+     * Dates compare by time and arrays compare element-wise, because both are
+     * rebuilt as NEW instances on every `derivedDefaults` recompute: a `range` /
+     * `multiple` date-picker maps its incoming array into fresh Date objects, so
+     * reference equality would report "changed" for byte-identical data and the
+     * watch would reset the form on every unrelated re-render.
+     */
+    function valuesEqual(a: unknown, b: unknown): boolean {
+        if (a instanceof Date && b instanceof Date) {
+            return a.getTime() === b.getTime();
+        }
+        if (Array.isArray(a) && Array.isArray(b)) {
+            return a.length === b.length && a.every((entry, i) => valuesEqual(entry, b[i]));
+        }
+        return a === b;
+    }
+
+    /**
+     * Shallow equality for plain value records — Date instances compared by time,
+     * arrays compared element-wise.
      * Used to skip redundant resets when derivedDefaults recomputes with identical data.
      */
     function shallowRecordEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
@@ -313,15 +431,7 @@
             return false;
         }
         for (const key of aKeys) {
-            const av = a[key];
-            const bv = b[key];
-            if (av instanceof Date && bv instanceof Date) {
-                if (av.getTime() !== bv.getTime()) {
-                    return false;
-                }
-                continue;
-            }
-            if (av !== bv) {
+            if (!valuesEqual(a[key], b[key])) {
                 return false;
             }
         }
@@ -497,21 +607,20 @@
         // Snapshot of exactly what this request carries. `currentValues` rebuilds a
         // fresh object on every read, so this stays a true point-in-time copy.
         const submittedValues = currentValues.value;
-        internalForm
-            .transform((data: Record<string, unknown>) => {
-                if (dateOnlyFields.length === 0) return data;
-                const result = { ...data };
-                for (const field of dateOnlyFields) {
-                    const val = result[field.key];
-                    if (val instanceof Date) {
-                        result[field.key] = toLocalDateStr(val);
-                    } else if (Array.isArray(val)) {
-                        result[field.key] = val.map((v) => (v instanceof Date ? toLocalDateStr(v) : v));
-                    }
+        const request = internalForm.transform((data: Record<string, unknown>) => {
+            if (dateOnlyFields.length === 0) return data;
+            const result = { ...data };
+            for (const field of dateOnlyFields) {
+                const val = result[field.key];
+                if (val instanceof Date) {
+                    result[field.key] = toLocalDateStr(val);
+                } else if (Array.isArray(val)) {
+                    result[field.key] = val.map((v) => (v instanceof Date ? toLocalDateStr(v) : v));
                 }
-                return result;
-            })
-            [method](url, {
+            }
+            return result;
+        });
+        request[method](url, {
                 preserveScroll,
                 forceFormData: hasFileFields.value,
                 onSuccess: () => {
@@ -580,7 +689,17 @@
     const processing = computed(() => internalForm.processing);
     const isDirty = computed(() => internalForm.isDirty);
 
-    defineExpose({ reset, submit, processing, isDirty, dataLoading, remoteData, currentValues, setValue });
+    /**
+     * Programmatic refetch of `dataUrl` — same loading-state and error-toast
+     * semantics as the mount-time load. Lets a host refresh the form after an
+     * out-of-band change (a sibling dialog saved the same record) without
+     * remounting it. No-op when the form has no `dataUrl`.
+     */
+    function reload(): Promise<void> {
+        return fetchRemoteData();
+    }
+
+    defineExpose({ reset, submit, reload, processing, isDirty, dataLoading, remoteData, currentValues, setValue });
 
     // ── Dynamic Options ───────────────────────────────────────────────────────────
 
@@ -589,18 +708,38 @@
     const optionErrors = ref<Set<string>>(new Set());
     const lastOptionUrl = ref<Record<string, string | null>>({});
 
+    /**
+     * Select-like fields that source their options from a URL.
+     * Uses SELECT_TYPES so `checkbox-group` — which accepts `optionsUrl` in the
+     * config type but was missing from the old literal list, leaving its options
+     * permanently empty — is included.
+     */
     const dynamicSelectFields = computed<SelectFieldConfig[]>(() =>
         flatFields.value.filter(
-            (f): f is SelectFieldConfig =>
-                ['select', 'multiselect', 'radio', 'select-button'].includes(f.type) &&
-                !!(f as SelectFieldConfig).optionsUrl,
+            (f): f is SelectFieldConfig => SELECT_TYPES.has(f.type) && !!(f as SelectFieldConfig).optionsUrl,
         ),
     );
 
+    /**
+     * Monotonic per-field request counter. A dependent select (`optionsUrl` as a
+     * function of the parent's value) can have several requests in flight when the
+     * user changes the parent quickly; without this, a SLOW earlier response
+     * lands after a fast later one and overwrites the correct option list — or
+     * flags a stale error on a field that has since loaded fine.
+     */
+    const optionRequestTokens = new Map<string, number>();
+
     async function fetchOptions(field: SelectFieldConfig, url: string): Promise<void> {
+        const token = (optionRequestTokens.get(field.key) ?? 0) + 1;
+        optionRequestTokens.set(field.key, token);
+        const isCurrent = (): boolean => optionRequestTokens.get(field.key) === token;
+
         loadingOptions.value = new Set([...loadingOptions.value, field.key]);
         try {
             const options = await api.get<SelectOption[]>(url);
+            // Superseded response — drop it entirely: no options write, no error
+            // flag, no toast. The newer request owns this field's state.
+            if (!isCurrent()) return;
             dynamicOptions.value = { ...dynamicOptions.value, [field.key]: options };
             if (optionErrors.value.has(field.key)) {
                 const cleared = new Set(optionErrors.value);
@@ -608,6 +747,7 @@
                 optionErrors.value = cleared;
             }
         } catch {
+            if (!isCurrent()) return;
             // Field-level error indicator + toast instead of a silent empty list.
             dynamicOptions.value = { ...dynamicOptions.value, [field.key]: [] };
             optionErrors.value = new Set([...optionErrors.value, field.key]);
@@ -619,9 +759,13 @@
                 life: 4000,
             });
         } finally {
-            const next = new Set(loadingOptions.value);
-            next.delete(field.key);
-            loadingOptions.value = next;
+            // Only the current request clears the spinner: a superseded one must
+            // not switch it off while its successor is still loading.
+            if (isCurrent()) {
+                const next = new Set(loadingOptions.value);
+                next.delete(field.key);
+                loadingOptions.value = next;
+            }
         }
     }
 

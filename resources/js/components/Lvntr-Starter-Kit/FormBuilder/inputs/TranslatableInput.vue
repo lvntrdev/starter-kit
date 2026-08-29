@@ -4,6 +4,8 @@
         TranslatableTextareaFieldConfig,
         TranslatableTextFieldConfig,
     } from '../core';
+    import type { ResolvedLocale } from '../core/locales';
+    import { applyLocaleFilters, resolveContentLocales } from '../core/locales';
     import EditorInput from './EditorInput.vue';
     import { usePage } from '@inertiajs/vue3';
     import { trans } from 'laravel-vue-i18n';
@@ -39,27 +41,12 @@
 
     const page = usePage<SharedPageProps>();
 
-    const resolvedLocales = computed<Array<{ code: string; name: string }>>(() => {
-        // Content fields walk the *content* languages (DB-backed) — distinct from
-        // the admin UI translation locales. Fall back to `availableLocales` when the
-        // content-languages prop is absent or empty (old consumers / empty table /
-        // installer pages), so multilingual forms never render an empty locale list.
-        const contentLocales = page.props.availableContentLocales;
-        const available =
-            contentLocales && Object.keys(contentLocales).length > 0
-                ? contentLocales
-                : (page.props.availableLocales ?? {});
-        let locales = Object.entries(available).map(([code, name]) => ({ code, name }));
-
-        if (props.field.onlyLocales?.length) {
-            locales = locales.filter((l) => props.field.onlyLocales!.includes(l.code));
-        }
-        if (props.field.exceptLocales?.length) {
-            locales = locales.filter((l) => !props.field.exceptLocales!.includes(l.code));
-        }
-
-        return locales;
-    });
+    // Resolution + filtering live in `core/locales` so SkForm's translatable
+    // DEFAULT (the empty `{ locale: '' }` record it seeds on a create form) is
+    // built from exactly the locales rendered here.
+    const resolvedLocales = computed<ResolvedLocale[]>(() =>
+        applyLocaleFilters(resolveContentLocales(page.props), props.field),
+    );
 
     const isSingle = computed(() => resolvedLocales.value.length <= 1);
     const fieldType = computed(() => props.field.type);

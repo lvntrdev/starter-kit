@@ -62,6 +62,7 @@ If `submit(...)` is omitted, you can use `v-model` and handle submission yoursel
 - `dividers(boolean)` — in horizontal layout, draw hairline dividers between field rows and left-align labels (settings-style stacked rows). No effect in vertical layout. Default `false`.
 - `class(string)`
 - `dataUrl(url)`
+- `reloadOnDataUrlChange(boolean)` — opt in to refetching `dataUrl` whenever it changes after mount (e.g. a dialog reused for a different record id). Default `false`: a form whose config is rebuilt on every parent render would otherwise refetch on every rebuild, and a same-URL rebuild must not wipe in-progress edits.
 - `dataKey(key)`
 - `initialData(record)`
 - `actionsPosition('top' | 'bottom' | 'both')`
@@ -107,6 +108,12 @@ Most fields support:
 FB.inputText().key('user_id').default(currentUserId).hidden();
 ```
 
+### Label `for` / control id convention
+
+For most field types the rendered `<label for>` targets the field's own `key`. Six field types render their PrimeVue control inside a non-focusable wrapper element (`input-number`, `date-picker`, `select`, `multiselect`, `toggle-switch`, and `password` when `.feedback()` is enabled) — for those, the inner focusable control receives `${key}__control` as its id via PrimeVue's `inputId` prop, and the label's `for` targets that id instead of the wrapper. This is internal wiring (`core/ids.ts`'s `controlId()`); it only matters if you're reading rendered markup or writing a test that queries by label/id.
+
+
+
 ## Available Field Builders
 
 - `FB.inputText()`
@@ -119,7 +126,7 @@ FB.inputText().key('user_id').default(currentUserId).hidden();
 - `FB.radio()`
 - `FB.selectButton()`
 - `FB.checkbox()`
-- `FB.checkboxGroup()`
+- `FB.checkboxGroup()` — supports `optionsUrl` the same as `select`/`multiselect`/`radio`/`selectButton` (see [Dynamic Options from API](#dynamic-options-from-api-dependent-selects))
 - `FB.password()`
 - `FB.textarea()`
 - `FB.editor()`
@@ -299,6 +306,52 @@ Server-side, route every read through `HtmlSanitizer::clean()` before sharing to
 ### URL scheme allowlist
 
 `HtmlSanitizer` allows relative URLs plus `http://`, `https://`, `mailto:`, `tel:`. Everything else (`blob:`, `data:`, `file:`, `ftp:`, `javascript:`, `vbscript:`) is rejected. Keep this in mind when populating editor content programmatically — any smuggled scheme is stripped before save.
+
+## File Upload Field API
+
+`FB.fileUpload()` renders a picker plus a drag-and-drop drop zone. It works in both single-file and multi-file mode and can mix already-attached media with newly picked files in the same value.
+
+- `multiple(boolean)` — allow more than one file. Default `false` (single file, value is a plain `File | null`).
+- `accept(string)` — comma-separated pattern list (MIME type, wildcard like `image/*`, or extension like `.pdf`), matched client-side before a file is added. A dropped or picked file that doesn't match is silently skipped — the same behavior as the native file dialog's `accept` attribute.
+- `maxFileSize(bytes)` — per-file size cap. **Enforced only when set** — omit it for no client-side size check. A file over the limit is rejected and reported in a single toast that lists the rejected file names; files under the limit are still added.
+- `fileLimit(number)` — in `multiple` mode, caps the total count of existing (kept) + newly picked files. **Enforced only when set.** When a drop/pick would exceed it, only the files that fit are added and the rest are reported in the same toast as `maxFileSize` rejections.
+- `existingMedia(items)` — existing media to show in edit mode (`{ id, name, url, size, mime_type }[]`).
+- `existingMediaKey(key)` — key in `initialData`/`remoteData` that auto-populates `existingMedia` (e.g. `'identity_document_media'`), so you don't have to wire it manually when using `dataUrl`/`resource`.
+- `deferExistingRemoval(boolean)` — see below. Default `false`.
+
+```ts
+FB.fileUpload()
+    .key('attachments')
+    .multiple()
+    .accept('image/*,.pdf')
+    .maxFileSize(5 * 1024 * 1024)
+    .fileLimit(10)
+    .existingMediaKey('attachments_media');
+```
+
+### Removal semantics: immediate vs. deferred
+
+Removing an **already-saved** file has two modes:
+
+- **Default (`deferExistingRemoval` unset/`false`)** — clicking remove fires `DELETE /media/{id}` immediately (after the confirm dialog), so the file is gone even if the form is never submitted. A failed delete leaves the file in the list and shows an error toast instead of silently dropping it from the UI.
+- **`deferExistingRemoval(true)`** — nothing is deleted on click; the item only leaves the rendered list and the field's keep-list. Deletion is deferred to the save request via the field's own keep-list contract (see below).
+
+A newly picked (not-yet-uploaded) file always removes immediately from the pending selection — there's nothing on the server to defer.
+
+### Save-side keep-list contract (`deferExistingRemoval`)
+
+When `deferExistingRemoval(true)` is set, the field submits an array mixing kept existing media ids and new `UploadedFile`s. Pair it with `Lvntr\StarterKit\Traits\HasMediaCollections::syncMediaCollection()` on the model, which accepts exactly that shape:
+
+```php
+// $request->validated('attachments') is an array of ids (kept) and UploadedFile instances (new)
+$user->syncMediaCollection('attachments', $request->validated('attachments'));
+```
+
+`syncMediaCollection()` deletes any media in the collection whose id is **not** in the submitted keep-list and attaches every `UploadedFile` in the array — so the array the frontend sends **is** the desired end state of the collection, not a diff.
+
+### Drag-and-drop
+
+The drop zone accepts files dragged over it in addition to the file picker button; both paths go through the same `addFiles()` validation (`accept`, `maxFileSize`, `fileLimit`), so drag-and-drop cannot bypass a limit the picker enforces. A file that doesn't match `accept` is dropped silently, same as a picker rejection.
 
 ## Translatable Field API
 
@@ -615,3 +668,13 @@ Keep field definitions close to the page or tab that owns the form. Use domain A
 - dialog-friendly cancel behavior
 - unified error rendering for internal or external mode
 - turning the form read-only when `permission` is set and the user lacks the ability
+
+### Exposed component API
+
+`SkForm` exposes a small imperative surface via `defineExpose` for hosts that hold a template ref on it:
+
+- `reset()` — resets the internal Inertia form and clears errors (internal submit mode only).
+- `submit()` — programmatically triggers the same submit path the action bar's submit button uses. Useful when `hideActions(true)` moves the submit control into a host-rendered footer.
+- `reload()` — re-fetches `dataUrl` on demand, with the same loading-state and error-toast semantics as the mount-time load. No-op when the form has no `dataUrl`. Use this instead of `.reloadOnDataUrlChange()` when you want an explicit refresh trigger (a "Refresh" button, a sibling save event) rather than an automatic refetch whenever the URL prop changes.
+- `processing`, `isDirty`, `dataLoading`, `remoteData`, `currentValues` — reactive state mirrors for a host-rendered action bar or status indicator.
+- `setValue(key, value)` — programmatically sets a single field's value.

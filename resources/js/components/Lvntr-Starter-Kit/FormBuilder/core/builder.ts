@@ -691,6 +691,16 @@ export class FileUploadBuilder extends BaseFieldBuilder<FileUploadFieldConfig> {
         this.config.existingMediaKey = key;
         return this;
     }
+
+    /**
+     * Defer removal of existing media to the save request instead of deleting it
+     * immediately. Requires a keep-list sync on the server (see
+     * `FileUploadFieldConfig.deferExistingRemoval`).
+     */
+    deferExistingRemoval(enabled = true): this {
+        this.config.deferExistingRemoval = enabled;
+        return this;
+    }
 }
 
 export class ColorSelectorBuilder extends BaseFieldBuilder<ColorSelectorFieldConfig> {
@@ -935,6 +945,18 @@ export class FormBuilder {
      */
     dataUrl(url: string): this {
         this.config.dataUrl = url;
+        return this;
+    }
+
+    /**
+     * Refetch `dataUrl` when it changes after mount (default: mount-only).
+     *
+     * Opt-in: a config rebuilt on every parent render would otherwise refetch
+     * continuously and wipe in-progress edits. Use it for a persistent form whose
+     * record genuinely changes — e.g. a dialog reused for a different id.
+     */
+    reloadOnDataUrlChange(enabled = true): this {
+        this.config.reloadOnDataUrlChange = enabled;
         return this;
     }
 

@@ -62,6 +62,7 @@ import SkForm from '@lvntr/components/FormBuilder/SkForm.vue';
 - `dividers(boolean)` — horizontal layout'ta alan satırları arasına ince ayraç çizgileri çeker ve label'ları sola yaslar (ayarlar-tarzı üst üste satırlar). Vertical layout'ta etkisi yoktur. Varsayılan `false`.
 - `class(string)`
 - `dataUrl(url)`
+- `reloadOnDataUrlChange(boolean)` — mount sonrası `dataUrl` değiştiğinde otomatik yeniden çekmeye opt-in olur (örn. farklı bir kayıt için tekrar kullanılan bir dialog). Varsayılan `false`: config'i her parent render'da yeniden kurulan bir form aksi halde her rebuild'de yeniden veri çekerdi, aynı URL ile rebuild ise devam eden düzenlemeleri silmemeli.
 - `dataKey(key)`
 - `initialData(record)`
 - `actionsPosition('top' | 'bottom' | 'both')`
@@ -107,6 +108,10 @@ import SkForm from '@lvntr/components/FormBuilder/SkForm.vue';
 FB.inputText().key('user_id').default(currentUserId).hidden();
 ```
 
+### Label `for` / control id kuralı
+
+Çoğu field tipinde render edilen `<label for>`, field'ın kendi `key`'ini hedefler. Altı field tipi PrimeVue kontrolünü odaklanamayan bir wrapper elemanı içinde render eder (`input-number`, `date-picker`, `select`, `multiselect`, `toggle-switch` ve `.feedback()` açıkken `password`) — bunlarda iç odaklanabilir kontrol, PrimeVue'nun `inputId` prop'u üzerinden `${key}__control` id'sini alır ve label'ın `for`'u wrapper yerine bu id'yi hedefler. Bu iç kablolamadır (`core/ids.ts`'in `controlId()` fonksiyonu); yalnızca render edilen markup'ı okurken veya label/id ile sorgu yapan bir test yazarken önemlidir.
+
 ## Kullanılabilir Field Builder'lar
 
 - `FB.inputText()`
@@ -119,7 +124,7 @@ FB.inputText().key('user_id').default(currentUserId).hidden();
 - `FB.radio()`
 - `FB.selectButton()`
 - `FB.checkbox()`
-- `FB.checkboxGroup()`
+- `FB.checkboxGroup()` — `select`/`multiselect`/`radio`/`selectButton` ile aynı şekilde `optionsUrl` destekler (bkz. [API'den Dinamik Seçenekler](#apiden-dinamik-seçenekler-bağımlı-selectler))
 - `FB.password()`
 - `FB.textarea()`
 - `FB.editor()`
@@ -299,6 +304,52 @@ Server tarafında, frontend'e paylaşmadan önce her okumayı `HtmlSanitizer::cl
 ### URL scheme allowlist'i
 
 `HtmlSanitizer` relative URL'lerle birlikte `http://`, `https://`, `mailto:`, `tel:` scheme'lerine izin verir. Diğer her şey (`blob:`, `data:`, `file:`, `ftp:`, `javascript:`, `vbscript:`) reddedilir. Editor içeriğini programatik doldururken bunu hatırlayın — kayıt öncesinde kaçak scheme temizlenir.
+
+## Dosya Yükleme Alanı API'si
+
+`FB.fileUpload()`, bir seçici butonu ile birlikte sürükle-bırak drop zone render eder. Hem tekli hem çoklu dosya modunda çalışır ve aynı değer içinde zaten bağlı medya ile yeni seçilen dosyaları karıştırabilir.
+
+- `multiple(boolean)` — birden fazla dosyaya izin verir. Varsayılan `false` (tekli dosya, değer düz bir `File | null`).
+- `accept(string)` — virgülle ayrılmış desen listesi (MIME tipi, `image/*` gibi wildcard veya `.pdf` gibi uzantı); bir dosya eklenmeden önce client-side eşleştirilir. Eşleşmeyen bırakılan/seçilen bir dosya sessizce atlanır — native dosya diyaloğunun `accept` özniteliğiyle aynı davranış.
+- `maxFileSize(bytes)` — dosya başına boyut sınırı. **Yalnızca ayarlandığında uygulanır** — client-side boyut kontrolü istemiyorsanız atlayın. Sınırı aşan bir dosya reddedilir ve reddedilen dosya adlarını listeleyen tek bir toast ile bildirilir; sınırın altındaki dosyalar yine de eklenir.
+- `fileLimit(number)` — `multiple` modunda, mevcut (korunan) + yeni seçilen dosyaların toplam sayısını sınırlar. **Yalnızca ayarlandığında uygulanır.** Bir bırakma/seçim bu sınırı aşarsa yalnızca sığan dosyalar eklenir, geri kalanı `maxFileSize` reddiyle aynı toast'ta bildirilir.
+- `existingMedia(items)` — edit modunda gösterilecek mevcut medya (`{ id, name, url, size, mime_type }[]`).
+- `existingMediaKey(key)` — `initialData`/`remoteData` içinde `existingMedia`'yı otomatik dolduran anahtar (örn. `'identity_document_media'`), böylece `dataUrl`/`resource` kullanırken elle bağlamanıza gerek kalmaz.
+- `deferExistingRemoval(boolean)` — aşağıya bakın. Varsayılan `false`.
+
+```ts
+FB.fileUpload()
+    .key('attachments')
+    .multiple()
+    .accept('image/*,.pdf')
+    .maxFileSize(5 * 1024 * 1024)
+    .fileLimit(10)
+    .existingMediaKey('attachments_media');
+```
+
+### Silme semantiği: anında vs. ertelenmiş
+
+Zaten kaydedilmiş bir dosyayı silmenin iki modu vardır:
+
+- **Varsayılan (`deferExistingRemoval` set edilmemiş/`false`)** — silmeye tıklamak (onay diyaloğundan sonra) hemen `DELETE /media/{id}` gönderir, yani form hiç submit edilmese bile dosya silinmiş olur. Başarısız bir silme, dosyayı listede bırakır ve onu UI'dan sessizce düşürmek yerine bir hata toast'ı gösterir.
+- **`deferExistingRemoval(true)`** — tıklamada hiçbir şey silinmez; öğe yalnızca render edilen listeden ve field'ın keep-list'inden çıkar. Silme, field'ın kendi keep-list sözleşmesi üzerinden save isteğine ertelenir (aşağıya bakın).
+
+Yeni seçilen (henüz yüklenmemiş) bir dosya her zaman bekleyen seçimden anında kaldırılır — sunucuda ertelenecek bir şey yoktur.
+
+### Save-side keep-list sözleşmesi (`deferExistingRemoval`)
+
+`deferExistingRemoval(true)` set edildiğinde field, korunan mevcut medya id'lerini ve yeni `UploadedFile`'ları karıştıran bir dizi submit eder. Modelde `Lvntr\StarterKit\Traits\HasMediaCollections::syncMediaCollection()` ile eşleştirin; bu metot tam olarak bu şekli kabul eder:
+
+```php
+// $request->validated('attachments') id'lerin (korunan) ve UploadedFile örneklerinin (yeni) karışık bir dizisidir
+$user->syncMediaCollection('attachments', $request->validated('attachments'));
+```
+
+`syncMediaCollection()`, koleksiyondaki id'si submit edilen keep-list'te **olmayan** her medyayı siler ve dizideki her `UploadedFile`'ı ekler — yani frontend'in gönderdiği dizi bir diff değil, koleksiyonun **olması gereken son hâlidir**.
+
+### Sürükle-bırak
+
+Drop zone, dosya seçici butonuna ek olarak üzerine sürüklenen dosyaları kabul eder; her iki yol da aynı `addFiles()` doğrulamasından geçer (`accept`, `maxFileSize`, `fileLimit`), yani sürükle-bırak seçicinin uyguladığı bir sınırı atlayamaz. `accept` ile eşleşmeyen bir dosya, seçicideki reddedişle aynı şekilde sessizce düşer.
 
 ## Çevrilebilir Alan API'si
 
@@ -615,3 +666,13 @@ Alan tanımlarını, formun ait olduğu sayfa veya sekmeye yakın tutun. Backend
 - dialog için uygun cancel davranışı
 - dahili veya harici modda birleşik hata gösterimi
 - `permission` set edilirse formu salt-okunur moda alma
+
+### Expose Edilen Component API'si
+
+`SkForm`, üzerinde template ref tutan host'lar için `defineExpose` ile küçük bir imperative yüzey açar:
+
+- `reset()` — internal Inertia formunu resetler ve hataları temizler (yalnızca internal submit modunda).
+- `submit()` — action bar'ın submit butonunun kullandığı aynı submit yolunu programatik olarak tetikler. `hideActions(true)` submit kontrolünü host-render edilen bir footer'a taşıdığında kullanışlıdır.
+- `reload()` — mount-time yükleme ile aynı loading-state ve hata-toast semantiğiyle `dataUrl`'i istek üzerine yeniden çeker. Formda `dataUrl` yoksa no-op'tur. URL prop'u her değiştiğinde otomatik yeniden çekim yerine, açık bir yenileme tetikleyicisi ("Yenile" butonu, bir kardeş kaydetme olayı) istediğinizde `.reloadOnDataUrlChange()` yerine bunu kullanın.
+- `processing`, `isDirty`, `dataLoading`, `remoteData`, `currentValues` — host-render edilen bir action bar veya durum göstergesi için reaktif state ayna değerleri.
+- `setValue(key, value)` — tek bir field'ın değerini programatik olarak set eder.

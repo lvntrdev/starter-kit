@@ -44,6 +44,15 @@ return [
     'confirm_delete_header' => 'Delete Confirmation',
     'confirm_delete_message' => 'Are you sure you want to delete this record? This action cannot be undone.',
 
+    'upload_drop_hint' => 'Drop files here or click to upload',
+    'upload_click_hint' => 'Click to select a file',
+    'upload_max_size' => 'Max. :size',
+    'upload_confirm_delete_existing' => 'Are you sure you want to delete this file? This action cannot be undone.',
+    'upload_confirm_remove_new' => 'Are you sure you want to remove this file?',
+    'upload_file_too_large' => 'Files larger than :size were skipped: :files',
+    'upload_file_limit' => 'You can upload at most :limit file(s); the extra files were skipped.',
+    'upload_delete_failed' => 'The file could not be deleted. Please try again.',
+
     'placeholder' => [
         'select_role' => 'Select Role',
         'select_status' => 'Select Status',

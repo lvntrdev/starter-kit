@@ -497,6 +497,11 @@
     background: color-mix(in srgb, var(--p-red-950) 20%, transparent);
 }
 
+.sk-fb__upload-zone--dragover {
+    border-color: var(--p-primary-color) !important;
+    background: color-mix(in srgb, var(--p-primary-color) 8%, transparent);
+}
+
 .sk-fb__upload-zone--disabled {
     @apply pointer-events-none opacity-50;
 }

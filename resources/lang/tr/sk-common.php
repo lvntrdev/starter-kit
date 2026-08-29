@@ -44,6 +44,15 @@ return [
     'confirm_delete_header' => 'Silme Onayı',
     'confirm_delete_message' => 'Bu kaydı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.',
 
+    'upload_drop_hint' => 'Dosyaları buraya bırakın veya yüklemek için tıklayın',
+    'upload_click_hint' => 'Dosya seçmek için tıklayın',
+    'upload_max_size' => 'Maks. :size',
+    'upload_confirm_delete_existing' => 'Bu dosyayı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.',
+    'upload_confirm_remove_new' => 'Bu dosyayı kaldırmak istediğinizden emin misiniz?',
+    'upload_file_too_large' => ':size boyutundan büyük dosyalar atlandı: :files',
+    'upload_file_limit' => 'En fazla :limit dosya yükleyebilirsiniz; fazla dosyalar atlandı.',
+    'upload_delete_failed' => 'Dosya silinemedi. Lütfen tekrar deneyin.',
+
     'placeholder' => [
         'select_role' => 'Rol Seçin',
         'select_status' => 'Durum Seçin',
