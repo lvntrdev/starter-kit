@@ -224,15 +224,25 @@ it('parses the created_at date bounds in both shapes', function (): void {
     ]);
 });
 
-it('drops empty / whitespace-only filter values as inactive', function (): void {
+it('passes a blank / whitespace-only value through verbatim — only null and [] are inactive', function (): void {
+    // Spatie's exact filter renders `WHERE status = ''` for a blank value (an
+    // empty set), so the bulk side must apply the SAME value rather than drop
+    // it — dropping it would resolve a WIDER set than the table showed. null
+    // and [] are the only shapes Spatie skips, so they are the only inactive
+    // ones. Nothing is trimmed: the table trims nothing either.
     $result = normalizeUserFilters([
-        'filter[status]' => '   ',           // boş (trim) → pasif, yok sayılır
-        'filter[role]' => '',                // boş → pasif
-        'filter[created_at_from]' => null,   // değer yok → pasif
-        'filter[search]' => 'kept',
+        'filter[status]' => '   ',
+        'filter[role]' => '',
+        'filter[created_at_from]' => null,
+        'filter[created_at_to]' => [],
+        'filter[search]' => ' kept ',
     ]);
 
-    expect($result)->toBe(['search' => 'kept']);
+    expect($result)->toBe([
+        'status' => '   ',
+        'role' => '',
+        'search' => ' kept ',
+    ]);
 });
 
 it('rejects an unknown ACTIVE filter instead of silently dropping it', function (): void {
@@ -298,7 +308,11 @@ function extractRoleSearch(array $snapshot): ?string
 it('extracts the role search term (bracket + nested), ignoring non-filter keys', function (): void {
     expect(extractRoleSearch(['filter[search]' => 'manager', 'sort' => 'id', 'page' => '2']))->toBe('manager');
     expect(extractRoleSearch(['filter' => ['search' => 'editor']]))->toBe('editor');
-    expect(extractRoleSearch(['filter[search]' => '   ']))->toBeNull();
+    // A blank search is an active value that applies nothing on BOTH sides —
+    // it is passed through verbatim, not dropped (only null and [] are inactive).
+    expect(extractRoleSearch(['filter[search]' => '   ']))->toBe('   ');
+    expect(extractRoleSearch(['filter[search]' => null]))->toBeNull();
+    expect(extractRoleSearch(['filter[search]' => []]))->toBeNull();
     expect(extractRoleSearch([]))->toBeNull();
 });
 

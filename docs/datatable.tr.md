@@ -239,7 +239,7 @@ Seçim, sayfa değişikliklerinde korunur. Backend yanıt verdikten sonra `onSuc
 
 ### Request Doğrulama
 
-`ids.*` alanı `string|min:1|max:64` kuralıyla doğrulanır. Bu kural; integer auto-increment anahtarları, UUID (36 karakter) ve ULID (26 karakter) formatlarını tipe özgü ayrı bir kural gerektirmeden karşılar.
+`ids.*` alanı `string|min:1|max:64` kuralıyla doğrulanır. Bu kural; integer auto-increment anahtarları, UUID (36 karakter) ve ULID (26 karakter) formatlarını tipe özgü ayrı bir kural gerektirmeden karşılar. `ids` alanının kendisi yalnızca sayfa modunda zorunludur; `select_all_filtered` `true` olduğunda boş gelebilir ya da hiç gönderilmeyebilir, çünkü küme `filter_snapshot`'tan çözülür. Her iki modda da gönderilen id'ler 500 ile sınırlıdır.
 
 ### Backend
 
@@ -256,7 +256,7 @@ interface BulkAction
 
 ### Select-all-filtered fail-closed sözleşmesi
 
-Bir query sınıfı sayfalar-arası seçimi uyguladığında (ör. `UserBulkSelectionQuery`), datatable'ın kendi filtre koşullarını — gönderilen Users tablosu için bunlar `status`, `role`, `search`, `created_at_from`, `created_at_to` — `BulkFilterSnapshot::normalize()` üzerinden yeniden uygular. İstemcinin `filter_snapshot`'ında bulunan başka herhangi bir **aktif** `filter[...]` anahtarı sessizce düşürülmez; 422 (`sk-bulk.unknown_filters`) ile reddedilir, çünkü düşürmek kullanıcının gördüğü ve filtrelediği kümeden daha geniş bir küme çözer. `ids` sayısal dönüşüm yapılmadan opak string olarak gönderilir ve doğrulanır (`string|min:1|max:64`), böylece UUID/ULID birincil anahtarlar değişmeden geçer.
+Bir query sınıfı sayfalar-arası seçimi uyguladığında (ör. `UserBulkSelectionQuery`), datatable'ın kendi filtre koşullarını — gönderilen Users tablosu için bunlar `status`, `role`, `search`, `created_at_from`, `created_at_to` — `BulkFilterSnapshot::normalize()` üzerinden yeniden uygular. İstemcinin `filter_snapshot`'ında bulunan başka herhangi bir **aktif** `filter[...]` anahtarı sessizce düşürülmez; 422 (`sk-bulk.unknown_filters`) ile reddedilir, çünkü düşürmek kullanıcının gördüğü ve filtrelediği kümeden daha geniş bir küme çözer. Yalnızca `null` değer ya da boş dizi pasif sayılır — Spatie'nin `AllowedFilter`'ının kendisinin atladığı iki şekil. Boş ya da yalnızca boşluktan oluşan bir string aktif bir değerdir ve olduğu gibi (trim edilmeden) geçirilir; tablonun kendi koşuluyla uygulanır: `status` gibi bir exact filtre tablonun gösterdiği aynı boş kümeyi verir, `search` ve tarih sınırları ise tablonun yaptığı gibi onu yok sayar — böylece boş bir değer toplu kümeyi asla genişletemez; desteklenmeyen bir anahtardaki boş değer de diğer aktif değerler gibi reddedilir. `ids` sayısal dönüşüm yapılmadan opak string olarak gönderilir ve doğrulanır (`string|min:1|max:64`), böylece UUID/ULID birincil anahtarlar değişmeden geçer.
 
 `BulkActionResult` şu alanları taşır:
 

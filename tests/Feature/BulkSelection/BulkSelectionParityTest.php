@@ -120,6 +120,42 @@ function assertBulkParity(array $range): void
     expect(bulkParityDatatableIds($range))->toBe(bulkParityCandidateIds($range));
 }
 
+/**
+ * Visible id set vs bulk candidate set for a `filter[search]` value. A blank
+ * search must apply NOTHING on both sides — the table's callback and the bulk
+ * query both split on whitespace first — so neither side touches a column.
+ *
+ * @return array{table: list<int>, bulk: list<int>}
+ */
+function bulkParitySearchIds(string $search): array
+{
+    request()->replace(['filter' => ['search' => $search]]);
+
+    $payload = DatatableQueryBuilder::for(BulkParityTestUser::class)
+        ->searchable(['email'])
+        ->sortable(['id'])
+        ->defaultSort('id')
+        ->response()
+        ->toResponse(request())
+        ->getData(true);
+
+    $query = new UserBulkSelectionQuery;
+
+    $normalize = new ReflectionMethod($query, 'normalizeFilters');
+    $normalize->setAccessible(true);
+
+    $apply = new ReflectionMethod($query, 'applyFilters');
+    $apply->setAccessible(true);
+
+    $builder = BulkParityTestUser::query();
+    $apply->invoke($query, $builder, $normalize->invoke($query, ['filter[search]' => $search]));
+
+    return [
+        'table' => array_map('intval', array_column($payload['data']['data'], 'id')),
+        'bulk' => $builder->orderBy('id')->pluck('id')->map(fn ($id) => (int) $id)->all(),
+    ];
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Parity senaryoları
 // ──────────────────────────────────────────────────────────────────────────────
@@ -182,6 +218,18 @@ it('keeps parity when the date bound is malformed (both sides ignore it)', funct
     assertBulkParity(['from' => 'not-a-date', 'to' => '2026-02-30']);
 });
 
+it('keeps parity with an empty and a whitespace-only search (both sides apply nothing)', function (): void {
+    createBulkParityUser('a@example.com', '2026-01-15 12:00:00');
+    createBulkParityUser('b@example.com', '2026-01-16 12:00:00');
+
+    foreach (['', '   '] as $search) {
+        ['table' => $table, 'bulk' => $bulk] = bulkParitySearchIds($search);
+
+        expect($table)->toHaveCount(2)
+            ->and($bulk)->toBe($table);
+    }
+});
+
 // ──────────────────────────────────────────────────────────────────────────────
 // 422 sözleşmesi — yalnız `filter` anahtarları aktif-bilinmeyen ise reddedilir
 // ──────────────────────────────────────────────────────────────────────────────
@@ -203,14 +251,19 @@ it('rejects an active unknown filter key with a filter_snapshot 422 naming it', 
         ->and($caught->errors()['filter_snapshot'][0])->toContain('evil');
 });
 
-it('resolves normally when the only unknown key is inactive (empty value)', function (): void {
+it('treats only null and [] as inactive on an unknown key — a blank string is active and rejected', function (): void {
     $query = new UserBulkSelectionQuery;
     $normalize = new ReflectionMethod($query, 'normalizeFilters');
     $normalize->setAccessible(true);
 
-    $result = $normalize->invoke($query, ['filter[evil]' => '']);
+    expect($normalize->invoke($query, ['filter[evil]' => null]))->toBe([])
+        ->and($normalize->invoke($query, ['filter[evil]' => []]))->toBe([]);
 
-    expect($result)->toBe([]);
+    // Spatie applies `filter[evil]=` as a real (empty) value on the table side —
+    // an exact filter renders `WHERE evil = ''` — so ignoring it here would
+    // widen the bulk set. It is an active filter this query cannot apply.
+    expect(fn () => $normalize->invoke($query, ['filter[evil]' => '']))
+        ->toThrow(ValidationException::class);
 });
 
 it('never triggers the 422 on non-filter keys (sort, page, columns, type)', function (): void {

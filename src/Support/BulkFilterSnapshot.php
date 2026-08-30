@@ -24,14 +24,20 @@ use Illuminate\Validation\ValidationException;
  *      `page`, `per_page`, `columns`) and unrelated page-level params. Those
  *      are not filters and are ignored — they never narrow or widen the set.
  *
- *   3. EMPTY IS INACTIVE. A null, empty or whitespace-only value is not an
- *      active filter (the table itself applies nothing for it), so it is
- *      ignored rather than rejected.
+ *   3. ONLY NULL AND [] ARE INACTIVE. Those are exactly the two shapes Spatie's
+ *      AllowedFilter skips, so the table applies nothing for them and neither
+ *      does this. Anything else present on an allow-listed key — an empty or
+ *      whitespace-only string included — IS a value: the table's exact filter
+ *      renders `WHERE status = ''` for it (an empty set), so treating it as
+ *      "no filter" here would resolve a WIDER set. The value is passed through
+ *      verbatim (no trim — the table trims nothing either) and each query
+ *      applies it with the table's own predicate, so `search` and the date
+ *      bounds still no-op on blank input exactly as the table does.
  */
 final class BulkFilterSnapshot
 {
     /**
-     * Flatten + validate the snapshot into an `allow-listed key => trimmed value` map.
+     * Flatten + validate the snapshot into an `allow-listed key => value` map.
      *
      * Accepts both shapes the frontend can produce: bracket-style keys coming
      * from URLSearchParams (`filter[status]`) and an already-nested
@@ -39,7 +45,7 @@ final class BulkFilterSnapshot
      *
      * @param  array<string, mixed>  $snapshot  Raw client snapshot.
      * @param  string[]  $allowed  Filter keys the caller's query can actually apply.
-     * @return array<string, string> Keyed in allow-list order.
+     * @return array<string, string> Keyed in allow-list order; values verbatim, never trimmed.
      *
      * @throws ValidationException When the snapshot carries an active filter the query cannot apply.
      */
@@ -51,8 +57,9 @@ final class BulkFilterSnapshot
         $active = [];
 
         foreach ($flat as $key => $value) {
-            // Inactive: nothing was filtered on, so nothing has to be applied.
-            if ($value === null || $value === [] || (is_scalar($value) && trim((string) $value) === '')) {
+            // Inactive: the two shapes Spatie itself skips (contract #3). A blank
+            // string is NOT one of them — the table applies it as a value.
+            if ($value === null || $value === []) {
                 continue;
             }
 
@@ -62,7 +69,7 @@ final class BulkFilterSnapshot
                 continue;
             }
 
-            $active[$key] = trim((string) $value);
+            $active[$key] = (string) $value;
         }
 
         if ($unapplicable !== []) {

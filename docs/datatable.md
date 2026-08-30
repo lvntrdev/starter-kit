@@ -239,7 +239,7 @@ Selection is preserved across page changes. `onSuccess` and `onError` Inertia ro
 
 ### Request Validation
 
-`ids.*` is validated as `string|min:1|max:64`, which covers integer auto-increment keys, UUIDs (36 chars), and ULIDs (26 chars) without a type-specific rule.
+`ids.*` is validated as `string|min:1|max:64`, which covers integer auto-increment keys, UUIDs (36 chars), and ULIDs (26 chars) without a type-specific rule. `ids` itself is required only in page mode; when `select_all_filtered` is `true` it may be empty or omitted, because the set is resolved from `filter_snapshot`. Any ids sent in either mode are still capped at 500.
 
 ### Backend
 
@@ -256,7 +256,7 @@ interface BulkAction
 
 ### Select-all-filtered fail-closed contract
 
-When a query class implements cross-page selection (e.g. `UserBulkSelectionQuery`), it re-applies the datatable's own filter predicates — for the shipped Users table that's `status`, `role`, `search`, `created_at_from`, `created_at_to` — via `BulkFilterSnapshot::normalize()`. Any other **active** `filter[...]` key present in the client's `filter_snapshot` is rejected with a 422 (`sk-bulk.unknown_filters`) instead of being silently dropped, because dropping it would resolve a wider set than the one the user saw and filtered on. `ids` are sent and validated as opaque strings (`string|min:1|max:64`) with no numeric coercion, so UUID/ULID primary keys pass through unchanged.
+When a query class implements cross-page selection (e.g. `UserBulkSelectionQuery`), it re-applies the datatable's own filter predicates — for the shipped Users table that's `status`, `role`, `search`, `created_at_from`, `created_at_to` — via `BulkFilterSnapshot::normalize()`. Any other **active** `filter[...]` key present in the client's `filter_snapshot` is rejected with a 422 (`sk-bulk.unknown_filters`) instead of being silently dropped, because dropping it would resolve a wider set than the one the user saw and filtered on. Only a `null` value or an empty array counts as inactive — the two shapes Spatie's `AllowedFilter` itself skips. An empty or whitespace-only string is an active value and is passed through verbatim (no trim), to be applied with the table's own predicate: an exact filter such as `status` yields the same empty set the table showed, while `search` and the date bounds ignore it exactly as the table does — so a blank value can never widen the bulk set, and a blank value on an unsupported key is rejected like any other active one. `ids` are sent and validated as opaque strings (`string|min:1|max:64`) with no numeric coercion, so UUID/ULID primary keys pass through unchanged.
 
 `BulkActionResult` carries:
 

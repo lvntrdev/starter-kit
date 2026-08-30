@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * Validation for bulk action POST requests.
@@ -16,9 +17,13 @@ use Illuminate\Foundation\Http\FormRequest;
  *   "filter_snapshot": { ... }           // optional — active filter state for select_all_filtered
  * }
  *
- * The 'ids' field is always required. When select_all_filtered is true,
- * the controller uses filter_snapshot to re-query instead of ids — but ids
- * is still validated to avoid completely open-ended operations.
+ * 'ids' is required unless select_all_filtered is true. In cross-page mode
+ * the controller ignores ids and re-resolves the set from filter_snapshot
+ * through the domain's BulkSelectionQuery (bounded by its MAX_ITEMS cap), so
+ * an empty or absent ids is valid there — the shipped useDatatableSelection()
+ * composable posts `ids: []` in "all" mode once nothing on the current page
+ * is selected. Any ids that ARE sent are still shape-checked in both modes
+ * (array, max:500, opaque strings).
  *
  * Note: table-level existence checks (ids.* exists in DB) are intentionally
  * omitted here — the controller resolves the model collection directly
@@ -57,7 +62,9 @@ class BulkActionRequest extends FormRequest
     {
         return [
             'action' => ['required', 'string', 'max:64'],
-            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            // Page mode needs at least one id (`required` already rejects an
+            // empty array); cross-page mode resolves the set from filter_snapshot.
+            'ids' => [Rule::requiredIf(fn (): bool => ! $this->boolean('select_all_filtered')), 'array', 'max:500'],
             // ID type-agnostic: integer auto-increment, UUID (36 char), ULID (26 char) — all accepted.
             'ids.*' => ['required', 'string', 'min:1', 'max:64'],
             'select_all_filtered' => ['sometimes', 'boolean'],
@@ -72,7 +79,6 @@ class BulkActionRequest extends FormRequest
     {
         return [
             'ids.required' => __('sk-bulk.ids_required'),
-            'ids.min' => __('sk-bulk.ids_min'),
             'ids.max' => __('sk-bulk.ids_max'),
             'action.required' => __('sk-bulk.action_required'),
         ];
