@@ -226,9 +226,9 @@ To customize kit strings wholesale: `php artisan sk:publish --tag=lang`.
 ### Field label auto-resolution
 
 If you omit `.label()` on a FormBuilder field, the label resolves to
-`sk-attribute.attributes.{key}`. Add the attribute to `lang/{locale}/sk-attribute.php`
-(or `validation.php` `attributes`) instead of hardcoding labels. Same for
-DataTable column labels.
+`validation.attributes.{key}`. Add the attribute to the `attributes` array in
+`lang/{locale}/validation.php` instead of hardcoding labels. Same for
+DataTable column and filter labels.
 
 ### Build step
 

@@ -55,6 +55,8 @@ import SkForm from '@lvntr/components/FormBuilder/SkForm.vue';
 <SkForm v-model="formData" :config="formConfig" :errors="errors" />
 ```
 
+Bu modda `SkForm` **yalnızca** bağladığın nesneyi okur ve yazar. `initialData()`, bir alanın `.default()` değeri ve `dataUrl`'den yüklenen veri yalnızca dahili Inertia formunu besler — `v-model`'i asla doldurmaz — ve `reset()` no-op'tur; bu yüzden `formData`'yı mount'tan önce kendin doldur (`reactive({ status: 'active', ...record })`).
+
 ## Form Builder API
 
 - `layout('vertical' | 'horizontal')`

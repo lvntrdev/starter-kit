@@ -55,6 +55,8 @@ If `submit(...)` is omitted, you can use `v-model` and handle submission yoursel
 <SkForm v-model="formData" :config="formConfig" :errors="errors" />
 ```
 
+In this mode `SkForm` reads and writes **only** the object you bind. `initialData()`, a field's `.default()` and data loaded from `dataUrl` seed the internal Inertia form only — they never populate `v-model` — and `reset()` is a no-op, so seed `formData` yourself (`reactive({ status: 'active', ...record })`) before mounting.
+
 ## Form Builder API
 
 - `layout('vertical' | 'horizontal')`
