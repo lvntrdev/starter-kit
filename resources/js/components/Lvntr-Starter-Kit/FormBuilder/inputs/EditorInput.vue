@@ -31,6 +31,9 @@
 
     interface Props {
         id?: string;
+        /** Id of the element naming the editor — a contenteditable cannot be a `label[for]` target. */
+        ariaLabelledby?: string;
+        ariaRequired?: boolean;
         modelValue: string;
         placeholder?: string;
         toolbar?: EditorToolbarPreset;
@@ -44,6 +47,8 @@
 
     const props = withDefaults(defineProps<Props>(), {
         id: undefined,
+        ariaLabelledby: undefined,
+        ariaRequired: false,
         placeholder: undefined,
         toolbar: 'standard',
         minHeight: '10rem',
@@ -141,6 +146,35 @@
     const dialog = useDialog();
     const toast = useToast();
 
+    /**
+     * Attributes for the node the user actually types in.
+     *
+     * `<EditorContent>` renders a plain wrapper `<div>` and Tiptap puts the
+     * contenteditable node INSIDE it, so an `id` or `aria-*` on the wrapper
+     * names nothing: a `<div>` is not a labelable element, and assistive
+     * technology reads the state of the editable node, not of its wrapper.
+     * Everything that identifies or describes the control therefore goes here.
+     *
+     * Tiptap reads these once, at creation — every call site passes a value that
+     * is fixed for the field (its key, its label id, its required flag).
+     */
+    const editableAttributes: Record<string, string> = {
+        class: 'sk-rte__content',
+        spellcheck: 'true',
+        role: 'textbox',
+        'aria-multiline': 'true',
+    };
+
+    if (props.id) {
+        editableAttributes.id = props.id;
+    }
+    if (props.ariaLabelledby) {
+        editableAttributes['aria-labelledby'] = props.ariaLabelledby;
+    }
+    if (props.ariaRequired) {
+        editableAttributes['aria-required'] = 'true';
+    }
+
     const editor = useEditor({
         extensions,
         content: props.modelValue,
@@ -151,10 +185,7 @@
             emit('update:modelValue', out);
         },
         editorProps: {
-            attributes: {
-                class: 'sk-rte__content',
-                spellcheck: 'true',
-            },
+            attributes: editableAttributes,
             handlePaste: (_view, event) => handleImageEvent(event as unknown as ClipboardEvent, 'paste'),
             handleDrop: (_view, event) => handleImageEvent(event as unknown as DragEvent, 'drop'),
         },
@@ -968,6 +999,6 @@
             />
         </Popover>
 
-        <EditorContent :id="id" :editor="editor" class="sk-rte__body" :style="{ minHeight }" />
+        <EditorContent :editor="editor" class="sk-rte__body" :style="{ minHeight }" />
     </div>
 </template>

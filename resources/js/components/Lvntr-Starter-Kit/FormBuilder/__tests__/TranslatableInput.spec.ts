@@ -458,3 +458,78 @@ describe('SkForm and TranslatableInput resolve the SAME locale set from identica
         }
     });
 });
+
+// ── Tests: accessibility (label ↔ input association, required semantics) ─────
+
+describe('TranslatableInput — accessibility', () => {
+    it('associates the rendered label with the input in single-locale mode', () => {
+        const field = makeTextField({ onlyLocales: ['tr'], required: true });
+        const wrapper = mount(TranslatableInput, {
+            props: { field, modelValue: { tr: '' }, showLabel: true },
+            global: globalConfig,
+        });
+
+        const input = wrapper.find('input');
+        expect(wrapper.find('label').attributes('for')).toBe('name');
+        expect(input.attributes('id')).toBe('name');
+        expect(input.attributes('aria-required')).toBe('true');
+        expect(wrapper.find('.sk-fb__required').attributes('aria-hidden')).toBe('true');
+        expect(wrapper.find('.sr-only').text()).toBe('sk-common.required');
+    });
+
+    it('keeps the label pointing at the active locale input in multi-locale mode', async () => {
+        const field = makeTextField({ required: true });
+        const wrapper = mount(TranslatableInput, {
+            props: { field, modelValue: { tr: '', en: '' }, showLabel: true },
+            global: globalConfig,
+        });
+
+        expect(wrapper.find('label').attributes('for')).toBe('name');
+        expect(wrapper.find('input').attributes('id')).toBe('name');
+        // Only the DEFAULT locale is `required` server-side (HasTranslatableRules),
+        // and the rendered content locales carry no signal for which one that is —
+        // so no locale tab's input is announced as required.
+        expect(wrapper.find('input').attributes('aria-required')).toBeUndefined();
+        expect(wrapper.find('.sr-only').exists()).toBe(false);
+        expect(wrapper.find('.sk-fb__required').attributes('aria-hidden')).toBe('true');
+
+        await wrapper.findAll('button[role="tab"]')[1].trigger('click');
+        await nextTick();
+
+        // Only the active locale's input is rendered, so the id stays unique.
+        expect(wrapper.findAll('input')).toHaveLength(1);
+        expect(wrapper.find('input').attributes('id')).toBe('name');
+    });
+
+    it('names a translatable editor through aria-labelledby instead of a dead label[for]', () => {
+        const field = { ...makeTextField({ onlyLocales: ['tr'], required: true }), type: 'translatable-editor' };
+        const wrapper = mount(TranslatableInput, {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            props: { field: field as any, modelValue: { tr: '' }, showLabel: true },
+            global: globalConfig,
+        });
+
+        const label = wrapper.find('label');
+        const editor = wrapper.find('[data-testid="editor-input"]');
+
+        // A contenteditable is not labelable, so the label drops `for` and names
+        // the editor by id; EditorInput forwards both onto the editable node.
+        expect(label.attributes('id')).toBe('name__label');
+        expect(label.attributes('for')).toBeUndefined();
+        expect(editor.attributes('id')).toBe('name');
+        expect(editor.attributes('aria-labelledby')).toBe('name__label');
+        expect(editor.attributes('aria-required')).toBe('true');
+    });
+
+    it('does not mark an optional field as required', () => {
+        const field = makeTextField({ onlyLocales: ['tr'] });
+        const wrapper = mount(TranslatableInput, {
+            props: { field, modelValue: { tr: '' }, showLabel: true },
+            global: globalConfig,
+        });
+
+        expect(wrapper.find('input').attributes('aria-required')).toBeUndefined();
+        expect(wrapper.find('.sk-fb__required').exists()).toBe(false);
+        expect(wrapper.find('.sr-only').exists()).toBe(false);
+    });
+});

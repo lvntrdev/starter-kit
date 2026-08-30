@@ -160,6 +160,32 @@
     const activeLocale = computed(
         () => resolvedLocales.value.find((l) => l.code === activeTab.value) ?? resolvedLocales.value[0],
     );
+
+    // ── Label association / required semantics ───────────────────────────────────
+
+    const labelId = computed(() => `${props.field.key}__label`);
+
+    /**
+     * A rich-text editor's editable node is a contenteditable `<div>` — not a
+     * labelable element, so `label[for]` can never target it. That type is named
+     * through `aria-labelledby` on the editable node instead (see EditorInput),
+     * and the label drops its `for` rather than pointing at nothing.
+     */
+    const labelFor = computed(() => (fieldType.value === 'translatable-editor' ? undefined : props.field.key));
+
+    /**
+     * Requiredness is announced on the control ONLY when a single locale renders.
+     *
+     * The kit's own rule builder (`HasTranslatableRules::translatableRules()`)
+     * keeps `required` on the default locale and turns every other locale into
+     * `nullable`, and nothing in the page props says which of the rendered
+     * CONTENT locales that default is — so marking each locale tab's input
+     * required would announce optional locales as required. With one locale the
+     * question does not arise: that input is the one the asterisk is about. In
+     * multi-locale mode the asterisk stays visual (`aria-hidden`), exactly as it
+     * was before the label was associated.
+     */
+    const requiredControl = computed(() => props.field.required === true && isSingle.value);
 </script>
 
 <template>
@@ -167,12 +193,14 @@
         <!-- Tek dil -->
         <template v-if="isSingle">
             <template v-if="resolvedLocales.length === 1">
-                <label v-if="showLabel" class="sk-fb__label">
+                <label v-if="showLabel" :id="labelId" :for="labelFor" class="sk-fb__label">
                     {{ displayFieldLabel }}
-                    <span v-if="field.required" class="sk-fb__required">*</span>
+                    <span v-if="field.required" class="sk-fb__required" aria-hidden="true">*</span><span v-if="requiredControl" class="sr-only">{{ trans('sk-common.required') }}</span>
                 </label>
                 <InputText
                     v-if="fieldType === 'translatable-text'"
+                    :id="field.key"
+                    :aria-required="requiredControl ? 'true' : undefined"
                     :model-value="value[resolvedLocales[0].code] ?? ''"
                     :type="asTranslatableText.inputType ?? 'text'"
                     :placeholder="asTranslatableText.placeholder"
@@ -186,6 +214,8 @@
                 />
                 <Textarea
                     v-else-if="fieldType === 'translatable-textarea'"
+                    :id="field.key"
+                    :aria-required="requiredControl ? 'true' : undefined"
                     :model-value="value[resolvedLocales[0].code] ?? ''"
                     :placeholder="asTranslatableTextarea.placeholder"
                     :rows="asTranslatableTextarea.rows ?? 4"
@@ -198,6 +228,9 @@
                 />
                 <EditorInput
                     v-else-if="fieldType === 'translatable-editor'"
+                    :id="field.key"
+                    :aria-labelledby="showLabel ? labelId : undefined"
+                    :aria-required="requiredControl"
                     :model-value="value[resolvedLocales[0].code] ?? ''"
                     :min-height="asTranslatableEditor.minHeight ?? '10rem'"
                     :toolbar="asTranslatableEditor.toolbar ?? 'standard'"
@@ -216,9 +249,9 @@
         <!-- Çok dil: label satırında dil seçici, altında yalnız aktif dilin girişi -->
         <template v-else>
             <div class="mb-2 flex items-center gap-3">
-                <label v-if="showLabel" class="sk-fb__label mb-0!">
+                <label v-if="showLabel" :id="labelId" :for="labelFor" class="sk-fb__label mb-0!">
                     {{ displayFieldLabel }}
-                    <span v-if="field.required" class="sk-fb__required">*</span>
+                    <span v-if="field.required" class="sk-fb__required" aria-hidden="true">*</span><span v-if="requiredControl" class="sr-only">{{ trans('sk-common.required') }}</span>
                 </label>
                 <div
                     class="inline-flex items-center gap-0.5 rounded-lg bg-surface-100 p-0.5 dark:bg-surface-800"
@@ -251,6 +284,8 @@
             <template v-if="activeLocale">
                 <InputText
                     v-if="fieldType === 'translatable-text'"
+                    :id="field.key"
+                    :aria-required="requiredControl ? 'true' : undefined"
                     :model-value="value[activeLocale.code] ?? ''"
                     :type="asTranslatableText.inputType ?? 'text'"
                     :placeholder="asTranslatableText.placeholder"
@@ -264,6 +299,8 @@
                 />
                 <Textarea
                     v-else-if="fieldType === 'translatable-textarea'"
+                    :id="field.key"
+                    :aria-required="requiredControl ? 'true' : undefined"
                     :model-value="value[activeLocale.code] ?? ''"
                     :placeholder="asTranslatableTextarea.placeholder"
                     :rows="asTranslatableTextarea.rows ?? 4"
@@ -276,6 +313,9 @@
                 />
                 <EditorInput
                     v-else-if="fieldType === 'translatable-editor'"
+                    :id="field.key"
+                    :aria-labelledby="showLabel ? labelId : undefined"
+                    :aria-required="requiredControl"
                     :model-value="value[activeLocale.code] ?? ''"
                     :min-height="asTranslatableEditor.minHeight ?? '10rem'"
                     :toolbar="asTranslatableEditor.toolbar ?? 'standard'"
