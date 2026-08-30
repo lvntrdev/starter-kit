@@ -106,6 +106,22 @@ The reason it is not simply switched is how far the switch would reach. An insta
 
 Whichever way you set it, the env var stays a valid production escape hatch: set it back to `true` if you need more time to finish remediation, keeping in mind that every route left unresolved is, by definition, ungated for as long as it stays that way.
 
+### Cross-page bulk selection now fail-closes on unsupported filters
+
+If a page adds its own filter on top of the kit's Users or Roles table — a custom `filter[...]` key the datatable doesn't declare — clicking "select all filtered" for a bulk action now returns a **422** (`sk-bulk.unknown_filters`) instead of silently running the bulk action against a set that ignores that filter. Before this release, an unsupported active filter was dropped from the snapshot and the resolved set was **wider** than what the table showed — deleting or acting on rows the filter was meant to hide.
+
+**Do not "fix" the 422 by stripping the unsupported filter out of the snapshot before it reaches the backend** — that re-widens the set back to the old, unsafe behavior. Instead, extend the allow-list the query class actually applies (`UserBulkSelectionQuery::ALLOWED_FILTERS` / the Roles equivalent) so the new filter is honoured with the same semantics the table uses, or leave cross-page selection disabled while that filter is active and fall back to per-row selection.
+
+This fix lives in the vendor query classes (`Lvntr\StarterKit\Domain\User\Queries\UserBulkSelectionQuery`, `Lvntr\StarterKit\Domain\Role\Queries\RoleBulkSelectionQuery`). **An ejected copy of either query — via `make:sk-domain` or any manual copy out of the vendor namespace — does not receive this fix on `composer update`**; re-diff your copy against the vendor source to pick it up. Likewise, a copy of `useDatatableSelection.ts` published with `php artisan sk:publish --tag=composables` keeps sending whatever id shape it sent before until you re-publish or manually port the change described below.
+
+### Bulk selection ids are sent as opaque strings, no numeric coercion
+
+`useDatatableSelection()`'s `executeBulkAction()` no longer coerces selected row ids before posting them. Backend `ids.*` validation already accepts `string|min:1|max:64`, so UUID/ULID primary keys were already valid — but a numeric-looking id could previously round-trip through a coercion step. If your own bulk endpoint parses `ids` with a strict integer cast, confirm it still accepts the exact string PrimeVue key type your `idKey` column uses.
+
+### `DatatableQueryBuilder::columns()` payload shaping is fail-closed
+
+A backend that declares `columns()` and receives a `?columns=` request parameter with **no key matching a declared column** now reduces every row to the `alwaysInclude()` keys only — it no longer falls back to returning the full row. An absent `columns` parameter is unaffected and still returns the full row. If a frontend column key and the corresponding backend `columns()` key have ever drifted apart (a rename on one side only), affected cells now render empty instead of masking the mismatch with the full payload; audit both sides if you see missing cell data after upgrading.
+
 ## v13.6.8 → v13.6.9
 
 ### `CheckResourcePermission` is now fail-closed on staging/demo (behavior change)

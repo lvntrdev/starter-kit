@@ -15,12 +15,16 @@
 |        - rütbeli aktör → yalnız eşit/alt rütbe (sort_order >= aktör min)
 |        - rolsüz aktör (direct-permission) → yalnız rolsüz kullanıcılar
 |
-|   B) UserBulkSelectionQuery::normalizeFilters() — allow-list parse. Keyfi
-|      snapshot anahtarı query'ye sızmamalı; yalnız status/role/search.
+|   B) UserBulkSelectionQuery::normalizeFilters() — allow-list parse + FAIL-CLOSED.
+|      Yalnız status/role/search/created_at_from/created_at_to uygulanır;
 |      bracket-style ('filter[status]') ve nested (['filter']['status'])
-|      şekilleri kabul edilir; App\Models gerektirmeyen saf mantık.
+|      şekilleri kabul edilir. Uygulanamayan AKTİF bir filtre sessizce
+|      düşürülmez — 422 (ValidationException) ile reddedilir, çünkü düşürmek
+|      kullanıcının gördüğünden DAHA GENİŞ bir kümeyi silmeye yol açardı.
+|      App\Models gerektirmeyen saf mantık.
 |
-|   C) RoleBulkSelectionQuery::extractSearch() — yalnız 'search' allow-list'li.
+|   C) RoleBulkSelectionQuery::extractSearch() — yalnız 'search' allow-list'li;
+|      başka bir aktif filtre aynı 422'yi doğurur.
 |
 | App\Models\User/Role bu pakette autoload edilemediğinden resolve()'ın
 | DB tarafı (User::query()) burada test edilemez; bunun yerine güvenliği
@@ -32,6 +36,7 @@
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Lvntr\StarterKit\Domain\Role\Queries\RoleBulkSelectionQuery;
 use Lvntr\StarterKit\Domain\User\Queries\UserBulkSelectionQuery;
 use Lvntr\StarterKit\Domain\User\Queries\UserDatatableQuery;
@@ -161,7 +166,7 @@ it('role-less actor (direct-permission) only sees other role-less users', functi
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// B) UserBulkSelectionQuery::normalizeFilters — allow-list parse (saf mantık)
+// B) UserBulkSelectionQuery::normalizeFilters — allow-list + fail-closed
 // ──────────────────────────────────────────────────────────────────────────────
 
 function normalizeUserFilters(array $snapshot): array
@@ -173,14 +178,14 @@ function normalizeUserFilters(array $snapshot): array
     return $ref->invoke($q, $snapshot);
 }
 
-it('parses bracket-style filter keys and keeps only allow-listed ones', function (): void {
+it('parses bracket-style filter keys and ignores non-filter params', function (): void {
     $result = normalizeUserFilters([
         'filter[status]' => 'active',
         'filter[role]' => 'admin',
         'filter[search]' => 'john',
-        'filter[evil]' => 'DROP',     // allow-list dışı → düşmeli
         'sort' => '-created_at',       // filter değil → yok sayılmalı
         'page' => '3',
+        'per_page' => '25',
         'columns' => 'name,email',
     ]);
 
@@ -193,7 +198,7 @@ it('parses bracket-style filter keys and keeps only allow-listed ones', function
 
 it('parses the nested filter shape too', function (): void {
     $result = normalizeUserFilters([
-        'filter' => ['status' => 'inactive', 'role' => 'user', 'injected' => 'x'],
+        'filter' => ['status' => 'inactive', 'role' => 'user'],
     ]);
 
     expect($result)->toBe([
@@ -202,24 +207,79 @@ it('parses the nested filter shape too', function (): void {
     ]);
 });
 
-it('drops empty / non-scalar filter values', function (): void {
+it('parses the created_at date bounds in both shapes', function (): void {
+    expect(normalizeUserFilters([
+        'filter[created_at_from]' => '2026-01-01',
+        'filter[created_at_to]' => '2026-01-31',
+    ]))->toBe([
+        'created_at_from' => '2026-01-01',
+        'created_at_to' => '2026-01-31',
+    ]);
+
+    expect(normalizeUserFilters([
+        'filter' => ['created_at_from' => '2026-02-01', 'created_at_to' => '2026-02-28'],
+    ]))->toBe([
+        'created_at_from' => '2026-02-01',
+        'created_at_to' => '2026-02-28',
+    ]);
+});
+
+it('drops empty / whitespace-only filter values as inactive', function (): void {
     $result = normalizeUserFilters([
-        'filter[status]' => '   ',          // boş (trim) → düşmeli
-        'filter[role]' => ['array'],         // non-scalar → düşmeli
+        'filter[status]' => '   ',           // boş (trim) → pasif, yok sayılır
+        'filter[role]' => '',                // boş → pasif
+        'filter[created_at_from]' => null,   // değer yok → pasif
         'filter[search]' => 'kept',
     ]);
 
     expect($result)->toBe(['search' => 'kept']);
 });
 
-it('returns an empty filter set for an arbitrary / hostile snapshot', function (): void {
-    $result = normalizeUserFilters([
+it('rejects an unknown ACTIVE filter instead of silently dropping it', function (): void {
+    expect(fn () => normalizeUserFilters([
+        'filter[status]' => 'active',
+        'filter[evil]' => 'DROP',
+        'sort' => '-created_at',
+    ]))->toThrow(ValidationException::class);
+
+    try {
+        normalizeUserFilters(['filter[evil]' => 'DROP']);
+        $caught = null;
+    } catch (ValidationException $e) {
+        $caught = $e;
+    }
+
+    expect($caught)->not->toBeNull()
+        ->and($caught->errors())->toHaveKey('filter_snapshot')
+        ->and($caught->errors()['filter_snapshot'][0])->toContain('evil');
+});
+
+it('rejects an unknown active filter in the nested shape as well', function (): void {
+    expect(fn () => normalizeUserFilters([
+        'filter' => ['status' => 'inactive', 'injected' => 'x'],
+    ]))->toThrow(ValidationException::class);
+});
+
+it('rejects an allow-listed key whose value is not a usable scalar', function (): void {
+    expect(fn () => normalizeUserFilters([
+        'filter[role]' => ['array'],
+    ]))->toThrow(ValidationException::class);
+});
+
+it('rejects an arbitrary / hostile snapshot carrying active filter keys', function (): void {
+    expect(fn () => normalizeUserFilters([
         'filter[deleted_at]' => 'whatever',
         'password' => 'x',
         'is_admin' => '1',
-    ]);
+    ]))->toThrow(ValidationException::class);
+});
 
-    expect($result)->toBe([]);
+it('returns an empty filter set when the snapshot carries no filter key at all', function (): void {
+    expect(normalizeUserFilters([
+        'password' => 'x',
+        'is_admin' => '1',
+        'sort' => '-created_at',
+    ]))->toBe([]);
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -235,9 +295,14 @@ function extractRoleSearch(array $snapshot): ?string
     return $ref->invoke($q, $snapshot);
 }
 
-it('extracts the role search term (bracket + nested), ignoring other keys', function (): void {
-    expect(extractRoleSearch(['filter[search]' => 'manager']))->toBe('manager');
+it('extracts the role search term (bracket + nested), ignoring non-filter keys', function (): void {
+    expect(extractRoleSearch(['filter[search]' => 'manager', 'sort' => 'id', 'page' => '2']))->toBe('manager');
     expect(extractRoleSearch(['filter' => ['search' => 'editor']]))->toBe('editor');
-    expect(extractRoleSearch(['filter[name]' => 'x', 'filter[evil]' => 'y']))->toBeNull();
     expect(extractRoleSearch(['filter[search]' => '   ']))->toBeNull();
+    expect(extractRoleSearch([]))->toBeNull();
+});
+
+it('rejects any other active filter on the role snapshot', function (): void {
+    expect(fn () => extractRoleSearch(['filter[name]' => 'x']))->toThrow(ValidationException::class);
+    expect(fn () => extractRoleSearch(['filter[evil]' => 'y']))->toThrow(ValidationException::class);
 });

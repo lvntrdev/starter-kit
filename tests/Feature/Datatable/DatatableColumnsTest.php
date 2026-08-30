@@ -105,7 +105,7 @@ it('returns the full payload when no columns param is sent', function (): void {
     expect($payload['data'][0])->toHaveKeys(['id', 'name', 'email']);
 });
 
-it('ignores unknown requested column keys', function (): void {
+it('fails closed to alwaysInclude when every requested column key is unknown', function (): void {
     request()->merge(['columns' => 'password,totally_unknown']);
 
     $payload = dtPayload(
@@ -115,8 +115,23 @@ it('ignores unknown requested column keys', function (): void {
             ->columns(['name', 'email']),
     );
 
-    // Hiçbir geçerli sütun seçilmediyse satırlar olduğu gibi döner.
-    expect($payload['data'][0])->toHaveKeys(['id', 'name', 'email']);
+    // Geçerli sütun eşleşmediyse satır tam olarak dönmez; yalnız alwaysInclude kalır.
+    expect($payload['data'][0])->toHaveKeys(['id']);
+    expect($payload['data'][0])->not->toHaveKeys(['name', 'email', 'password']);
+});
+
+it('fails closed to alwaysInclude when the columns param is present but empty', function (): void {
+    request()->merge(['columns' => '']);
+
+    $payload = dtPayload(
+        DatatableQueryBuilder::for(DatatableColumnsTestUser::class)
+            ->sortable(['id'])
+            ->defaultSort('id')
+            ->columns(['name', 'email']),
+    );
+
+    expect($payload['data'][0])->toHaveKeys(['id']);
+    expect($payload['data'][0])->not->toHaveKeys(['name', 'email']);
 });
 
 it('keeps the top-level segment for dot-notation column keys', function (): void {

@@ -16,4 +16,7 @@ return [
 
     // Cross-page "select all filtered" cap warning
     'cap_reached' => 'Selection reached the upper limit; only the first :max items were processed.',
+
+    // Cross-page "select all filtered" fail-closed snapshot guard
+    'unknown_filters' => 'This bulk action cannot be applied: the active filter(s) :keys are not supported for select-all. Clear them or select the items individually.',
 ];

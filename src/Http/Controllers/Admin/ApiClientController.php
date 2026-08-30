@@ -42,7 +42,7 @@ class ApiClientController extends Controller
             ->where('revoked', false);
 
         return DatatableQueryBuilder::for($query)
-            ->sortable(['name', 'created_at'])
+            ->sortable(['id', 'name', 'created_at'])
             ->resource(ApiClientResource::class)
             ->response();
     }

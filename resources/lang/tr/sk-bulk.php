@@ -16,4 +16,7 @@ return [
 
     // Cross-page "tümünü seç" üst sınır uyarısı
     'cap_reached' => 'Seçim üst sınıra ulaştı; yalnızca ilk :max kayıt işlendi.',
+
+    // Cross-page "tümünü seç" fail-closed snapshot koruması
+    'unknown_filters' => 'Bu toplu işlem uygulanamaz: :keys filtresi tümünü seç için desteklenmiyor. Filtreyi kaldırın ya da kayıtları tek tek seçin.',
 ];

@@ -5,6 +5,8 @@ namespace Lvntr\StarterKit\Domain\Role\Queries;
 use App\Models\Role;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\ValidationException;
+use Lvntr\StarterKit\Support\BulkFilterSnapshot;
 
 /**
  * Query: Resolve the full set of roles matching a "select all filtered"
@@ -22,9 +24,12 @@ use Illuminate\Database\Eloquent\Collection;
  *      the gate that drops protected/outranking roles. This matches exactly
  *      what the ids-based path already does.
  *
- *   2. ALLOW-LISTED FILTERS. Only the search the datatable exposes is honoured
- *      (RoleDatatableQuery declares searchable(['id', 'name']) and no
- *      filterable()). Arbitrary snapshot keys are ignored.
+ *   2. ALLOW-LISTED FILTERS, FAIL-CLOSED. Only the search the datatable exposes
+ *      is honoured (RoleDatatableQuery declares searchable(['id', 'name']) and
+ *      no filterable()). An ACTIVE filter this query cannot apply is NOT
+ *      silently dropped — BulkFilterSnapshot rejects the request with a 422,
+ *      because dropping it would resolve a set WIDER than the one the user saw
+ *      and delete roles the filter was hiding.
  *
  *   3. PERFORMANCE BOUND. No ids.max:500 applies to cross-page; a hard cap
  *      protects against unbounded batches (the role table is small in practice,
@@ -64,27 +69,16 @@ class RoleBulkSelectionQuery
     /**
      * Pull the (allow-listed) search term out of the client snapshot, accepting
      * both bracket-style ('filter[search]') and nested ['filter']['search']
-     * shapes. Everything else is ignored.
+     * shapes. Non-filter keys (sort/page/columns/...) are ignored; any OTHER
+     * active filter raises a 422 through the shared normalizer.
      *
      * @param  array<string, mixed>  $snapshot
+     *
+     * @throws ValidationException
      */
     private function extractSearch(array $snapshot): ?string
     {
-        $raw = null;
-
-        if (isset($snapshot['filter']) && is_array($snapshot['filter']) && isset($snapshot['filter']['search'])) {
-            $raw = $snapshot['filter']['search'];
-        } elseif (isset($snapshot['filter[search]'])) {
-            $raw = $snapshot['filter[search]'];
-        }
-
-        if (! is_scalar($raw)) {
-            return null;
-        }
-
-        $value = trim((string) $raw);
-
-        return $value === '' ? null : $value;
+        return BulkFilterSnapshot::normalize($snapshot, ['search'])['search'] ?? null;
     }
 
     /**

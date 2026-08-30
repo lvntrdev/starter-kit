@@ -126,20 +126,42 @@ class DatatableQueryBuilder
     {
         return [
             AllowedFilter::callback("{$column}_from", function (Builder $query, mixed $value) use ($column): void {
-                $date = self::parseCalendarDate($value);
-
-                if ($date !== null) {
-                    $query->where($column, '>=', $date->startOfDay()->utc());
-                }
+                self::applyCalendarDateRange($query, $column, from: $value);
             }),
             AllowedFilter::callback("{$column}_to", function (Builder $query, mixed $value) use ($column): void {
-                $date = self::parseCalendarDate($value);
-
-                if ($date !== null) {
-                    $query->where($column, '<', $date->startOfDay()->addDay()->utc());
-                }
+                self::applyCalendarDateRange($query, $column, to: $value);
             }),
         ];
+    }
+
+    /**
+     * Apply the inclusive local-calendar date predicate for a UTC datetime column.
+     *
+     * SINGLE SOURCE OF TRUTH for the date-range semantics: the datatable's
+     * dateRangeFilters() closures AND the cross-page bulk selection queries both
+     * go through here, so the visible set and the bulk set can never diverge on
+     * timezone/DST boundaries. Bounds are resolved in the user's display
+     * timezone: `from` is >= local start-of-day, `to` is < local start of the
+     * NEXT day (so the `to` day itself is included).
+     *
+     * A value that is not a valid `Y-m-d` calendar date is ignored — exactly as
+     * the datatable ignores it — rather than raising an error.
+     *
+     * @param  Builder<Model>  $query
+     */
+    public static function applyCalendarDateRange(Builder $query, string $column, mixed $from = null, mixed $to = null): void
+    {
+        $fromDate = self::parseCalendarDate($from);
+
+        if ($fromDate !== null) {
+            $query->where($column, '>=', $fromDate->startOfDay()->utc());
+        }
+
+        $toDate = self::parseCalendarDate($to);
+
+        if ($toDate !== null) {
+            $query->where($column, '<', $toDate->startOfDay()->addDay()->utc());
+        }
     }
 
     /**
@@ -274,7 +296,10 @@ class DatatableQueryBuilder
 
     /**
      * Shape each row down to the requested ?columns selection (+ alwaysInclude keys).
-     * Unknown keys are ignored; without a ?columns param the payload stays complete.
+     * Fail-closed: the full row is only returned when the request carries no `columns`
+     * parameter at all. Once the parameter is present — empty, unknown-only, or
+     * partially valid — every row is reduced to alwaysInclude() keys plus whichever
+     * requested keys are valid (possibly none), never the full row.
      * Dot keys (e.g. role.name) keep their top-level segment.
      *
      * @param  array<int, mixed>  $items
@@ -282,18 +307,14 @@ class DatatableQueryBuilder
      */
     private function shapeItems(array $items): array
     {
-        $requested = array_filter(explode(',', (string) request()->input('columns', '')));
-
-        if ($requested === []) {
+        if (! request()->has('columns')) {
             return $items;
         }
+
+        $requested = array_filter(explode(',', (string) request()->input('columns', '')));
 
         $allowed = array_column($this->columns, 'key');
         $selected = array_values(array_intersect($requested, $allowed));
-
-        if ($selected === []) {
-            return $items;
-        }
 
         $keep = array_flip(array_unique([
             ...$this->alwaysInclude,

@@ -106,6 +106,22 @@ Varsayılan değişmeden önce izlenecek **sıralı düzeltme yolu**:
 
 Değeri hangi yöne verirseniz verin, env değişkeni production'da geçerli kaçış kapısı olarak kalır — düzeltmeyi bitirmek için daha fazla zamana ihtiyacınız varsa `true`'ya geri alabilirsiniz; ancak çözülememiş her route, tanımı gereği, o hâlde kaldığı sürece izinsiz (ungated) demektir.
 
+### Sayfalar-arası toplu seçim artık desteklenmeyen filtrelerde fail-closed davranıyor
+
+Bir sayfa, kit'in Users veya Roles tablosuna kendi filtresini ekliyorsa — datatable'ın tanımlamadığı özel bir `filter[...]` anahtarı — artık "tümünü seç"e tıklandığında bu filtre aktifken toplu işlem sessizce o filtreyi yok sayan bir küme üzerinde çalışmak yerine **422** (`sk-bulk.unknown_filters`) döner. Bu sürümden önce desteklenmeyen aktif bir filtre snapshot'tan düşürülüyordu ve çözülen küme tablonun gösterdiğinden **daha geniş** oluyordu — filtrenin gizlemesi gereken satırları da siliyor ya da onlar üzerinde işlem yapıyordu.
+
+**422'yi, desteklenmeyen filtreyi backend'e ulaşmadan snapshot'tan çıkararak "düzeltmeyin"** — bu, kümeyi eski, güvensiz davranışa geri genişletir. Bunun yerine query sınıfının gerçekten uyguladığı allow-list'i genişletin (`UserBulkSelectionQuery::ALLOWED_FILTERS` / Roles karşılığı) ki yeni filtre tablonun kullandığı aynı semantikle uygulansın, ya da o filtre aktifken sayfalar-arası seçimi devre dışı bırakıp satır bazlı seçime geri dönün.
+
+Bu düzeltme vendor query sınıflarında yaşıyor (`Lvntr\StarterKit\Domain\User\Queries\UserBulkSelectionQuery`, `Lvntr\StarterKit\Domain\Role\Queries\RoleBulkSelectionQuery`). **Bu sorgulardan birinin vendor namespace'i dışına çıkarılmış bir kopyası — `make:sk-domain` ile ya da elle — `composer update` ile bu düzeltmeyi almaz**; kopyanızı vendor kaynağıyla yeniden diff'leyin. Aynı şekilde, `php artisan sk:publish --tag=composables` ile publish edilmiş bir `useDatatableSelection.ts` kopyası, siz yeniden publish edene ya da aşağıda anlatılan değişikliği elle taşıyana kadar eski gönderdiği id şeklini göndermeye devam eder.
+
+### Toplu seçim id'leri opak string olarak gönderiliyor, sayısal dönüşüm yok
+
+`useDatatableSelection()`'ın `executeBulkAction()`'ı artık seçili satır id'lerini göndermeden önce dönüştürmüyor. Backend `ids.*` doğrulaması zaten `string|min:1|max:64` kabul ediyordu — yani UUID/ULID birincil anahtarlar zaten geçerliydi — ama sayısal görünümlü bir id daha önce bir dönüşüm adımından geçebiliyordu. Kendi toplu işlem endpoint'iniz `ids`'i katı bir integer cast ile ayrıştırıyorsa, `idKey` kolonunuzun kullandığı tam string tipini hâlâ kabul ettiğinden emin olun.
+
+### `DatatableQueryBuilder::columns()` payload şekillendirmesi fail-closed
+
+`columns()` tanımlayan ve **hiçbir tanımlı sütunla eşleşmeyen** bir `?columns=` istek parametresi alan bir backend artık her satırı yalnızca `alwaysInclude()` anahtarlarına indirger — artık tam satıra geri dönmez. `columns` parametresinin hiç bulunmaması bu davranıştan etkilenmez ve tam satır dönmeye devam eder. Frontend sütun anahtarı ile karşılık gelen backend `columns()` anahtarı bir tarafta yeniden adlandırılıp diğerinde kalmışsa, etkilenen hücreler artık tam payload'ın uyumsuzluğu maskelemesi yerine boş render edilir; güncelleme sonrası eksik hücre verisi görürseniz her iki tarafı da denetleyin.
+
 ## v13.6.8 → v13.6.9
 
 ### `CheckResourcePermission` artık staging/demo'da fail-closed (davranış değişikliği)

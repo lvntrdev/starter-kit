@@ -254,6 +254,10 @@ interface BulkAction
 
 `BulkActionDispatcher`, `action` anahtarından doğru action sınıfını çözer; `ids` doluysa belirtilen model kümesini, `select_all_filtered` `true` ise tüm filtrelenmiş kümeyi aktarır.
 
+### Select-all-filtered fail-closed sözleşmesi
+
+Bir query sınıfı sayfalar-arası seçimi uyguladığında (ör. `UserBulkSelectionQuery`), datatable'ın kendi filtre koşullarını — gönderilen Users tablosu için bunlar `status`, `role`, `search`, `created_at_from`, `created_at_to` — `BulkFilterSnapshot::normalize()` üzerinden yeniden uygular. İstemcinin `filter_snapshot`'ında bulunan başka herhangi bir **aktif** `filter[...]` anahtarı sessizce düşürülmez; 422 (`sk-bulk.unknown_filters`) ile reddedilir, çünkü düşürmek kullanıcının gördüğü ve filtrelediği kümeden daha geniş bir küme çözer. `ids` sayısal dönüşüm yapılmadan opak string olarak gönderilir ve doğrulanır (`string|min:1|max:64`), böylece UUID/ULID birincil anahtarlar değişmeden geçer.
+
 `BulkActionResult` şu alanları taşır:
 
 ```php
@@ -397,7 +401,7 @@ return DatatableQueryBuilder::for(User::query())
 
 ### Sütun tanımı ve payload şekillendirme
 
-`columns()` tablonun sunduğu sütun listesini tanımlar. Her giriş bir key string'i ya da opsiyonel `label`, `sortable`, `visible`, `locked` bayraklı bir dizidir. Liste `columns` meta'sı olarak döner — böylece frontend menüsü başlangıçta gizli sütunları da sunabilir — ve payload şekillendirmeyi açar: istek `?columns=key1,key2` taşıdığında her satır seçili sütun anahtarlarına ve `alwaysInclude()` anahtarlarına (varsayılan `['id']`) indirgenir. Satır aksiyonlarının görünürlükten bağımsız ihtiyaç duyduğu alanlar (confirm diyaloğu için isim, URL'ler vb.) için `alwaysInclude()` kullanın. `role.name` gibi dot anahtarlarda üst seviye `role` segmenti korunur. Bilinmeyen istek anahtarları yok sayılır; parametre yoksa payload eksiksiz kalır.
+`columns()` tablonun sunduğu sütun listesini tanımlar. Her giriş bir key string'i ya da opsiyonel `label`, `sortable`, `visible`, `locked` bayraklı bir dizidir. Liste `columns` meta'sı olarak döner — böylece frontend menüsü başlangıçta gizli sütunları da sunabilir — ve payload şekillendirmeyi açar: **fail-closed** — satırın tamamı yalnızca istekte `columns` parametresi hiç yoksa döner. Parametre mevcutsa her satır, `alwaysInclude()` anahtarlarına (varsayılan `['id']`) ve tanımlı bir sütun anahtarıyla gerçekten eşleşen istek anahtarlarına indirgenir; hiçbir anahtar eşleşmese bile satır yalnızca `alwaysInclude()` anahtarlarına indirgenir — tam satıra asla geri dönmez. Satır aksiyonlarının görünürlükten bağımsız ihtiyaç duyduğu alanlar (confirm diyaloğu için isim, URL'ler vb.) için `alwaysInclude()` kullanın. `role.name` gibi dot anahtarlarda üst seviye `role` segmenti korunur. Tanımlı sütun anahtarları frontend sütun anahtarlarıyla birebir eşleşmelidir, aksi halde ilgili hücreler boş render edilir.
 
 ### Arama semantiği
 

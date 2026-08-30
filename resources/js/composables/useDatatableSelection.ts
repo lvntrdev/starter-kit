@@ -140,9 +140,7 @@ export function useDatatableSelection(options: {
 
         const payload: BulkActionPayload = {
             action,
-            ids: [...selectedIds.value].map((id) =>
-                typeof id === 'string' && /^\d+$/.test(id) ? parseInt(id, 10) : id,
-            ),
+            ids: [...selectedIds.value],
             select_all_filtered: selectionMode.value === 'all',
             filter_snapshot: selectionMode.value === 'all' ? filterSnapshot : {},
         };

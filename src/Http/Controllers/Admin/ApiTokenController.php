@@ -53,7 +53,7 @@ class ApiTokenController extends Controller
         // hatası fırlatır. Bu yüzden ->with(['user']) kullanılmaz; user'lar
         // ApiTokenResource::collection() içinde tek query ile önçekilir.
         return DatatableQueryBuilder::for($query)
-            ->sortable(['name', 'created_at'])
+            ->sortable(['id', 'name', 'created_at'])
             ->resource(ApiTokenResource::class)
             ->response();
     }

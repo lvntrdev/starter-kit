@@ -254,6 +254,10 @@ interface BulkAction
 
 `BulkActionDispatcher` resolves the right action from the `action` key and passes either the explicit model set (when `ids` is present) or the full filtered set (when `select_all_filtered` is `true`).
 
+### Select-all-filtered fail-closed contract
+
+When a query class implements cross-page selection (e.g. `UserBulkSelectionQuery`), it re-applies the datatable's own filter predicates — for the shipped Users table that's `status`, `role`, `search`, `created_at_from`, `created_at_to` — via `BulkFilterSnapshot::normalize()`. Any other **active** `filter[...]` key present in the client's `filter_snapshot` is rejected with a 422 (`sk-bulk.unknown_filters`) instead of being silently dropped, because dropping it would resolve a wider set than the one the user saw and filtered on. `ids` are sent and validated as opaque strings (`string|min:1|max:64`) with no numeric coercion, so UUID/ULID primary keys pass through unchanged.
+
 `BulkActionResult` carries:
 
 ```php
@@ -397,7 +401,7 @@ return DatatableQueryBuilder::for(User::query())
 
 ### Column declaration & payload shaping
 
-`columns()` declares the column list the table offers. Each entry is a key string or an array with optional `label`, `sortable`, `visible`, and `locked` flags. The list is returned as `columns` meta — so the frontend menu can offer initially-hidden columns — and enables payload shaping: when the request carries `?columns=key1,key2`, each row is reduced to the selected columns' keys plus the `alwaysInclude()` keys (default `['id']`). Use `alwaysInclude()` for fields row actions need regardless of visibility (names for confirm dialogs, URLs, etc.). Dot keys such as `role.name` keep their top-level `role` segment. Unknown requested keys are ignored; without the param the payload stays complete.
+`columns()` declares the column list the table offers. Each entry is a key string or an array with optional `label`, `sortable`, `visible`, and `locked` flags. The list is returned as `columns` meta — so the frontend menu can offer initially-hidden columns — and enables payload shaping: **fail-closed** — the full row is only returned when the request carries no `columns` parameter at all. Once the parameter is present, every row is reduced to the `alwaysInclude()` keys (default `['id']`) plus whichever requested keys actually match a declared column key; a present parameter with no matching key still reduces rows to `alwaysInclude()` only — it never falls back to the full row. Use `alwaysInclude()` for fields row actions need regardless of visibility (names for confirm dialogs, URLs, etc.). Dot keys such as `role.name` keep their top-level `role` segment. Declared column keys must match the frontend column keys exactly, or the corresponding cells render empty.
 
 ### Search semantics
 
