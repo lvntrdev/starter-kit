@@ -245,6 +245,31 @@ it('passes a blank / whitespace-only value through verbatim — only null and []
     ]);
 });
 
+it('coerces a literal true / false string to the boolean Spatie hands the table', function (): void {
+    // QueryBuilderRequest::getFilterValue() turns 'true' / 'false' into
+    // booleans BEFORE the table's filter sees them, so the bulk side must apply
+    // the SAME PHP value — searching the text "true" would resolve a different
+    // (possibly wider) set than the "1" the table's callback ends up with.
+    // Case-sensitive like Spatie's comparison; '0' / '1' stay strings.
+    $result = normalizeUserFilters([
+        'filter[status]' => 'true',
+        'filter[role]' => 'TRUE',
+        'filter[search]' => 'false',
+        'filter[created_at_from]' => '0',
+    ]);
+
+    expect($result)->toBe([
+        'status' => true,
+        'role' => 'TRUE',
+        'search' => false,
+        'created_at_from' => '0',
+    ]);
+
+    // A JSON boolean in the nested shape is the same filter — kept as-is.
+    expect(normalizeUserFilters(['filter' => ['status' => true, 'search' => false]]))
+        ->toBe(['status' => true, 'search' => false]);
+});
+
 it('rejects an unknown ACTIVE filter instead of silently dropping it', function (): void {
     expect(fn () => normalizeUserFilters([
         'filter[status]' => 'active',
@@ -296,7 +321,7 @@ it('returns an empty filter set when the snapshot carries no filter key at all',
 // C) RoleBulkSelectionQuery::extractSearch — yalnız search allow-list'li
 // ──────────────────────────────────────────────────────────────────────────────
 
-function extractRoleSearch(array $snapshot): ?string
+function extractRoleSearch(array $snapshot): string|bool|null
 {
     $q = new RoleBulkSelectionQuery;
     $ref = new ReflectionMethod($q, 'extractSearch');
@@ -311,6 +336,9 @@ it('extracts the role search term (bracket + nested), ignoring non-filter keys',
     // A blank search is an active value that applies nothing on BOTH sides —
     // it is passed through verbatim, not dropped (only null and [] are inactive).
     expect(extractRoleSearch(['filter[search]' => '   ']))->toBe('   ');
+    // 'true' / 'false' come back as the booleans Spatie hands the table's callback.
+    expect(extractRoleSearch(['filter[search]' => 'true']))->toBe(true);
+    expect(extractRoleSearch(['filter[search]' => 'false']))->toBe(false);
     expect(extractRoleSearch(['filter[search]' => null]))->toBeNull();
     expect(extractRoleSearch(['filter[search]' => []]))->toBeNull();
     expect(extractRoleSearch([]))->toBeNull();

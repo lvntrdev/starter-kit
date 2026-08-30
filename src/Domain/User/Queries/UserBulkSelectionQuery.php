@@ -95,7 +95,7 @@ class UserBulkSelectionQuery
      * query cannot apply raises a 422 instead of being dropped).
      *
      * @param  array<string, mixed>  $snapshot
-     * @return array<string, string>
+     * @return array<string, string|bool>
      *
      * @throws ValidationException
      */
@@ -108,7 +108,7 @@ class UserBulkSelectionQuery
      * Apply the allow-listed filters using the same semantics as the datatable.
      *
      * @param  Builder<User>  $query
-     * @param  array<string, string>  $filters
+     * @param  array<string, string|bool>  $filters
      */
     private function applyFilters(Builder $query, array $filters): void
     {
@@ -119,7 +119,9 @@ class UserBulkSelectionQuery
             // The datatable's status filter is single-value, so this never
             // diverges in practice — and if it ever did, this direction matches
             // FEWER rows (never more), so the per-item authorize() gate is never
-            // widened. Safe by design.
+            // widened. Safe by design. A boolean (a literal `true`/`false` in the
+            // URL — BulkFilterSnapshot contract #4) reaches where() as the same
+            // bool the table's exact filter binds.
             $query->where('status', $filters['status']);
         }
 
@@ -140,21 +142,14 @@ class UserBulkSelectionQuery
         );
 
         if (isset($filters['search'])) {
-            // Mirrors DatatableQueryBuilder's 'search' filter: each word must
-            // match at least one searchable column; wildcards are escaped.
-            $words = array_filter(explode(' ', trim($filters['search'])));
-            $fields = ['id', 'first_name', 'last_name', 'email'];
-
-            $query->where(function (Builder $outer) use ($words, $fields) {
-                foreach ($words as $word) {
-                    $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $word);
-                    $outer->where(function (Builder $inner) use ($escaped, $fields) {
-                        foreach ($fields as $field) {
-                            $inner->orWhere($field, 'like', '%'.$escaped.'%');
-                        }
-                    });
-                }
-            });
+            // SAME helper as the table's 'search' filter callback, so word
+            // splitting, wildcard escaping and boolean coercion cannot drift.
+            // Keep the column list in lockstep with UserDatatableQuery::searchable().
+            DatatableQueryBuilder::applySearchWords(
+                $query,
+                ['id', 'first_name', 'last_name', 'email'],
+                $filters['search'],
+            );
         }
     }
 }

@@ -97,7 +97,9 @@
 }
 
 .sk-dt-search__clear {
-    @apply shrink-0 cursor-pointer text-xs text-slate-400 transition-colors duration-150;
+    /* Real <button> under the hood (keyboard-focusable clear action) — reset
+       native button chrome so it stays visually identical to the old icon-only <i>. */
+    @apply shrink-0 cursor-pointer appearance-none border-0 bg-transparent p-0 text-xs text-slate-400 transition-colors duration-150;
 
     &:hover {
         @apply text-slate-600 dark:text-slate-300;

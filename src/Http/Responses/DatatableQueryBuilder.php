@@ -7,9 +7,11 @@ use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Arr;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
+use Spatie\QueryBuilder\QueryBuilderRequest;
 
 /**
  * Fluent wrapper around Spatie QueryBuilder for DataTable endpoints.
@@ -162,6 +164,50 @@ class DatatableQueryBuilder
         if ($toDate !== null) {
             $query->where($column, '<', $toDate->startOfDay()->addDay()->utc());
         }
+    }
+
+    /**
+     * Apply the word-search predicate: every whitespace-separated word must
+     * match at least one of the given columns (LIKE, wildcards escaped).
+     *
+     * SINGLE SOURCE OF TRUTH for the search semantics: the datatable's `search`
+     * filter callback AND the cross-page bulk selection queries both go through
+     * here, so the visible set and the bulk set can never diverge on how a
+     * value is split, escaped or coerced.
+     *
+     * Spatie's QueryBuilderRequest::getFilterValue() hands the table's callback
+     * a boolean for the literal strings `true` / `false` (not the text the user
+     * typed), so a bool is accepted and applied exactly as the table always has:
+     * `true` searches "1", `false` searches nothing. The same method also
+     * EXPLODES the value on the filter array delimiter (`,` by default), so a
+     * search such as "Acar, Levent" reaches the table's callback as an array
+     * — it used to fail with a TypeError (HTTP 500). The parts are re-joined
+     * with the same delimiter, which restores the text the user typed
+     * losslessly; the bulk side applies that raw text from the snapshot, so
+     * both sides end up with the same predicate.
+     *
+     * @param  Builder<Model>  $query
+     * @param  list<string>  $fields
+     * @param  string|bool|array<int|string, mixed>  $value
+     */
+    public static function applySearchWords(Builder $query, array $fields, string|bool|array $value): void
+    {
+        if (is_array($value)) {
+            $value = implode(QueryBuilderRequest::getFilterArrayValueDelimiter(), Arr::flatten($value));
+        }
+
+        $words = array_filter(explode(' ', trim((string) $value)));
+
+        $query->where(function (Builder $outer) use ($words, $fields): void {
+            foreach ($words as $word) {
+                $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $word);
+                $outer->where(function (Builder $inner) use ($escaped, $fields): void {
+                    foreach ($fields as $field) {
+                        $inner->orWhere($field, 'like', '%'.$escaped.'%');
+                    }
+                });
+            }
+        });
     }
 
     /**
@@ -361,19 +407,8 @@ class DatatableQueryBuilder
         $filters = [];
 
         if ($this->searchFields) {
-            $filters[] = AllowedFilter::callback('search', function (Builder $query, $value) {
-                $words = array_filter(explode(' ', trim($value)));
-
-                $query->where(function (Builder $q) use ($words) {
-                    foreach ($words as $word) {
-                        $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $word);
-                        $q->where(function (Builder $inner) use ($escaped) {
-                            foreach ($this->searchFields as $field) {
-                                $inner->orWhere($field, 'like', '%'.$escaped.'%');
-                            }
-                        });
-                    }
-                });
+            $filters[] = AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
+                self::applySearchWords($query, $this->searchFields, $value);
             });
         }
 

@@ -28,6 +28,7 @@ return [
     'visible_columns' => 'Görünür Sütunlar',
     'show_all' => 'Tümünü göster',
     'clear_filters' => 'Filtreleri Temizle',
+    'clear_search' => 'Aramayı temizle',
 
     /*
     |--------------------------------------------------------------------------

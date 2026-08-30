@@ -3,9 +3,9 @@
 namespace Lvntr\StarterKit\Domain\Role\Queries;
 
 use App\Models\Role;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
+use Lvntr\StarterKit\Http\Responses\DatatableQueryBuilder;
 use Lvntr\StarterKit\Support\BulkFilterSnapshot;
 
 /**
@@ -26,7 +26,9 @@ use Lvntr\StarterKit\Support\BulkFilterSnapshot;
  *
  *   2. ALLOW-LISTED FILTERS, FAIL-CLOSED. Only the search the datatable exposes
  *      is honoured (RoleDatatableQuery declares searchable(['id', 'name']) and
- *      no filterable()). An ACTIVE filter this query cannot apply is NOT
+ *      no filterable()), applied through DatatableQueryBuilder::applySearchWords()
+ *      — the SAME helper the table's own search callback runs, so the visible
+ *      set and the bulk set cannot drift. An ACTIVE filter this query cannot apply is NOT
  *      silently dropped — BulkFilterSnapshot rejects the request with a 422,
  *      because dropping it would resolve a set WIDER than the one the user saw
  *      and delete roles the filter was hiding.
@@ -57,7 +59,8 @@ class RoleBulkSelectionQuery
 
         $search = $this->extractSearch($filterSnapshot);
         if ($search !== null) {
-            $this->applySearch($query, $search);
+            // Keep the column list in lockstep with RoleDatatableQuery::searchable().
+            DatatableQueryBuilder::applySearchWords($query, ['id', 'name'], $search);
         }
 
         // Deterministic subset: order before capping so MAX_ITEMS always takes
@@ -70,37 +73,16 @@ class RoleBulkSelectionQuery
      * Pull the (allow-listed) search term out of the client snapshot, accepting
      * both bracket-style ('filter[search]') and nested ['filter']['search']
      * shapes. Non-filter keys (sort/page/columns/...) are ignored; any OTHER
-     * active filter raises a 422 through the shared normalizer.
+     * active filter raises a 422 through the shared normalizer. A literal
+     * `true` / `false` comes back as the boolean Spatie hands the table
+     * (BulkFilterSnapshot contract #4).
      *
      * @param  array<string, mixed>  $snapshot
      *
      * @throws ValidationException
      */
-    private function extractSearch(array $snapshot): ?string
+    private function extractSearch(array $snapshot): string|bool|null
     {
         return BulkFilterSnapshot::normalize($snapshot, ['search'])['search'] ?? null;
-    }
-
-    /**
-     * Apply the search filter using the same semantics as the datatable:
-     * each word must match id OR name; wildcards are escaped.
-     *
-     * @param  Builder<Role>  $query
-     */
-    private function applySearch(Builder $query, string $search): void
-    {
-        $words = array_filter(explode(' ', trim($search)));
-        $fields = ['id', 'name'];
-
-        $query->where(function (Builder $outer) use ($words, $fields) {
-            foreach ($words as $word) {
-                $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $word);
-                $outer->where(function (Builder $inner) use ($escaped, $fields) {
-                    foreach ($fields as $field) {
-                        $inner->orWhere($field, 'like', '%'.$escaped.'%');
-                    }
-                });
-            }
-        });
     }
 }

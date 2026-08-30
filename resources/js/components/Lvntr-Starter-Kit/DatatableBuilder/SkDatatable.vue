@@ -1261,7 +1261,13 @@
                         :placeholder="$t('sk-common.search')"
                         autocomplete="one-time-code"
                     />
-                    <i v-if="search" class="pi pi-times sk-dt-search__clear" @click="search = ''" />
+                    <button
+                        v-if="search"
+                        type="button"
+                        class="pi pi-times sk-dt-search__clear"
+                        :aria-label="$t('sk-datatable.clear_search')"
+                        @click="search = ''"
+                    />
                 </div>
 
                 <!-- Inline filter pills — directly after the search box, per design -->
@@ -1650,7 +1656,7 @@
                             v-if="search"
                             type="button"
                             class="p-inputicon pi pi-times sk-dt-toolbar__search-clear"
-                            :aria-label="$t('sk-button.close')"
+                            :aria-label="$t('sk-datatable.clear_search')"
                             @click="search = ''"
                         />
                     </IconField>

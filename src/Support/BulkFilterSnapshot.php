@@ -33,6 +33,16 @@ use Illuminate\Validation\ValidationException;
  *      verbatim (no trim — the table trims nothing either) and each query
  *      applies it with the table's own predicate, so `search` and the date
  *      bounds still no-op on blank input exactly as the table does.
+ *
+ *   4. SAME VALUE SHAPE AS THE TABLE. Spatie's QueryBuilderRequest::
+ *      getFilterValue() turns the literal strings `true` / `false` into
+ *      booleans BEFORE the table's filter sees them — an exact filter binds
+ *      `WHERE status = 1`, and the search callback receives bool true (which
+ *      it applies as "1"). The snapshot carries the raw strings, so they are
+ *      coerced here exactly the same way; passing them through as text would
+ *      make the bulk side search the word "true" while the table searched
+ *      "1", resolving a DIFFERENT (possibly wider) set. Every other scalar
+ *      stays a verbatim string.
  */
 final class BulkFilterSnapshot
 {
@@ -45,7 +55,9 @@ final class BulkFilterSnapshot
      *
      * @param  array<string, mixed>  $snapshot  Raw client snapshot.
      * @param  string[]  $allowed  Filter keys the caller's query can actually apply.
-     * @return array<string, string> Keyed in allow-list order; values verbatim, never trimmed.
+     * @return array<string, string|bool> Keyed in allow-list order; values verbatim (never
+     *                                    trimmed), except a literal `true` / `false` string,
+     *                                    which becomes the boolean Spatie hands the table.
      *
      * @throws ValidationException When the snapshot carries an active filter the query cannot apply.
      */
@@ -69,7 +81,7 @@ final class BulkFilterSnapshot
                 continue;
             }
 
-            $active[$key] = (string) $value;
+            $active[$key] = self::coerce($value);
         }
 
         if ($unapplicable !== []) {
@@ -90,6 +102,29 @@ final class BulkFilterSnapshot
         }
 
         return $filters;
+    }
+
+    /**
+     * Mirror Spatie's QueryBuilderRequest::getFilterValue() scalar coercion
+     * (contract #4): the literal strings 'true' / 'false' become booleans, a
+     * JSON boolean (nested snapshot shape) is kept as-is, everything else is
+     * the verbatim string. Case-sensitive, exactly like Spatie's comparison.
+     */
+    private static function coerce(bool|int|float|string $value): string|bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if ($value === 'true') {
+            return true;
+        }
+
+        if ($value === 'false') {
+            return false;
+        }
+
+        return (string) $value;
     }
 
     /**

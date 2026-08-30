@@ -28,6 +28,7 @@ return [
     'visible_columns' => 'Visible Columns',
     'show_all' => 'Show all',
     'clear_filters' => 'Clear Filters',
+    'clear_search' => 'Clear search',
 
     /*
     |--------------------------------------------------------------------------

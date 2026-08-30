@@ -121,9 +121,10 @@ function assertBulkParity(array $range): void
 }
 
 /**
- * Visible id set vs bulk candidate set for a `filter[search]` value. A blank
- * search must apply NOTHING on both sides — the table's callback and the bulk
- * query both split on whitespace first — so neither side touches a column.
+ * Visible id set vs bulk candidate set for a `filter[search]` value. The table
+ * side searches the SAME columns the shipped Users table does
+ * (UserDatatableQuery::searchable()), so any divergence comes from the value
+ * path — Spatie's request coercion vs BulkFilterSnapshot — not the column list.
  *
  * @return array{table: list<int>, bulk: list<int>}
  */
@@ -132,7 +133,7 @@ function bulkParitySearchIds(string $search): array
     request()->replace(['filter' => ['search' => $search]]);
 
     $payload = DatatableQueryBuilder::for(BulkParityTestUser::class)
-        ->searchable(['email'])
+        ->searchable(['id', 'first_name', 'last_name', 'email'])
         ->sortable(['id'])
         ->defaultSort('id')
         ->response()
@@ -226,6 +227,45 @@ it('keeps parity with an empty and a whitespace-only search (both sides apply no
         ['table' => $table, 'bulk' => $bulk] = bulkParitySearchIds($search);
 
         expect($table)->toHaveCount(2)
+            ->and($bulk)->toBe($table);
+    }
+});
+
+it('keeps parity with a literal true / false search (Spatie hands the table a boolean)', function (): void {
+    // QueryBuilderRequest::getFilterValue() coerces 'true' / 'false' to
+    // booleans, so the table's callback ends up searching "1" for `true` and
+    // NOTHING for `false`. The bulk side must land on the same set — applying
+    // the text "true" / "false" instead used to resolve a different one.
+    $one = createBulkParityUser('one1@example.com', '2026-01-15 12:00:00');
+    createBulkParityUser('true@example.com', '2026-01-16 12:00:00');
+    createBulkParityUser('plain@example.com', '2026-01-17 12:00:00');
+
+    ['table' => $table, 'bulk' => $bulk] = bulkParitySearchIds('true');
+
+    expect($table)->toContain((int) $one->id)
+        ->and($table)->not->toContain((int) BulkParityTestUser::query()->where('email', 'true@example.com')->value('id'))
+        ->and($bulk)->toBe($table);
+
+    ['table' => $table, 'bulk' => $bulk] = bulkParitySearchIds('false');
+
+    expect($table)->toHaveCount(3)
+        ->and($bulk)->toBe($table);
+});
+
+it('keeps parity with a comma in the search (Spatie explodes the value, the table re-joins it)', function (): void {
+    // QueryBuilderRequest::getFilterValue() explodes a filter value on `,`
+    // before the table's callback sees it, so "comma,one" arrives as
+    // ['comma', 'one']. The table used to fail with a TypeError (HTTP 500);
+    // now it re-joins the parts and searches the text as typed — the SAME
+    // text the bulk side applies verbatim from the snapshot.
+    $match = createBulkParityUser('comma,one@example.com', '2026-01-15 12:00:00');
+    createBulkParityUser('commaone@example.com', '2026-01-16 12:00:00');
+    createBulkParityUser('plain@example.com', '2026-01-17 12:00:00');
+
+    foreach (['comma,one', 'comma, one'] as $search) {
+        ['table' => $table, 'bulk' => $bulk] = bulkParitySearchIds($search);
+
+        expect($table)->toBe([(int) $match->id])
             ->and($bulk)->toBe($table);
     }
 });

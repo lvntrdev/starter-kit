@@ -170,6 +170,11 @@ abstract class DatabaseTestCase extends Orchestra
         Schema::create('users', function (Blueprint $table): void {
             $table->id();
             $table->string('name');
+            // UserDatatableQuery::searchable() / UserBulkSelectionQuery search
+            // these two as well — present (nullable) so the shipped search
+            // predicate can run against this table in parity tests.
+            $table->string('first_name')->nullable();
+            $table->string('last_name')->nullable();
             $table->string('email')->unique();
             // Kullanıcı bazlı görüntüleme timezone'u. `null` anlamlıdır:
             // "site ayarını izle" demektir, 'UTC' seçmekle aynı DEĞİLDİR.
