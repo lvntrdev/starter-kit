@@ -918,6 +918,55 @@ describe('SkTabs — empty slot', () => {
         expect(wrapper.find('.sk-tabs-vertical').exists()).toBe(true);
         expect(wrapper.find('.sk-vtab-nav').exists()).toBe(true);
     });
+
+    /** Every tab visible, none selectable: all of them disabled. */
+    const allDisabledConfig = (vertical: boolean) => {
+        const builder = TB.tabs();
+        if (vertical) builder.vertical();
+        return builder
+            .addTabs(TB.item().key('general').disabled(true), TB.item().key('security').disabled(() => true))
+            .build();
+    };
+
+    it('replaces the vertical shell when every visible tab is disabled', () => {
+        const wrapper = mountTabs(allDisabledConfig(true), {
+            slots: { empty: () => h('div', { 'data-testid': 'empty' }) },
+        });
+
+        expect(wrapper.find('[data-testid="empty"]').exists()).toBe(true);
+        expect(wrapper.find('.sk-tabs-vertical').exists()).toBe(false);
+        expect(wrapper.find('.sk-vtab').exists()).toBe(false);
+    });
+
+    it('replaces the horizontal shell when every visible tab is disabled', () => {
+        const wrapper = mountTabs(allDisabledConfig(false), {
+            slots: { empty: () => h('div', { 'data-testid': 'empty' }) },
+        });
+
+        expect(wrapper.find('[data-testid="empty"]').exists()).toBe(true);
+        expect(wrapper.find('.sk-tabs__panel').exists()).toBe(false);
+    });
+
+    it('without the slot an all-disabled strip renders exactly as before', () => {
+        const wrapper = mountTabs(allDisabledConfig(true));
+
+        expect(wrapper.find('[data-testid="empty"]').exists()).toBe(false);
+        expect(wrapper.findAll('.sk-vtab--disabled')).toHaveLength(2);
+        expect(wrapper.find('[role="tabpanel"]').exists()).toBe(false);
+    });
+
+    it('one selectable tab keeps the shell even when the rest are disabled', () => {
+        const config = TB.tabs()
+            .vertical()
+            .addTabs(TB.item().key('general').disabled(true), TB.item().key('security'))
+            .build();
+        const wrapper = mountTabs(config, {
+            slots: { ...defaultSlots(config), empty: () => h('div', { 'data-testid': 'empty' }) },
+        });
+
+        expect(wrapper.find('[data-testid="empty"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="panel-security"]').exists()).toBe(true);
+    });
 });
 
 // ── vertical ARIA ────────────────────────────────────────────────────────────
@@ -943,6 +992,37 @@ describe('SkTabs — vertical ARIA', () => {
         expect(tabs[0].attributes('aria-controls')).toBe(panel.attributes('id'));
         expect(panel.attributes('aria-labelledby')).toBe(tabs[0].attributes('id'));
         expect(panel.attributes('tabindex')).toBe('0');
+    });
+
+    it('hides icons from assistive tech and speaks the checked state as text', () => {
+        const config = TB.tabs()
+            .vertical()
+            .addTabs(
+                TB.item().key('general').icon('pi pi-user').checked(),
+                TB.item().key('security').icon('pi pi-lock').badge(3),
+            )
+            .build();
+        const wrapper = mountTabs(config);
+
+        const icons = wrapper.findAll('.sk-vtab__icon');
+        expect(icons).toHaveLength(2);
+        icons.forEach((icon) => expect(icon.attributes('aria-hidden')).toBe('true'));
+
+        expect(wrapper.get('.sk-vtab__check').attributes('aria-hidden')).toBe('true');
+
+        // `$t` is mocked to echo the key: the hidden text is the translated
+        // state, and only the checked tab carries it.
+        const tabs = wrapper.findAll('[role="tab"]');
+        expect(tabs[0].get('.sr-only').text()).toBe('sk-common.completed');
+        expect(tabs[1].find('.sr-only').exists()).toBe(false);
+        expect(tabs[1].get('.sk-vtab__badge').text()).toBe('3');
+    });
+
+    it('hides the horizontal tab icon from assistive tech too', () => {
+        const config = TB.tabs().addTabs(TB.item().key('general').icon('pi pi-user')).build();
+        const wrapper = mountTabs(config);
+
+        expect(wrapper.get('.sk-vtab__icon').attributes('aria-hidden')).toBe('true');
     });
 
     it('marks a disabled tab aria-disabled and leaves the others without it', () => {

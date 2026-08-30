@@ -150,6 +150,19 @@ export class TabsBuilder {
     }
 
     queryParam(param: string): this {
+        // An empty or whitespace-only name produces `?=key` — a parameter nothing
+        // reads back — so the tabs silently stop syncing with the URL. Loud in
+        // development, non-fatal in production: the name already set (the `tab`
+        // default, or an earlier call) is kept rather than a screen losing its
+        // deep links over a config mistake.
+        if (typeof param !== 'string' || param.trim() === '') {
+            const message = 'TabBuilder queryParam must be a non-empty string';
+            if (import.meta.env.DEV) {
+                throw new Error(message);
+            }
+            console.error(message);
+            return this;
+        }
         this.config.queryParam = param;
         return this;
     }

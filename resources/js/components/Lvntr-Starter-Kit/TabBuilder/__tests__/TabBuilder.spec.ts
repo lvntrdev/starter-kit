@@ -232,3 +232,37 @@ describe('TB.tabs() — panel / history / url options', () => {
         expect(cfg.syncUrl).toBeUndefined();
     });
 });
+
+describe('TB.tabs() — queryParam validation', () => {
+    const oneTab = () => TB.item().key('a');
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.restoreAllMocks();
+    });
+
+    it('throws in development on an empty or whitespace-only name', () => {
+        expect(() => TB.tabs().queryParam('')).toThrow('queryParam must be a non-empty string');
+        expect(() => TB.tabs().queryParam('   ')).toThrow('queryParam must be a non-empty string');
+    });
+
+    it('outside development it logs once per call and keeps the name already set', () => {
+        vi.stubEnv('DEV', false);
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const kept = TB.tabs().addTabs(oneTab()).queryParam('').build();
+        const earlier = TB.tabs().addTabs(oneTab()).queryParam('section').queryParam('   ').build();
+
+        expect(spy).toHaveBeenCalledTimes(2);
+        expect(kept.queryParam).toBe('tab');
+        expect(earlier.queryParam).toBe('section');
+    });
+
+    it('a real name is stored as given and never logs', () => {
+        vi.stubEnv('DEV', false);
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        expect(TB.tabs().addTabs(oneTab()).queryParam('section').build().queryParam).toBe('section');
+        expect(spy).not.toHaveBeenCalled();
+    });
+});

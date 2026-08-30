@@ -206,7 +206,7 @@
             'sidebar-header'?(props: Record<string, never>): unknown;
             /** Vertical sidebar: extra content below the tab navigation */
             'sidebar-footer'?(props: Record<string, never>): unknown;
-            /** Rendered alone when no tab survived permission/role/visible gating */
+            /** Rendered alone when no tab is selectable: none survived permission/role/visible gating, or every visible tab is disabled */
             empty?(props: Record<string, never>): unknown;
         } & {
             /** Dynamic tab content slots — one per tab.key */
@@ -227,12 +227,14 @@
 
 <template>
     <!--
-        Empty state: every tab was gated away by permission/role/visible. Only the
-        slot is rendered — a host's own empty message must not land inside an
-        orphan sidebar or an empty tab strip. Without the slot the markup below is
-        unchanged, so nothing moves for an existing screen.
+        Empty state: no tab is selectable — every tab was gated away by
+        permission/role/visible, or every visible tab is disabled. Only the slot
+        is rendered — a host's own empty message must not land inside an orphan
+        sidebar, an all-disabled tab strip, or beside a content area that has no
+        active panel. Without the slot the markup below is unchanged, so nothing
+        moves for an existing screen.
     -->
-    <template v-if="visibleTabs.length === 0 && $slots.empty">
+    <template v-if="selectableTabs.length === 0 && $slots.empty">
         <slot name="empty" />
     </template>
 
@@ -271,7 +273,7 @@
                                 class="sk-vtab__icon-tile"
                                 :class="`sk-vtab__icon-tile--${tab.iconColor ?? 'slate'}`"
                             >
-                                <i :class="tab.icon" class="sk-vtab__icon" />
+                                <i :class="tab.icon" class="sk-vtab__icon" aria-hidden="true" />
                             </span>
 
                             <span class="sk-vtab__body">
@@ -282,7 +284,15 @@
                             </span>
 
                             <span v-if="tab.checked || tab.badge != null" class="sk-vtab__trailing">
-                                <i v-if="tab.checked" class="pi pi-check-circle sk-vtab__check" />
+                                <!--
+                                    The check is state, not decoration: the icon is
+                                    hidden from assistive tech and the state is
+                                    spoken through visually hidden text instead.
+                                -->
+                                <template v-if="tab.checked">
+                                    <i class="pi pi-check-circle sk-vtab__check" aria-hidden="true" />
+                                    <span class="sr-only">{{ $t('sk-common.completed') }}</span>
+                                </template>
                                 <span
                                     v-else-if="tab.badge != null"
                                     class="sk-vtab__badge"
@@ -355,7 +365,7 @@
     >
         <TabList>
             <Tab v-for="tab in visibleTabs" :key="tab.key" :value="tab.key" :disabled="isDisabled(tab)">
-                <i v-if="tab.icon" :class="tab.icon" class="sk-vtab__icon" />
+                <i v-if="tab.icon" :class="tab.icon" class="sk-vtab__icon" aria-hidden="true" />
                 {{ $t(tab.label) }}
             </Tab>
         </TabList>

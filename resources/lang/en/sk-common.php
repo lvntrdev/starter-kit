@@ -35,6 +35,7 @@ return [
     'error' => 'Error',
     'unsaved' => 'You have unsaved changes.',
     'required' => 'required',
+    'completed' => 'Completed',
     'confirm_leave' => 'You have unsaved changes. Are you sure you want to leave this page?',
     'data_load_error' => 'The data could not be loaded. Please try again.',
     'options_load_error' => 'The options could not be loaded.',

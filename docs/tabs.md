@@ -90,7 +90,7 @@ TB.item().key('admin-tools').label('Admin Tools').role('admin', 'superadmin'),
 - `v-model` (`modelValue?: string`) — optional two-way binding for the active tab key. In URL mode a deep link (e.g. `?tab=security`) wins over a different incoming `modelValue` on mount; in local mode (`.syncUrl(false)`) `modelValue` seeds the initial selection instead. Either way, writing `modelValue` goes through the same setter a click uses.
 - `@update:modelValue="(key: string) => …"` — fires whenever the resolved active key differs from `modelValue`, including immediately after mount
 - `@change="(payload: TabChangePayload) => …"` — fires on every tab change **after** mount (the initial mount is not a change); payload is `{ key, previousKey, tab }`, where `previousKey` is `null` when nothing was resolvable before
-- `#empty` slot — rendered alone, with no sidebar or tab strip, when every tab is gated away by `.permission()`/`.role()`/`.visible()`
+- `#empty` slot — rendered alone, with no sidebar or tab strip, when no tab is selectable: every tab is gated away by `.permission()`/`.role()`/`.visible()`, or every visible tab is `.disabled()`
 - exposed instance (`SkTabsExposed`, via a template ref) — `{ activeTab: string; isActive: (key: string) => boolean }`
 
 ```vue
@@ -158,7 +158,7 @@ const tabConfig = TB.tabs()
 - per-tab disabled logic
 - optional card wrappers with title and subtitle at both tab and container level
 - optional `v-model` binding and a `change` event for host-side reactions
-- an `empty` slot for the fully-gated-away case
+- an `empty` slot for the nothing-selectable case (every tab gated away, or every visible tab disabled)
 - full keyboard/ARIA support in vertical layout
 
 ## Built-in Behavior
@@ -171,8 +171,8 @@ const tabConfig = TB.tabs()
 - slot-based content keyed by the tab id
 - **lifecycle**: defaults unchanged — vertical mounts only the active panel and unmounts it on switch, horizontal mounts every panel once and toggles visibility, so per-tab local state survives a switch only in horizontal by default. `.lazy()` overrides either layout to active-only mounting (on horizontal this is PrimeVue's own `lazy` mode); `.keepAlive()` overrides either layout to mount every panel and keep it alive, hidden instead of unmounted (useful on vertical, to preserve per-tab state across switches)
 - **URL sync**: `?tab=` must name a visible, enabled tab or the first selectable tab wins; a disabled tab never activates from the URL; re-selecting the active tab is a no-op; `#hash` is preserved across switches. `.urlMode('server')` (default) syncs through an Inertia visit that re-resolves the page; `.urlMode('client')` rewrites the URL with no server request. `.history('replace')` (default) replaces the history entry on each switch, `.history('push')` gives each switch its own entry. `.syncUrl(false)` drops URL sync entirely — the active tab lives only in component state (and `v-model`)
-- **accessibility (vertical layout)**: the tab list is `role="tablist"` with `aria-orientation="vertical"`, each tab button is `role="tab"` with `aria-selected`/`aria-controls`/`aria-disabled` and roving `tabindex` (`0` on the active tab, `-1` on the rest), and the panel is wrapped in `role="tabpanel"`. Arrow Down/Up move focus between enabled tabs (wrapping at the ends), Home/End jump to the first/last enabled tab — focus only, manual activation — and Enter/Space select through the button's native click. Horizontal layout keeps PrimeVue's own accessibility
-- **builder validation**: `TB.item()…build()` throws on an empty or whitespace-only key; `TB.tabs()…build()` throws with no tabs added, and throws on a duplicate tab key in development builds (`console.error`s the same message in production instead, without de-duplicating); each `build()` returns a fresh snapshot, so later `.addTabs()` calls on the same builder — or mutating the returned config — never affect an already-built config
+- **accessibility (vertical layout)**: the tab list is `role="tablist"` with `aria-orientation="vertical"`, each tab button is `role="tab"` with `aria-selected`/`aria-controls`/`aria-disabled` and roving `tabindex` (`0` on the active tab, `-1` on the rest), and the panel is wrapped in `role="tabpanel"`. Arrow Down/Up move focus between enabled tabs (wrapping at the ends), Home/End jump to the first/last enabled tab — focus only, manual activation — and Enter/Space select through the button's native click. Tab icons are `aria-hidden` in both layouts (the label carries the name), and a `.checked()` tab announces its state through visually hidden text (`sk-common.completed`) beside the hidden check icon. Horizontal layout keeps PrimeVue's own accessibility
+- **builder validation**: `TB.item()…build()` throws on an empty or whitespace-only key; `TB.tabs()…build()` throws with no tabs added, and throws on a duplicate tab key in development builds (`console.error`s the same message in production instead, without de-duplicating); `TB.tabs().queryParam()` throws on an empty or whitespace-only name in development builds (`console.error`s in production and keeps the name already set); each `build()` returns a fresh snapshot, so later `.addTabs()` calls on the same builder — or mutating the returned config — never affect an already-built config
 - multiple `SkTabs` instances on the same page need distinct `.queryParam()` values
 - `.permission()`/`.role()` gating is presentation-only — authorize the underlying data server-side, and don't serialize hidden-tab data into the page's props
 
