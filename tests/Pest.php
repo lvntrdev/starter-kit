@@ -57,6 +57,10 @@ uses(PermissionMiddlewareTestCase::class)->in('Feature/Middleware');
 // Exception handler mapping testleri: saf resolve() eşlemesi, DB gerektirmiyor
 uses(TestCase::class)->in('Feature/Exceptions');
 
+// EnsureUserIsActive testleri: middleware kendi rotalarını tanımlar ve
+// kullanıcıyı DB'ye yazmadan guard'a set eder (actingAs), DB gerektirmiyor.
+uses(TestCase::class)->in('Feature/Auth');
+
 // DB gerektirmeyen diğer Feature testleri
 uses(TestCase::class)->in('Feature/BackwardCompat');
 

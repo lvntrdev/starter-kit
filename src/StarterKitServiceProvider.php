@@ -104,6 +104,7 @@ use Lvntr\StarterKit\Exceptions\ApiExceptionHandler;
 use Lvntr\StarterKit\Facades\FileManager as FileManagerFacade;
 use Lvntr\StarterKit\Http\Middleware\AssignTraceId;
 use Lvntr\StarterKit\Http\Middleware\CheckResourcePermission;
+use Lvntr\StarterKit\Http\Middleware\EnsureUserIsActive;
 use Lvntr\StarterKit\Http\Middleware\SecurityHeaders;
 use Lvntr\StarterKit\Http\Middleware\SetLocale;
 use Lvntr\StarterKit\Http\Middleware\ValidateTurnstile;
@@ -806,9 +807,60 @@ class StarterKitServiceProvider extends ServiceProvider
         $router = $this->app['router'];
         $router->aliasMiddleware('check.permission', CheckResourcePermission::class);
         $router->aliasMiddleware('check.resource.permission', CheckResourcePermission::class);
+        $router->aliasMiddleware('sk.active', EnsureUserIsActive::class);
+        $this->app->booted(fn () => $this->attachActiveUserMiddleware($router));
 
         $this->registerRoutes();
         $this->shareInertiaData();
+    }
+
+    /**
+     * Append EnsureUserIsActive to the `web` and `api` middleware groups.
+     *
+     * Done here rather than in Bootstrap::middleware() so an EXISTING install
+     * picks the guard up on `composer update` without editing bootstrap/app.php.
+     *
+     * TIMING — deferred to `booted()`, deliberately. EVERY kernel middleware
+     * setter (setMiddlewareGroups, appendMiddlewareToGroup, …) ends in
+     * Kernel::syncMiddlewareToRouter(), which calls Router::middlewareGroup()
+     * and REPLACES a group wholesale, so anything that touches the kernel after
+     * us would silently drop this append. The normal path — withMiddleware()'s
+     * `afterResolving(HttpKernel)` hook — fires when the kernel is resolved,
+     * strictly before BootProviders, so boot() would already be safe; running
+     * on `booted()` additionally puts us after every OTHER provider's boot(),
+     * which is the only window a package could still reach the kernel. Groups
+     * are expanded by the router at dispatch time, so being late costs nothing
+     * and stays correct under `route:cache`.
+     *
+     * Two defensive rules, both about never surprising a consumer:
+     *
+     *   1. A group the app does not define is SKIPPED, not created.
+     *      Router::pushMiddlewareToGroup() would happily invent an `api` group
+     *      on an app that deliberately has none; a phantom group is a config
+     *      the operator never wrote.
+     *   2. A group that already carries the middleware — by class OR by the
+     *      `sk.active` alias, which pushMiddlewareToGroup()'s own in_array()
+     *      dedupe cannot see — is left alone, so a consumer who wired it by
+     *      hand does not get it twice.
+     */
+    private function attachActiveUserMiddleware(Router $router): void
+    {
+        $groups = $router->getMiddlewareGroups();
+
+        foreach (['web', 'api'] as $group) {
+            if (! array_key_exists($group, $groups)) {
+                continue;
+            }
+
+            $existing = (array) $groups[$group];
+
+            if (in_array(EnsureUserIsActive::class, $existing, true)
+                || in_array('sk.active', $existing, true)) {
+                continue;
+            }
+
+            $router->pushMiddlewareToGroup($group, EnsureUserIsActive::class);
+        }
     }
 
     /**

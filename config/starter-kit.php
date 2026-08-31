@@ -226,9 +226,11 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Security headers (SecurityHeaders middleware)
+    | Security
     |--------------------------------------------------------------------------
     |
+    | csp_extra_origins (SecurityHeaders middleware)
+    | ----------------------------------------------
     | Extra origins appended to the img-src / media-src / connect-src CSP
     | directives, on top of the origins derived automatically from the
     | media-library disk and the public disk (a disk `url`, an s3 `endpoint`,
@@ -236,10 +238,57 @@ return [
     |
     |   'csp_extra_origins' => ['https://cdn.example.com'],
     |
+    | Active-account enforcement (EnsureUserIsActive middleware)
+    | ----------------------------------------------------------
+    | The login path already refuses a non-active account, but it cannot reach
+    | a session that is ALREADY open. EnsureUserIsActive closes that window: an
+    | account disabled mid-session is cut on its next request.
+    |
+    |   enforce_active_status  The kill switch. Set to false to disable the
+    |                          middleware outright without touching
+    |                          bootstrap/app.php.
+    |
+    |   active_status_denied   The ONLY statuses that terminate a session. The
+    |                          middleware never infers "not active therefore
+    |                          blocked" — an unknown value, and null, pass
+    |                          through. The default holds exactly the two
+    |                          non-active values the shipped `userStatus`
+    |                          definition produces (see the DefinitionSeeder
+    |                          stub); an install that uses its own vocabulary
+    |                          adds it here, e.g.:
+    |
+    |                            'active_status_denied' => [
+    |                                'inactive', 'banned', 'suspended',
+    |                            ],
+    |
+    |                          Matching is case-insensitive and trimmed. An
+    |                          EMPTY array blocks nothing — it is treated as a
+    |                          deliberate opt-out, not as "use the default".
+    |
+    |   active_status_guards   Guards consulted for an authenticated user, in
+    |                          order. A guard missing from `auth.guards` is
+    |                          skipped silently, so leaving `api` listed on an
+    |                          install without Passport costs nothing.
+    |
+    | STALE PUBLISHED CONFIG: mergeConfigFrom merges TOP-LEVEL keys only. A file
+    | published before this release has no `security` key at all, so the vendor
+    | block is inherited whole; but a file that carries a PARTIAL `security`
+    | array replaces the vendor one for every nested key. The middleware
+    | therefore falls back to class constants that reproduce these literals
+    | exactly (EnsureUserIsActive::ENFORCE_DEFAULT / ::DENIED_DEFAULT /
+    | ::GUARDS_DEFAULT), so both populations resolve the same values. Keep the
+    | two in sync — same discipline as the `encryption` block below.
+    |
     */
 
     'security' => [
         'csp_extra_origins' => [],
+
+        'enforce_active_status' => true,
+
+        'active_status_denied' => ['inactive', 'banned'],
+
+        'active_status_guards' => ['web', 'api'],
     ],
 
     /*
