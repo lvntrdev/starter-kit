@@ -64,6 +64,8 @@ class RestoreItemAction extends FileManagerAction
             }
         }
 
+        $this->guardAgainstSiblingNameConflict($context, $folder, $folderModel);
+
         DB::transaction(function () use ($context, $folder, $folderModel) {
             $this->cascadeRestore($context, $folder, $folderModel);
         });
@@ -104,6 +106,42 @@ class RestoreItemAction extends FileManagerAction
         }
 
         $media->restore();
+    }
+
+    /**
+     * Refuse a restore that would land a second folder of the same name beside
+     * an active sibling.
+     *
+     * CreateFolderAction already rejects a duplicate name, so without this the
+     * trash is a way around that rule: delete a folder, create a new one under
+     * the same name, restore the old one. The `(owner_type, owner_id,
+     * parent_id, name)` unique index does not stop it either — MySQL and SQLite
+     * treat two NULL `parent_id` values as distinct, so a root-level collision
+     * passes straight through.
+     *
+     * The destination is the parent the folder will actually be restored INTO,
+     * which is not necessarily its stored one: a permanently deleted parent has
+     * already been rewritten to null by the caller.
+     *
+     * @param  class-string<Model>  $folderModel
+     */
+    private function guardAgainstSiblingNameConflict(FileManagerContextDTO $context, Model $folder, string $folderModel): void
+    {
+        $conflict = $folderModel::query()
+            ->where('owner_type', $context->ownerType)
+            ->where('owner_id', $context->ownerId)
+            ->where('name', $folder->getAttribute('name'))
+            ->whereKeyNot($folder->getKey());
+
+        $parentId = $folder->getAttribute('parent_id');
+
+        $parentId === null
+            ? $conflict->whereNull('parent_id')
+            : $conflict->where('parent_id', $parentId);
+
+        if ($conflict->exists()) {
+            throw new DomainRuleException(__('sk-file-manager.errors.restore_name_conflict'));
+        }
     }
 
     /**

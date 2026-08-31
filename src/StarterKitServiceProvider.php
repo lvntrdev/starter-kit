@@ -12,6 +12,7 @@ use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Encryption\Encrypter as EncrypterContract;
 use Illuminate\Contracts\Encryption\StringEncrypter;
+use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Http\Request;
@@ -107,11 +108,13 @@ use Lvntr\StarterKit\Http\Middleware\SecurityHeaders;
 use Lvntr\StarterKit\Http\Middleware\SetLocale;
 use Lvntr\StarterKit\Http\Middleware\ValidateTurnstile;
 use Lvntr\StarterKit\Http\Responses\ApiResponse;
+use Lvntr\StarterKit\Support\DeferredDeleteMediaFilesystem;
 use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
 use Lvntr\StarterKit\Support\HtmlSanitizer;
 use Lvntr\StarterKit\Support\MediaPathGenerator;
 use Lvntr\StarterKit\Support\Scramble\ApiResponseExtension;
 use Lvntr\StarterKit\Support\TranslatableQueryHelpers;
+use Spatie\MediaLibrary\MediaCollections\Filesystem as MediaFilesystem;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class StarterKitServiceProvider extends ServiceProvider
@@ -193,6 +196,43 @@ class StarterKitServiceProvider extends ServiceProvider
         $this->registerNamespacelessKitTranslations();
 
         $this->registerDataEncryption();
+
+        $this->registerMediaFilesystem();
+    }
+
+    /**
+     * Make the physical removal of a media object wait for the commit of the
+     * transaction that removed its row.
+     *
+     * Spatie deletes the file from `MediaObserver::deleted()`, i.e. INSIDE the
+     * caller's transaction. Every kit force-delete path opens one (folder
+     * cascade, bulk delete, empty trash), so a rollback anywhere in that
+     * transaction used to restore the rows while leaving the already-removed
+     * files gone — a row pointing at bytes that no longer exist, which nothing
+     * can undo. {@see DeferredDeleteMediaFilesystem} moves the removal behind
+     * `afterCommit()`.
+     *
+     * Bound at the ONE choke point every removal goes through
+     * (`Filesystem::removeAllFiles()`), so no delete action, observer or
+     * command has to remember the ordering.
+     *
+     * `bind`, not `singleton`: Spatie does not bind this class at all, so
+     * `app(Filesystem::class)` builds a fresh instance per resolve today, and
+     * this keeps that lifecycle byte-for-byte. An app that bound the class
+     * itself is left alone — its binding is the one Spatie must keep using,
+     * and the guard also covers the reverse order (an app provider registers
+     * after this one and simply wins).
+     */
+    private function registerMediaFilesystem(): void
+    {
+        if ($this->app->bound(MediaFilesystem::class)) {
+            return;
+        }
+
+        $this->app->bind(
+            MediaFilesystem::class,
+            static fn ($app): MediaFilesystem => new DeferredDeleteMediaFilesystem($app->make(FilesystemFactory::class)),
+        );
     }
 
     /**

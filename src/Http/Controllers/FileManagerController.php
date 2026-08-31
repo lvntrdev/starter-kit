@@ -3,7 +3,6 @@
 namespace Lvntr\StarterKit\Http\Controllers;
 
 use App\Models\FileFolder;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Lvntr\StarterKit\Domain\FileManager\Actions\AddFavoriteAction;
 use Lvntr\StarterKit\Domain\FileManager\Actions\BulkDeleteAction;
@@ -20,7 +19,6 @@ use Lvntr\StarterKit\Domain\FileManager\Actions\RenameFileAction;
 use Lvntr\StarterKit\Domain\FileManager\Actions\RenameFolderAction;
 use Lvntr\StarterKit\Domain\FileManager\Actions\RestoreItemAction;
 use Lvntr\StarterKit\Domain\FileManager\Actions\UploadFileAction;
-use Lvntr\StarterKit\Domain\FileManager\DTOs\FileManagerContextDTO;
 use Lvntr\StarterKit\Domain\FileManager\Queries\FavoritesContentsQuery;
 use Lvntr\StarterKit\Domain\FileManager\Queries\FolderContentsQuery;
 use Lvntr\StarterKit\Domain\FileManager\Queries\FolderTreeQuery;
@@ -295,9 +293,13 @@ class FileManagerController extends Controller
         return to_api(['files' => $uploaded], __('sk-file-manager.files_uploaded'), 201);
     }
 
-    public function deleteFile(Request $request, Media $media, DeleteFileAction $action): ApiResponse
+    public function deleteFile(FileManagerContextRequest $request, Media $media, DeleteFileAction $action): ApiResponse
     {
-        $context = $this->contextFromRequest($request);
+        // Through the shared request, like every other FileManager route: a
+        // malformed or missing context used to reach FileManagerContextDTO
+        // directly and surface as an InvalidArgumentException (500) instead of
+        // the documented 422 envelope.
+        $context = $request->context();
         $this->authorizer->authorizeDelete($context);
 
         $action->execute($context, $media);
@@ -311,13 +313,5 @@ class FileManagerController extends Controller
         $this->authorizer->authorizeRead($context);
 
         return $action->execute($context, $media);
-    }
-
-    private function contextFromRequest(Request $request): FileManagerContextDTO
-    {
-        return FileManagerContextDTO::fromArray([
-            'context' => (string) $request->input('context', $request->query('context')),
-            'context_id' => $request->input('context_id', $request->query('context_id')),
-        ]);
     }
 }

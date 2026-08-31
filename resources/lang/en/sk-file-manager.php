@@ -197,5 +197,6 @@ return [
         'invalid_trash_item_type' => 'Invalid trash item type.',
         'trash_item_not_found' => 'The item was not found in trash.',
         'restore_parent_trashed' => 'Cannot restore: the parent folder is also in trash. Restore the parent first.',
+        'restore_name_conflict' => 'Cannot restore: a folder with this name already exists at the destination. Rename the existing folder first.',
     ],
 ];

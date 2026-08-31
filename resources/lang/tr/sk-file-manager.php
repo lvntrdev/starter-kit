@@ -197,5 +197,6 @@ return [
         'invalid_trash_item_type' => 'Geçersiz çöp öğe tipi.',
         'trash_item_not_found' => 'Öğe çöp kutusunda bulunamadı.',
         'restore_parent_trashed' => 'Geri yüklenemez: üst klasör de çöpte. Önce üst klasörü geri yükleyin.',
+        'restore_name_conflict' => 'Geri yüklenemez: hedefte aynı isimde bir klasör zaten var. Önce mevcut klasörü yeniden adlandırın.',
     ],
 ];

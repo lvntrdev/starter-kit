@@ -59,13 +59,16 @@ trait ResolvesMediaModel
      * Total bytes consumed by ALL media in the system, across every owner /
      * collection / context, including soft-deleted (trash) entries —
      * represents true disk usage for quota accounting.
+     *
+     * Goes through mediaQueryWithTrashed() rather than calling withTrashed()
+     * directly: on a bare install (Spatie's base Media model, no SoftDeletes)
+     * that macro does not exist, and an unguarded call throws
+     * BadMethodCallException on every upload the quota check touches.
      */
     protected function computeStorageUsed(): int
     {
-        $mediaModel = $this->mediaModel();
-
         /** @var object{s: int|string}|null $row */
-        $row = $mediaModel::withTrashed()
+        $row = $this->mediaQueryWithTrashed()
             ->selectRaw('coalesce(sum(size), 0) as s')
             ->first();
 
