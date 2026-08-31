@@ -94,17 +94,27 @@ Kontrol, tam temizlik geçişi değil **sınırlı ve salt-okunur bir sondadır*
 ```bash
 php artisan sk:install
 php artisan sk:install --force
+php artisan sk:install --adopt
+php artisan sk:install --adopt --dry-run
 php artisan sk:install --no-interaction
 php artisan sk:install --without-ai-skill
 php artisan sk:install --without-eject
 php artisan sk:install --resume
 ```
 
-- `--force` mevcut yayınlanabilir dosyaların üzerine yazar
+- `--force` mevcut yayınlanabilir dosyaların üzerine yazar **ve** aşağıda anlatılan "zaten kurulu" güvenlik durdurmasını atlar. Her koruma kuralının opt-out'udur: tüketicinin düzenlediği bir yayınlanmış dosya da, hash kaydında hiç izi olmayan bir dosya da üzerine yazılır
+- `--adopt` zaten kurulu olduğu hâlde kaydını kaybetmiş (stateless deploy, temizlenmiş `storage/`) bir uygulama için `storage/starter-kit/hashes.json` dosyasını gönderilen stub'lardan yeniden kurar. Hiçbir dosya kopyalamaz, hiçbir migration çalıştırmaz ve `.env` dosyasına asla dokunmaz; yazacağı kaydı önizlemek için `--dry-run` ile birlikte kullanın
+- `--dry-run` neyin yazılacağını yazdırır ve hiçbir şey yazmadan çıkar
 - `--no-interaction` tüm varsayılanları otomatik kabul eder; CI veya script tabanlı kurulumlar için uygundur
 - `--without-ai-skill` Lvntr Starter Kit AI skill'lerinin yayınlanmasını tamamen atlar — hem Claude Code kopyaları (`.claude/skills/`) hem de Codex aynası (`.codex/skills/`). Kit'in skill bundle'ını ne Claude Code ne Codex ile kullanan consumer'lar için
 - `--without-eject` ilk kurulumda varsayılan `User` ve `Role` domain eject'ini atlar; runtime vendor'da kalır ve `class_alias` ile çözülür. Bu flag'i atlarsanız `app/Domain/User/` ve `app/Domain/Role/` otomatik oluşturulur. Sahiplik takası için [install.tr.md](./install.tr.md) belgesine bakın.
 - `--resume` daha önce yarıda kalmış bir kurulumu, zaten tamamlandığı işaretlenmiş adımları atlayarak devam ettirir. Tam resume akışı için [install.tr.md](./install.tr.md) belgesine bakın.
+
+**Bu bir ilk kurulum komutudur, onarım aracı değil.** Banner yazdırılmadan önce fail-closed bir tespit taraması, kit şema tablolarını ve yalnızca kuruluma özgü yolları arar; eşleşen bir hash kaydı olmadan bunlardan herhangi birini bulursa komut **tek bayt yazmadan durur** ve `sk:update`, `sk:publish --tag=<alan>` ya da `--adopt` seçeneklerine yönlendirir. Mevcut bir `.env` ne ilk kurulumda ne de yeniden çalıştırmada asla üzerine yazılmaz: `.env.example` içindeki eksik anahtarlar eklenir, yalnızca ilk kuruluma özgü anahtarlar sadece yoksa yazılır ve mevcut hiçbir değer değiştirilmez.
+
+**Çıkış kodları.** **Zorunlu** bir adımın (publish, migration, seeder, izin seeding, Passport anahtarları, encryption anahtarları) başarısız olması çalıştırmayı durdurur, checkpoint'i `--resume` için bekler hâlde bırakır, hash kaydını yazmaz ve sıfırdan farklı bir kodla çıkar. Frontend adımları (`npm install`, Wayfinder üretimi, `npm run build`, `composer dump-autoload`, cache temizlikleri) bilinçli olarak ölümcül değildir — uyarır, elle çalıştırılacak komutu yazdırır ve kapanış özetinde tekrar listelenir.
+
+**Migration adımı, veritabanında zaten tablo varsa nasıl ilerleneceğini sorar.** Varsayılan (ve etkileşimsiz bir oturumun alabileceği tek seçenek) `Yalnızca bekleyen migration'ları çalıştır`tır; `Migration'ları atla` her zaman sunulur. Yıkıcı `Tüm tabloları düşür ve migration'ları sıfırdan çalıştır` seçeneği şu durumlarda **tamamen sunulmaz**: `APP_ENV` production'a benziyorsa, `APP_DEBUG` kapalıysa, oturum prompt açamıyorsa veya mevcut herhangi bir tablo zaten satır tutuyorsa. Sunulduğunda da seçilmesi, bir text prompt'ta veritabanı adının (veya `fresh` kelimesinin) yazılmasını gerektirir. Boş cevap dâhil başka her şey, hiçbir şey düşürmeden ek yapıcı `migrate` yoluna döner.
 
 Config aşaması, `config/database.php` içindeki mevcut `mysql` ve `mariadb` dizilerine idempotent biçimde `'timezone' => '+00:00'` ekler. Mevcut bir değeri korur, eksik bağlantıyı atlar ve diğer sürücülere dokunmaz. UTC dışı bir oturumda zaten veri taşıyan bir veritabanına karşı yeniden çalıştırıldığında adım atlanır ve `sk:upgrade` komutuna yönlendirir. Bkz. [install.tr.md](./install.tr.md) ve [Saat Dilimleri](timezone.tr.md).
 
@@ -422,6 +432,11 @@ Belirlenen yaştan eski soft-delete edilmiş Dosya Yöneticisi öğelerini kalı
 ```bash
 php artisan file-manager:purge-trash
 php artisan file-manager:purge-trash --days=30
+php artisan file-manager:purge-trash --chunk=1000
 ```
 
-Varsayılan süre 7 gündür. Komut yalnız File Manager media kayıtlarını (`collection_name = files`) ve çöpteki klasörleri hedefler; avatar, logo, editor upload veya diğer MediaLibrary collection'larına dokunmaz. Paketle gelen `routes/console.php` komutu günlük schedule eder.
+Varsayılan süre 7 gündür. Komut yalnız File Manager media kayıtlarını (`collection_name = files`) ve çöpteki klasörleri hedefler; avatar, logo, editor upload veya diğer MediaLibrary collection'larına dokunmaz. Paketle gelen `routes/console.php` komutu `withoutOverlapping()` ile günlük schedule eder.
+
+- `--chunk=<n>` (varsayılan 500, aralık 1–5000) her turda yüklenen satır sayısıdır; satırlar `chunkById` ile gezilir, böylece çöpün tamamı belleğe alınmaz.
+- Çalıştırma bir **cache lock** alır (`starter-kit:file-manager:purge-trash`, 1 saat TTL); böylece iki scheduler — ya da cron ile yarışan bir operatör — aynı satırları iki `forceDelete()` çağrısına veremez. Eşzamanlı ikinci çalıştırma uyarı verip purge yapmadan `0` ile çıkar.
+- Başarısız tek bir öğe çalıştırmayı durdurmaz; kalan öğeler yine işlenir ve geride bir şey kaldıysa komut **sıfırdan farklı bir kodla çıkar**.

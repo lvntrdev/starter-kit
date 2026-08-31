@@ -1,8 +1,11 @@
 <?php
 
+use Illuminate\Console\OutputStyle;
+use Illuminate\Console\View\Components\Factory as ComponentsFactory;
 use Illuminate\Filesystem\Filesystem;
 use Lvntr\StarterKit\Console\Commands\InstallCommand;
 use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 
 /*
 |--------------------------------------------------------------------------
@@ -98,6 +101,23 @@ function pogSeedRegistry(array $records): string
     return $path;
 }
 
+/**
+ * Point the registry at a path that does not exist — a FIRST install.
+ *
+ * The distinction matters to the publish loop, not just to the summary: an
+ * EMPTY registry file still means the kit has published here before and simply
+ * has no record for this one path, whereas a MISSING one means it has never
+ * published here at all. Only the first of those makes "no record" evidence of
+ * anything. Nothing to clean up afterwards, so it returns void.
+ */
+function pogNoRegistry(): void
+{
+    config([
+        'starter-kit.published_hashes' => sys_get_temp_dir()
+            .'/sk-publish-absent-'.bin2hex(random_bytes(6)).'.json',
+    ]);
+}
+
 function pogBootCommand(?Filesystem $files = null): InstallCommand
 {
     $command = new InstallCommand;
@@ -118,6 +138,34 @@ function pogPublish(InstallCommand $command, string $source, string $destination
     $method = new ReflectionMethod($command, 'publishDirectory');
     $method->setAccessible(true);
     $method->invoke($command, $source, $destination, $force);
+}
+
+/**
+ * Wire a command with just enough console plumbing to run printPreservedFiles()
+ * and read back what it actually printed — a silent preserve reads to the
+ * operator as "nothing happened", so the report text is part of the contract,
+ * not just the in-memory $preserved property.
+ */
+function pogBootCommandWithOutput(): array
+{
+    $command = new InstallCommand;
+    $output = new BufferedOutput;
+    $style = new OutputStyle(new ArrayInput([], $command->getDefinition()), $output);
+    $command->setInput(new ArrayInput([], $command->getDefinition()));
+    $command->setOutput($style);
+
+    $componentsProperty = new ReflectionProperty($command, 'components');
+    $componentsProperty->setAccessible(true);
+    $componentsProperty->setValue($command, new ComponentsFactory($style));
+
+    return [$command, $output];
+}
+
+function pogPrintPreserved(InstallCommand $command): void
+{
+    $method = new ReflectionMethod($command, 'printPreservedFiles');
+    $method->setAccessible(true);
+    $method->invoke($command);
 }
 
 /** @return list<string> */
@@ -242,17 +290,80 @@ it('still overwrites a consumer-edited file under --force', function (): void {
     unlink($registry);
 });
 
-it('publishes an untracked existing file, keeping the documented install behaviour', function (): void {
-    // No record: nothing to compare against, and the already-installed stop
-    // guards the case that matters. Pinned so the scope of the guard is explicit.
+it('publishes over an untracked existing file on a FIRST install', function (): void {
+    // No registry at all — the kit has never published into this application,
+    // so EVERY path is untracked and "no record" is evidence of nothing. A
+    // fresh Laravel skeleton already occupies plenty of the paths the kit
+    // publishes to; preserving them would leave a half-scaffolded app that
+    // reports success. The already-installed stop (detectExistingApp) is the
+    // guard for this direction, not the publish loop.
     $source = pogTree('src', [POG_PATH => 'NEW STUB']);
     $destination = pogTree('dst', [POG_PATH => 'SOMETHING ELSE']);
+    pogNoRegistry();
+
+    $command = pogBootCommand();
+    pogPublish($command, $source, $destination);
+
+    expect(file_get_contents($destination.'/'.POG_PATH))->toBe('NEW STUB')
+        ->and(pogProperty($command, 'published'))->toContain(POG_PATH)
+        ->and(pogProperty($command, 'preserved'))->toBeEmpty();
+
+    pogRemove($source);
+    pogRemove($destination);
+});
+
+it('preserves and reports an untracked file on a re-install with an authoritative registry', function (): void {
+    // The registry exists (this is not a first install) but carries no record
+    // for POG_PATH — the kit has never shipped this path here before, so the
+    // file already on disk is the consumer's own, not a stale copy of ours.
+    $source = pogTree('src', [POG_PATH => 'NEW STUB']);
+    $destination = pogTree('dst', [POG_PATH => 'SOMETHING ELSE']);
+    $registry = pogSeedRegistry([]);
+
+    [$command, $output] = pogBootCommandWithOutput();
+    pogPublish($command, $source, $destination);
+    pogPrintPreserved($command);
+
+    expect(file_get_contents($destination.'/'.POG_PATH))->toBe('SOMETHING ELSE')
+        ->and(pogProperty($command, 'preserved'))->toContain(POG_PATH)
+        ->and(pogProperty($command, 'published'))->not->toContain(POG_PATH)
+        ->and($output->fetch())->toContain(POG_PATH);
+
+    pogRemove($source);
+    pogRemove($destination);
+    unlink($registry);
+});
+
+it('overwrites an untracked file on a re-install under --force', function (): void {
+    $source = pogTree('src', [POG_PATH => 'NEW STUB']);
+    $destination = pogTree('dst', [POG_PATH => 'SOMETHING ELSE']);
+    $registry = pogSeedRegistry([]);
+
+    $command = pogBootCommand();
+    pogPublish($command, $source, $destination, force: true);
+
+    expect(file_get_contents($destination.'/'.POG_PATH))->toBe('NEW STUB')
+        ->and(pogProperty($command, 'preserved'))->toBeEmpty()
+        ->and(pogProperty($command, 'published'))->toContain(POG_PATH);
+
+    pogRemove($source);
+    pogRemove($destination);
+    unlink($registry);
+});
+
+it('publishes an untracked file whose content already matches the stub, keeping the published count honest', function (): void {
+    // No record, but the file on disk is byte-for-byte the stub already — the
+    // IDENTICAL decision fires before UNTRACKED is even considered, so this
+    // is a harmless no-op write, not a preserve.
+    $source = pogTree('src', [POG_PATH => 'NEW STUB']);
+    $destination = pogTree('dst', [POG_PATH => 'NEW STUB']);
     $registry = pogSeedRegistry([]);
 
     $command = pogBootCommand();
     pogPublish($command, $source, $destination);
 
     expect(file_get_contents($destination.'/'.POG_PATH))->toBe('NEW STUB')
+        ->and(pogProperty($command, 'published'))->toContain(POG_PATH)
         ->and(pogProperty($command, 'preserved'))->toBeEmpty();
 
     pogRemove($source);

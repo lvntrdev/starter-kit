@@ -4,6 +4,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Lvntr\StarterKit\Console\Commands\InstallCommand;
+use Lvntr\StarterKit\StarterKitServiceProvider;
 
 /**
  * Unit coverage for the fail-closed "this app already looks installed" guard.
@@ -34,6 +35,24 @@ function invokeDetection(string $method, array $args = []): mixed
     $ref->setAccessible(true);
 
     return $ref->invoke($command, ...$args);
+}
+
+/**
+ * Read a private class constant off InstallCommand.
+ *
+ * The marker datasets below are driven off the constants rather than repeating
+ * their values: a hardcoded copy asserts that the TEST's spelling works, which
+ * is exactly how `resources/js/Pages/Admin` (uppercase P, matching nothing the
+ * kit ships) survived in the constant while its test stayed green.
+ *
+ * @return list<string>
+ */
+function detectionMarkers(string $constant): array
+{
+    /** @var list<string> $value */
+    $value = (new ReflectionClass(InstallCommand::class))->getConstant($constant);
+
+    return $value;
 }
 
 /**
@@ -130,10 +149,10 @@ it('finds no evidence in an empty directory', function (): void {
 it('ignores an empty published directory', function (): void {
     // A leftover empty app/Http/Controllers/Admin/ holds no work worth
     // protecting, so it must not cost the operator an install.
-    $dir = makeDetectionTree([
-        'app/Http/Controllers/Admin/' => '',
-        'resources/js/Pages/Admin/' => '',
-    ]);
+    $dir = makeDetectionTree(array_fill_keys(
+        array_map(fn (string $marker): string => $marker.'/', detectionMarkers('EXISTING_APP_DIRECTORY_MARKERS')),
+        '',
+    ));
 
     expect(invokeDetection('detectPublishedTargetMarkers', [$dir]))->toBe([]);
 
@@ -153,10 +172,7 @@ it('names each kit-published file it finds', function (string $relative): void {
     expect($markers[0])->toContain($relative);
 
     removeDetectionTree($dir);
-})->with([
-    'app/Providers/DomainServiceProvider.php',
-    'config/permission-resources.php',
-]);
+})->with(detectionMarkers('EXISTING_APP_FILE_MARKERS'));
 
 it('names each non-empty kit-published directory it finds', function (string $relative): void {
     $dir = makeDetectionTree(stockLaravelTree() + [$relative.'/Kept.php' => '<?php']);
@@ -167,10 +183,63 @@ it('names each non-empty kit-published directory it finds', function (string $re
     expect($markers[0])->toContain($relative.'/');
 
     removeDetectionTree($dir);
-})->with([
-    'app/Http/Controllers/Admin',
-    'resources/js/Pages/Admin',
-]);
+})->with(detectionMarkers('EXISTING_APP_DIRECTORY_MARKERS'));
+
+// ── Marker liveness: a marker naming nothing the kit ships is dead ──────────
+
+/**
+ * Whether $relative exists under $base with EXACTLY this spelling.
+ *
+ * is_dir()/is_file() answer case-insensitively on macOS and APFS, which is what
+ * hid the dead `resources/js/Pages/Admin` marker: it resolved on the maintainer's
+ * machine and matched nothing on the Linux box the consumer installs on. Walking
+ * the real directory entries and comparing them strictly is the only check that
+ * behaves the same on both.
+ */
+function existsCaseSensitively(string $base, string $relative): bool
+{
+    $path = rtrim($base, '/');
+
+    foreach (explode('/', trim($relative, '/')) as $segment) {
+        $entries = @scandir($path);
+
+        if ($entries === false || ! in_array($segment, $entries, true)) {
+            return false;
+        }
+
+        $path .= '/'.$segment;
+    }
+
+    return true;
+}
+
+it('points every published-target marker at a path the kit actually ships', function (string $relative): void {
+    // A marker whose spelling matches no shipped stub can never fire, so the
+    // fail-closed guard silently loses one of its three evidence sources.
+    expect(existsCaseSensitively(StarterKitServiceProvider::stubsPath(), $relative))
+        ->toBeTrue("stubs/{$relative} does not exist — this marker can never match.");
+})->with(array_merge(
+    detectionMarkers('EXISTING_APP_FILE_MARKERS'),
+    detectionMarkers('EXISTING_APP_DIRECTORY_MARKERS'),
+));
+
+it('points every schema marker at a table the kit actually creates', function (): void {
+    // `permissions` is exempt: Spatie's migration creates it, not ours. Every
+    // other entry has to name a table one of the package migrations creates —
+    // `file_manager_folders` named none of them and was pure dead weight.
+    $migrations = implode("\n", array_map(
+        fn (string $file): string => (string) file_get_contents($file),
+        glob(StarterKitServiceProvider::basePath('database/migrations').'/*.php') ?: [],
+    ));
+
+    foreach (detectionMarkers('KIT_SCHEMA_TABLES') as $table) {
+        if ($table === 'permissions') {
+            continue;
+        }
+
+        expect($migrations)->toContain("Schema::create('{$table}'");
+    }
+});
 
 it('treats a directory it cannot inspect as present rather than empty', function (): void {
     // allFiles() throws for a path that is not an enumerable directory. Folding
@@ -184,7 +253,7 @@ it('collects every marker rather than stopping at the first', function (): void 
         'app/Providers/DomainServiceProvider.php' => '<?php',
         'config/permission-resources.php' => '<?php return [];',
         'app/Http/Controllers/Admin/UserController.php' => '<?php',
-        'resources/js/Pages/Admin/Dashboard.vue' => '<template />',
+        'resources/js/pages/Admin/Dashboard.vue' => '<template />',
     ]);
 
     expect(invokeDetection('detectPublishedTargetMarkers', [$dir]))->toHaveCount(4);

@@ -32,129 +32,10 @@
 |
 */
 
-use Illuminate\Console\OutputStyle;
-use Illuminate\Console\View\Components\Factory;
 use Illuminate\Filesystem\Filesystem;
-use Lvntr\StarterKit\Console\Commands\EncryptionKeyCommand;
 use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
-use Symfony\Component\Console\Input\ArrayInput;
-use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Output\BufferedOutput;
 
-/**
- * A Filesystem that remembers every payload handed to put(), in order.
- *
- * atomicPut() routes its single write per step through put() (into a sibling
- * temp file) and then renames it into place, so this list IS the ordered
- * sequence of candidate .env bodies the command flushed to disk. Recording the
- * payload rather than re-reading the file is what makes the intermediate state
- * observable at all.
- */
-final class EkcRecordingFilesystem extends Filesystem
-{
-    /** @var list<string> */
-    public array $writes = [];
-
-    public function put($path, $contents, $lock = false)
-    {
-        $this->writes[] = (string) $contents;
-
-        return parent::put($path, $contents, $lock);
-    }
-}
-
-/**
- * Deterministic 32-byte key material in the `base64:` form an operator writes.
- */
-function ekcKey(string $seed): string
-{
-    return 'base64:'.base64_encode(substr(hash('sha256', $seed, true), 0, 32));
-}
-
-function ekcEnvPath(): string
-{
-    return base_path('.env');
-}
-
-/**
- * Install an .env fixture inside the redirected (temp) base path.
- */
-function ekcFixture(string $contents): void
-{
-    file_put_contents(ekcEnvPath(), $contents);
-}
-
-function ekcEnvContents(): string
-{
-    return (string) file_get_contents(ekcEnvPath());
-}
-
-/**
- * Every APP_KEY assignment line, verbatim — the unit of the "untouched"
- * assertion. Compared as raw lines on purpose: a value that round-tripped
- * through a re-encode would still parse to the same bytes and must STILL fail.
- *
- * @return list<string>
- */
-function ekcAppKeyLines(string $content): array
-{
-    preg_match_all('%^.*APP_KEY[ \t]*=.*$%m', $content, $matches);
-
-    return $matches[0];
-}
-
-/**
- * Read one key's effective value out of an .env body (last assignment wins,
- * matching phpdotenv).
- */
-function ekcRead(string $content, string $key): ?string
-{
-    $pattern = '%^[ \t]*(?:export[ \t]+)?'.preg_quote($key, '%').'[ \t]*=(.*)$%m';
-
-    if (! preg_match_all($pattern, $content, $matches)) {
-        return null;
-    }
-
-    $value = trim((string) end($matches[1]));
-
-    return $value === '' ? null : $value;
-}
-
-/**
- * Run encryption:key with IO wired by hand so the Filesystem can be injected.
- *
- * Constructed directly rather than resolved through Artisan: the recording
- * Filesystem is the whole point, and binding one into the container would hand
- * it to every other consumer of that class as well.
- *
- * @param  array<string, mixed>  $parameters
- * @return array{status: int, output: string, files: EkcRecordingFilesystem}
- */
-function ekcRun(array $parameters = []): array
-{
-    $files = new EkcRecordingFilesystem;
-
-    $command = new EncryptionKeyCommand($files);
-    $command->setLaravel(app());
-
-    $definition = $command->getDefinition();
-
-    if (! $definition->hasOption('no-interaction')) {
-        $definition->addOption(new InputOption('no-interaction', 'n', InputOption::VALUE_NONE));
-    }
-
-    $input = new ArrayInput($parameters, $definition);
-    $input->setInteractive(false);
-
-    $buffer = new BufferedOutput;
-    $style = new OutputStyle($input, $buffer);
-
-    foreach (['input' => $input, 'output' => $style, 'components' => new Factory($style)] as $property => $value) {
-        (new ReflectionProperty($command, $property))->setValue($command, $value);
-    }
-
-    return ['status' => $command->handle(), 'output' => $buffer->fetch(), 'files' => $files];
-}
+require_once __DIR__.'/EncryptionKeyHarness.php';
 
 beforeEach(function (): void {
     $this->ekcBasePath = sys_get_temp_dir().'/sk-encryption-key-'.bin2hex(random_bytes(6));
@@ -231,10 +112,15 @@ it('prepends the retired key ahead of the keys already in the list, without dupl
     $old = ekcKey('old-dedicated');
     $older = ekcKey('older');
 
+    // The list is QUOTED because it carries spaces, and phpdotenv rejects
+    // whitespace in an unquoted value — an unquoted form here would be an .env
+    // that Laravel itself cannot boot, so the command is right to refuse it and
+    // the fixture would be testing an unreachable state. The spaces, the blank
+    // entry and the duplicate are the point of the test and all survive quoting.
     ekcFixture(
         'APP_KEY='.ekcKey('app')."\n"
         ."DATA_ENCRYPTION_KEY={$old}\n"
-        ."DATA_ENCRYPTION_PREVIOUS_KEYS={$older}, {$old} ,,{$older}\n"
+        ."DATA_ENCRYPTION_PREVIOUS_KEYS=\"{$older}, {$old} ,,{$older}\"\n"
     );
 
     expect(ekcRun()['status'])->toBe(0);

@@ -131,6 +131,9 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-interaction --no-progress
 
+      # DB_CONNECTION doubles as the guard: tests/MigrationTestCase skips itself
+      # unless the resolved driver is mysql/mariadb, so this slice only ever
+      # executes here and in the MariaDB job — never in the SQLite `test` job.
       - name: Run migration-sensitive tests (MySQL)
         env:
           DB_CONNECTION: mysql
@@ -139,7 +142,7 @@ jobs:
           DB_DATABASE: starter_kit_ci
           DB_USERNAME: root
           DB_PASSWORD: root
-        run: vendor/bin/pest tests/Feature/Install
+        run: vendor/bin/pest tests/Feature/Migration
 
   test-mariadb:
     name: Tests — MariaDB 11 (PHP ${{ matrix.php }})
@@ -183,15 +186,19 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-interaction --no-progress
 
+      # DB_CONNECTION is `mariadb`, NOT `mysql`: the two drivers compile `uuid`
+      # differently (MySQL -> char(36), MariaDB >= 10.7 -> a native 16-byte
+      # uuid), and that divergence is the whole reason this job exists. Running
+      # MariaDB through the mysql driver would emit MySQL DDL and hide it.
       - name: Run migration-sensitive tests (MariaDB)
         env:
-          DB_CONNECTION: mysql
+          DB_CONNECTION: mariadb
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
           DB_DATABASE: starter_kit_ci
           DB_USERNAME: root
           DB_PASSWORD: root
-        run: vendor/bin/pest tests/Feature/Install
+        run: vendor/bin/pest tests/Feature/Migration
 
   node:
     name: Node (Frontend Quality)

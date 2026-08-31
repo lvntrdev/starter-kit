@@ -61,6 +61,31 @@ Politika değiştiğinde mevcut kullanıcıların parolaları geçersiz olmaz �
 - forgot-password POST route'u, eşleşme anında dinamik olarak Turnstile middleware'i alır
 - **API'de self-delete blokelidir.** `UserPolicy::delete` actor === target durumunda `false` dönüyor, yani `DELETE /api/v1/users/{self}` `users.delete` izni taşıyan kullanıcılar için bile 403 dönüyor. Desteklenen tek self-removal akışı Profile UI'daki password-confirmed Fortify yolu.
 
+### Zaten açık olan bir oturumu kesmek
+
+Yukarıdaki login anındaki kontrol, **zaten açık** bir oturuma ulaşamaz — aksi hâlde bir kullanıcıyı pasifleştiren yönetici, o kullanıcının çerezinin süresinin dolmasını beklemek zorunda kalırdı. Bu boşluğu iki parça kapatır.
+
+**`EnsureUserIsActive` middleware'i.** `StarterKitServiceProvider::boot()` tarafından `sk.active` alias'ı olarak kaydedilir ve `web` ile `api` gruplarına eklenir; böylece mevcut bir kurulum `bootstrap/app.php` dosyasına dokunmadan `composer update` ile bunu alır. Her istekte kimliği doğrulanmış model üzerindeki `status` değerini okur ve değer operatörün deny-list'indeyse oturumu sonlandırır:
+
+- **API / JSON isteği** → kitin dokümante edilmiş `ApiResponse` zarfında `403` (zarf middleware içinde kurulur; bu yüzden biçim `ApiExceptionHandler`'ın kayıtlı olmasına bağlı değildir).
+- **Web isteği** → stateful guard'dan çıkış yapılır, session invalidate edilir, CSRF token yeniden üretilir ve login anındaki engelin kullandığı aynı `sk-auth.inactive` metniyle isimli `login` route'una yönlendirilir.
+- **Kimlik bilgisi kesilemeyen web isteği** (`web` grubundan geçen bir token guard) veya `login` route'u olmayan bir uygulama → düz `403`. Yönlendirme döngüye girerdi, çünkü sonraki istek aynı kimlik bilgisiyle gelir.
+
+**Bilinçli olarak fail-open'dır.** `users.status` kolonunu kitin kontrol etmediği uygulamalara da gider ve toplu kilitlenme, bir saniye önce pasifleştirilmiş bir hesaba fazladan bir istek servis etmekten çok daha kötüdür. Şu durumlarda istek geçirilir: listelenen hiçbir guard'da kullanıcı yoksa; listelenen bir guard `auth.guards` altında tanımlı değilse ya da çözümlenirken hata fırlatıyorsa; modelde `status` attribute'u yoksa; `status` null, bool veya string'e normalize olmayan başka bir değerse; ya da normalize edilmiş değer deny-list'te **değilse** — bilinmeyen string'ler dahil. Middleware asla "active değil, o hâlde engelle" çıkarımı yapmaz; yalnızca açıkça listelenmiş bir status'ü engelleyebilir.
+
+**`RevokeUserAccessAction`.** Middleware yalnızca `web`/`api` gruplarından geçen isteklere etki eder. Bir kullanıcının normalize edilmiş status değeri deny-list'teki bir değere **geçtiğinde**, bu action ek olarak Passport access **ve** refresh token'larını, kullanılmamış authorization/device code'ları (bunlar aksi hâlde hâlâ yeni bir access token'a çevrilebilir) ve kullanıcının veritabanı session satırlarını iptal eder. Yalnızca gerçek bir geçişte çalışır — bir yıldır pasif olan bir kullanıcının adını düzenlemek hiçbir şey iptal etmez — ve çağırana asla hata fırlatmaz, çünkü status yazımı zaten commit edilmiştir.
+
+**Yapılandırma** — `config/starter-kit.php`, `security` bloğu:
+
+| Anahtar | Varsayılan | Ne yapar |
+|---|---|---|
+| `security.enforce_active_status` | `true` | Kill switch. `false` hem middleware'i hem de token iptalini devre dışı bırakır. |
+| `security.active_status_denied` | `['inactive', 'banned']` | Oturumu sonlandıran tek status kümesi. Bilinçli olarak, gönderilen `userStatus` definition'ının ürettiği iki non-active değerle sınırlıdır. |
+| `security.active_status_guards` | `['web', 'api']` | Her istekte incelenen guard'lar. |
+| `security.csp_extra_origins` | `[]` | Kitin Content-Security-Policy başlığına eklenen ek origin'ler. |
+
+> `mergeConfigFrom` yalnızca **üst seviye** anahtarları birleştirir. Bu sürümden önce yayınlanmış bir `config/starter-kit.php` hiç `security` anahtarı taşımaz ve vendor bloğunu bütün olarak devralır; **kısmi** bir `security` dizisi taşıyan bir dosya ise yazmadığı her iç anahtar için vendor bloğunun yerine geçer. Bu yüzden middleware, gönderilen literal değerleri birebir tekrarlayan sınıf sabitlerine (`EnsureUserIsActive::ENFORCE_DEFAULT` / `::DENIED_DEFAULT` / `::GUARDS_DEFAULT`) düşer; her iki kitle de aynı değerleri çözer.
+
 ## API Kimlik Doğrulama
 
 API tarafında Passport kullanılır:

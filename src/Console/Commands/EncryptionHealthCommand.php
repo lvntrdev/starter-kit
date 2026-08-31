@@ -50,7 +50,10 @@ use Throwable;
  *       non-primary key. Nothing is lost yet; clearing the previous-key list
  *       WOULD lose it. Run `encryption:rekey`.
  *   1 — {@see self::VERDICT_INCOMPLETE}: a surface could not be fully scanned,
- *       so "safe" cannot be asserted about it.
+ *       so "safe" cannot be asserted about it — or the configuration is CACHED
+ *       and the chain it resolved is not the one the environment imposes, so
+ *       the attribution describes a key set the next cache rebuild may retire
+ *       ({@see EncrypterCoverage::envChainDiverges()}).
  *   1 — {@see self::VERDICT_NOT_COVERED}: a surface is served by an encrypter
  *       the kit did not build and cannot vouch for, or the
  *       `starter-kit.encryption` config block is absent so DATA_ENCRYPTION_KEY
@@ -211,6 +214,10 @@ final class EncryptionHealthCommand extends Command
             'present' => $coverageProbe->configBlockPresent(),
             'configuration_cached' => $coverageProbe->configurationIsCached(),
             'primary_key_in_environment' => $coverageProbe->primaryKeyPresentInEnvironment(),
+            // Null on an uncached config, where `config()` reads the live files
+            // and there is nothing to be stale against. True on divergence AND
+            // on "could not tell" — see EncrypterCoverage::envChainDiverges().
+            'env_chain_diverges' => $coverageProbe->envChainDiverges($chain),
         ];
 
         $surfaces = [];
@@ -565,15 +572,22 @@ final class EncryptionHealthCommand extends Command
     /**
      * Roll the per-surface reports up.
      *
-     * `unvouched` and `config_block_missing` come from the COVERAGE probe, not
-     * from any row: a surface whose serving encrypter is not the kit's, and a
-     * config block that hides DATA_ENCRYPTION_KEY entirely, both make the
-     * row-level attribution below a true statement about the wrong thing.
+     * `unvouched`, `config_block_missing` and `env_chain_diverged` come from the
+     * COVERAGE probe, not from any row: a surface whose serving encrypter is
+     * not the kit's, a config block that hides DATA_ENCRYPTION_KEY entirely,
+     * and a cached config whose chain no longer matches the environment all
+     * make the row-level attribution below a true statement about the wrong
+     * thing.
+     *
+     * `env_chain_diverged` is a STRICT `=== true` test. The probe answers null
+     * when the configuration is not cached, and a loose truthiness check would
+     * read that "not applicable" as "clean" in one direction and as "diverged"
+     * in the other; only the explicit divergence may move a verdict.
      *
      * @param  list<array<string, mixed>>  $surfaces
      * @param  list<array{surface: string, status: string, encrypter: string, kit_built: bool, detail: string}>  $coverage
-     * @param  array{present: bool, configuration_cached: bool, primary_key_in_environment: bool}  $configBlock
-     * @return array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int, unvouched: int, config_block_missing: bool}
+     * @param  array{present: bool, configuration_cached: bool, primary_key_in_environment: bool, env_chain_diverges: bool|null}  $configBlock
+     * @return array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int, unvouched: int, config_block_missing: bool, env_chain_diverged: bool}
      */
     private function summarize(array $surfaces, array $coverage, array $configBlock): array
     {
@@ -585,6 +599,7 @@ final class EncryptionHealthCommand extends Command
             'incomplete' => 0,
             'unvouched' => 0,
             'config_block_missing' => ! $configBlock['present'],
+            'env_chain_diverged' => $configBlock['env_chain_diverges'] === true,
         ];
 
         foreach ($coverage as $entry) {
@@ -621,7 +636,15 @@ final class EncryptionHealthCommand extends Command
      * surface was scanned, vouched for, and every value it held read with the
      * primary key.
      *
-     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int, unvouched: int, config_block_missing: bool}  $summary
+     * A cached config whose chain diverges from the environment joins the
+     * INCOMPLETE branch, and joins it THERE for a reason: this method is
+     * downgrade-only, so the new signal must sit below every verdict that is
+     * already worse than it. It can turn `safe-to-clear` into `incomplete` and
+     * nothing else — it can never mask an unreadable value, an unvouched
+     * surface or a row still riding a previous key, each of which is a fact
+     * about the stored bytes and stays true whichever chain is in force.
+     *
+     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int, unvouched: int, config_block_missing: bool, env_chain_diverged: bool}  $summary
      */
     private function decideVerdict(array $summary): string
     {
@@ -637,7 +660,7 @@ final class EncryptionHealthCommand extends Command
             return self::VERDICT_REKEY_REQUIRED;
         }
 
-        if ($summary['incomplete'] > 0) {
+        if ($summary['incomplete'] > 0 || $summary['env_chain_diverged']) {
             return self::VERDICT_INCOMPLETE;
         }
 
@@ -657,7 +680,7 @@ final class EncryptionHealthCommand extends Command
      * One-line summary of the verdict, shared by both output modes so the JSON
      * consumer and the operator read the same sentence.
      *
-     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int, unvouched: int, config_block_missing: bool}  $summary
+     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int, unvouched: int, config_block_missing: bool, env_chain_diverged: bool}  $summary
      */
     private function verdictMessage(string $verdict, array $summary): string
     {
@@ -695,12 +718,28 @@ final class EncryptionHealthCommand extends Command
                     $summary['unvouched'],
                     DataEncrypterFactory::PREVIOUS_ENV_KEY,
                 ),
-            self::VERDICT_INCOMPLETE => sprintf(
-                '%d surface(s) could not be fully scanned, so this run cannot vouch for them. Every value it DID '
-                .'read is on the primary key. Do NOT clear %s on the strength of this report.',
-                $summary['incomplete'],
-                DataEncrypterFactory::PREVIOUS_ENV_KEY,
-            ),
+            // The divergence half comes FIRST because it invalidates the other
+            // half: when the cached chain is not the effective one, "every
+            // value it did read is on the primary key" is a sentence about a
+            // key set this app may stop using at the next cache rebuild.
+            self::VERDICT_INCOMPLETE => $summary['env_chain_diverged']
+                ? sprintf(
+                    'The configuration is CACHED and the key chain it resolved does not match the one the '
+                    .'environment imposes — they differ, or .env could not be read here. Everything below was '
+                    .'attributed with the cached chain, which stops being the effective one the moment the cache '
+                    .'is rebuilt. Run `php artisan config:clear`, then re-run this command. Do NOT clear %s on '
+                    .'the strength of this report%s.',
+                    DataEncrypterFactory::PREVIOUS_ENV_KEY,
+                    $summary['incomplete'] > 0
+                        ? sprintf(' (%d surface(s) could not be fully scanned either)', $summary['incomplete'])
+                        : '',
+                )
+                : sprintf(
+                    '%d surface(s) could not be fully scanned, so this run cannot vouch for them. Every value it '
+                    .'DID read is on the primary key. Do NOT clear %s on the strength of this report.',
+                    $summary['incomplete'],
+                    DataEncrypterFactory::PREVIOUS_ENV_KEY,
+                ),
             default => 'The encryption key chain could not be resolved, so nothing was attributed.',
         };
     }
@@ -708,9 +747,9 @@ final class EncryptionHealthCommand extends Command
     /**
      * @param  array<string, mixed>  $keys
      * @param  list<array<string, mixed>>  $surfaces
-     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int, unvouched: int, config_block_missing: bool}  $summary
+     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int, unvouched: int, config_block_missing: bool, env_chain_diverged: bool}  $summary
      * @param  list<array{surface: string, status: string, encrypter: string, kit_built: bool, detail: string}>  $coverage
-     * @param  array{present: bool, configuration_cached: bool, primary_key_in_environment: bool}  $configBlock
+     * @param  array{present: bool, configuration_cached: bool, primary_key_in_environment: bool, env_chain_diverges: bool|null}  $configBlock
      */
     private function outputText(array $keys, array $surfaces, array $summary, string $verdict, array $coverage, array $configBlock): int
     {
@@ -752,6 +791,7 @@ final class EncryptionHealthCommand extends Command
         }
 
         $this->reportConfigBlock($configBlock);
+        $this->reportEnvDivergence($configBlock);
 
         $this->newLine();
         $this->line('  <options=bold>Who serves each surface</>');
@@ -813,9 +853,9 @@ final class EncryptionHealthCommand extends Command
      *
      * @param  array<string, mixed>  $keys
      * @param  list<array<string, mixed>>  $surfaces
-     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int, unvouched: int, config_block_missing: bool}  $summary
+     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int, unvouched: int, config_block_missing: bool, env_chain_diverged: bool}  $summary
      * @param  list<array{surface: string, status: string, encrypter: string, kit_built: bool, detail: string}>  $coverage
-     * @param  array{present: bool, configuration_cached: bool, primary_key_in_environment: bool}  $configBlock
+     * @param  array{present: bool, configuration_cached: bool, primary_key_in_environment: bool, env_chain_diverges: bool|null}  $configBlock
      */
     private function outputJson(array $keys, array $surfaces, array $summary, string $verdict, array $coverage, array $configBlock): int
     {
@@ -868,6 +908,10 @@ final class EncryptionHealthCommand extends Command
             'incomplete' => 0,
             'unvouched' => 0,
             'config_block_missing' => false,
+            // Not probed: the chain did not resolve, so there is nothing to
+            // compare an environment rebuild against. This path already exits
+            // 2, so the flag cannot soften anything.
+            'env_chain_diverged' => false,
         ];
 
         if ($json) {
@@ -908,7 +952,7 @@ final class EncryptionHealthCommand extends Command
      * report, produced by a broken configuration, on an install whose operator
      * set DATA_ENCRYPTION_KEY and believes their data survives `key:generate`.
      *
-     * @param  array{present: bool, configuration_cached: bool, primary_key_in_environment: bool}  $configBlock
+     * @param  array{present: bool, configuration_cached: bool, primary_key_in_environment: bool, env_chain_diverges: bool|null}  $configBlock
      */
     private function reportConfigBlock(array $configBlock): void
     {
@@ -938,6 +982,42 @@ final class EncryptionHealthCommand extends Command
             $configBlock['configuration_cached'] ? ' and `php artisan config:cache` again' : '',
             DataEncrypterFactory::APP_ENV_KEY,
             DataEncrypterFactory::PRIMARY_ENV_KEY,
+        ));
+    }
+
+    /**
+     * Warn when a CACHED configuration resolved a different key chain than the
+     * environment imposes.
+     *
+     * Printed beside the config-block warning and before any attribution,
+     * because it is the same class of failure: the report below is true about
+     * the stored bytes and describes a key set this install may not be running
+     * on. Silence here is what turned a stale cache into a `safe-to-clear`.
+     *
+     * Nothing is printed when the answer is null (the configuration is not
+     * cached, so there is nothing to be stale against) or false (the chains
+     * were rebuilt and matched) — a healthy production install that caches its
+     * config must not be nagged, or the warning stops being read.
+     *
+     * @param  array{present: bool, configuration_cached: bool, primary_key_in_environment: bool, env_chain_diverges: bool|null}  $configBlock
+     */
+    private function reportEnvDivergence(array $configBlock): void
+    {
+        if ($configBlock['env_chain_diverges'] !== true) {
+            return;
+        }
+
+        $this->newLine();
+        $this->error(
+            '  The configuration is CACHED and the key chain it resolved does NOT match the one .env and the '
+            .'process environment impose. Either the cache predates an .env edit, or the file could not be read '
+            .'here — both are reported the same way, because neither can prove the chain below is the effective one.'
+        );
+        $this->warn(sprintf(
+            '  Fix: run `php artisan config:clear` and re-run this command (re-run `php artisan config:cache` '
+            .'afterwards if you cache config in production). Until the two agree, nothing below is a basis for '
+            .'clearing %s.',
+            DataEncrypterFactory::PREVIOUS_ENV_KEY,
         ));
     }
 

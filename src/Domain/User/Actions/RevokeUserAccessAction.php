@@ -253,10 +253,18 @@ class RevokeUserAccessAction extends BaseAction
      * null when the provider cannot be determined.
      *
      * `$user->tokens()` scopes itself this way — a token only counts when its
-     * client carries the user's provider (or none at all, for the default
-     * guard). The authorization- and device-code tables have no such relation
-     * helper, so two applications whose users share an identifier across
-     * providers would revoke each other's codes without this.
+     * client carries the user's provider. The authorization- and device-code
+     * tables have no such relation helper, so two applications whose users
+     * share an identifier across providers would revoke each other's codes
+     * without this.
+     *
+     * A client with a NULL provider is matched ONLY when the user's provider
+     * is the one the `api` guard is configured with. That is Passport's own
+     * reading of NULL — not "any provider" but "the default provider,
+     * unstated" — and `HasApiTokens::tokens()` gates it the same way. Matching
+     * NULL unconditionally would let a non-default-provider user's
+     * deactivation revoke a default-provider user's pending codes whenever the
+     * two share an identifier.
      *
      * A user model without Passport's `getProviderName()` cannot be scoped;
      * that returns null and the queries stay unscoped, which is the pre-existing
@@ -272,9 +280,12 @@ class RevokeUserAccessAction extends BaseAction
 
         try {
             $provider = $user->getProviderName();
+            $isDefaultProvider = $provider === config('auth.guards.api.provider');
 
             return Passport::client()->newQuery()
-                ->where(fn ($query) => $query->where('provider', $provider)->orWhereNull('provider'))
+                ->where(fn ($query) => $query
+                    ->where('provider', $provider)
+                    ->when($isDefaultProvider, fn ($query) => $query->orWhereNull('provider')))
                 ->pluck('id')
                 ->map(static fn ($id): string => (string) $id)
                 ->all();

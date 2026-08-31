@@ -4,7 +4,7 @@ Bu dosya büyük sürümler arası geçiş rehberidir. Her sürüm kendi bölüm
 
 ---
 
-## Unreleased
+## v13.6.16 → v13.7.0
 
 ### `sk:install` artık kendisinin kurmadığı bir uygulamada çalışmayı reddediyor
 
@@ -20,6 +20,8 @@ Durma mesajı iki çıkış yolu adlandırır: kurulu bir uygulamayı değiştir
 
 Hem `sk:install` hem `sk:update` artık bir published yolun üzerine yazılıp yazılmayacağına aynı üç-yönlü karşılaştırmayla (shipped stub hash'i vs. diskteki hash vs. son install/update'te kayda geçen hash) karar veriyor. Diskteki kopya kayda geçenle artık eşleşmiyorsa fark bir consumer düzenlemesi sayılıyor ve dosya sessizce üzerine yazılmak yerine **atlanıp raporlanıyor** — bu artık yalnızca `sk:update`'in değil, `sk:install`'in yeniden-publish yolunun da kapsamında. Yine de üzerine yazmak için `--force` verin; önce commit alın ki Git önceki sürümü erişilebilir tutsun.
 
+Bu, aynı korumadaki geriye kalan tek boşluğu da kapatıyor: yeniden kurulumda, hash kaydında **hiç izi olmayan** bir dosya — çünkü yeni bir paket sürümü, bu uygulamada daha önce hiç göndermediği bir yola dosya göndermeye başladı — `--force` fark etmeksizin üzerine yazılıyordu. Artık bir consumer düzenlemesiyle aynı muameleyi görüyor: `--force` verilmedikçe üzerine yazılmak yerine korunup raporlanıyor. Bu koruma yalnızca yetkili bir kayıt varken geçerli; gerçek bir ilk kurulum, kıyaslayacak henüz hiçbir şey olmadığından izlensin izlenmesin her yolu yine yayınlıyor.
+
 ### İnaktif kullanıcılar oturum ortasında kesiliyor
 
 Login yolu zaten aktif olmayan bir hesabı reddediyordu, ama zaten açık bir oturuma erişemiyordu — bir kullanıcıyı deaktive eden bir operatör o kullanıcının session cookie'sinin kendi kendine sona ermesini beklemek zorundaydı. Yeni bir `EnsureUserIsActive` middleware'i (otomatik olarak `web` ve `api` guard'larına bağlanır) artık her istekte kimliği doğrulanmış kullanıcının `status`'unu kontrol ediyor; operatörün deny-list'iyle eşleşiyorsa bir web oturumunu kapatıp login'e yönlendiriyor, bir API isteği için ise 403 döndürüyor.
@@ -32,11 +34,17 @@ Bu, her belirsiz durumda kasıtlı olarak **fail-open**: kimliği doğrulanmış
 
 Sessizce başarısız olan bir installer adımına rağmen şu an geçen bir CI hattı bu yükseltmeden sonra başarısız olmaya başlayacaktır — bu, etrafından dolaşılacak bir regresyon değil, amaçlanan sinyaldir. Frontend ve tooling adımları (`npm install`, Wayfinder üretimi, `npm run build`, `composer dump-autoload`, cache temizlikleri) bilerek ölümcül değil: yalnızca uyarıyor, elle çalıştırılacak komutu yazdırıyor ve kapanış özetinde tekrar listeleniyor; böylece Node ya da Composer'ı olmayan bir makine bugünkü gibi kurulmaya devam ediyor. `site:install` değişikliği `stubs/` üzerinden geliyor, dolayısıyla yalnızca yeni kurulumlara ve `sk:update` ile tazelenen uygulamalara ulaşıyor — mevcut, dokunulmamış bir consumer `site:install` kopyası değişmiyor.
 
+Kurulum sırasında ulaşılamayan bir veritabanı eskiden yine `Lvntr Starter Kit installed successfully!` yazdırıyor ve `0` ile çıkıyordu — veritabanı bloğu (migration, seeder, izin tohumlama) yalnızca ekrandaki bir uyarıyla atlanıyordu. Bu koşu artık kurulumu **eksik** olarak bitiriyor: hiçbir stub-hash registry yazılmıyor, tamamlanan dosya-sistemi adımlarına ait resume checkpoint'i korunuyor ve komut sıfırdan farklı bir çıkış koduyla çıkıyor. Veritabanı bağlantısını düzeltip `php artisan sk:install --resume` çalıştırın; böylece baştan başlamak yerine tam kaldığı yerden devam eder.
+
+### `migrate:fresh` artık yazılı bir onay istiyor
+
+`sk:install`, tabloları zaten dolu mevcut bir veritabanı bulduğunda "Tüm tabloları sil ve migration'ları sıfırdan çalıştır" seçeneğini de içeren bir `select()` menüsü sunuyordu; bu seçenek sıradan bir evet/hayır `select()` yanıtıyla onaylanıyordu — geri dönüşü olmayan bir `migrate:fresh`'ten yalnızca bir yanlış tuşa basma kadar uzaktaydı. Bu seçenek artık **yazılı** bir onay arkasına alındı: operatör silme işlemi çalışmadan önce bir `text()` prompt'unda veritabanı adını (ya da harfiyen `fresh` kelimesini) yazmak zorunda; bunun dışındaki her yanıt — boş bir cevap ya da refleks bir `y` dahil — hiçbir şey silinmeden ek türden `migrate` yoluna düşüyor. Yıkıcı seçenek ayrıca — prompt sebebini açıklıyor — `APP_ENV` production benzeri göründüğünde, `APP_DEBUG` kapalıyken, oturum hiç prompt gösteremediğinde (`--no-interaction`, CI, TTY yok) ya da mevcut bir tablo zaten satır içeriyorsa (okunamayan bir tablo veri içeriyor sayılır) baştan sunulmuyor. Yazılı onayın kendisi etrafında bir kaçış yolu yok; tek atlama yolu boş bir veritabanına karşı çalışmak ya da `migrate`'i kullanmak.
+
 ### `sk:install` artık kurtarma yolu olarak belgelenmiyor
 
-`docs/install.tr.md` ve `docs/update.tr.md`, mevcut bir projede `php artisan sk:install` komutunu yeniden çalıştırmayı idempotent bir proje-geneli kurtarma adımı olarak tarif ediyordu. Öyle değil ve bu tavsiye geri çekildi. `sk:install`, `--force` verilmese de `lang/` dışındaki her yolun üzerine yayın yapar; hash kaydı yalnızca sildiğiniz bir dosyayı korur (düzenlediğinizi değil) ve bu kayıt git tarafından yok sayılan `storage/starter-kit/hashes.json` altında durur — kaybı, komutun kurulu bir uygulamayı **ilk kurulum** saymasına yol açar; o noktada mevcut `.env` dosyasının üzerine `.env.example` kopyalanır ve `APP_KEY` yeniden üretilebilir.
+`docs/install.tr.md` ve `docs/update.tr.md`, mevcut bir projede `php artisan sk:install` komutunu yeniden çalıştırmayı idempotent bir proje-geneli kurtarma adımı olarak tarif ediyordu. Öyle değil ve bu tavsiye geri çekildi — deploy stratejinizde `storage/starter-kit/` dizinini kalıcı operasyon durumu olarak ele alın, tıpkı `storage/app/` gibi sürümler arasında yaşamalıdır.
 
-Bu sürümde kod değişmedi; komut her zamanki gibi davranıyor. Kurulu bir uygulamayı değiştirmek için `sk:update` ya da kapsamı daraltılmış `sk:publish --tag=<alan>` kullanın ve deploy stratejinizde `storage/starter-kit/` dizinini kalıcı operasyon durumu olarak ele alın — tıpkı `storage/app/` gibi sürümler arasında yaşamalıdır.
+Bu tavsiyenin geri çekilmesine yol açan risklerden ikisi artık açık değil, yukarıda ele alınıyor: eksik bir registry artık `sk:install`'ın kurulu bir uygulamayı sessizce ilk kurulum sayması sonucunu doğurmuyor (yukarıdaki "`sk:install` artık kendisinin kurmadığı bir uygulamada çalışmayı reddediyor" bölümüne bakın), mevcut bir `.env`'e sahip bir uygulamaya yapılan ilk kurulum da artık onun üzerine yazmıyor (yukarıdaki "`.env` artık asla üzerine yazılmıyor" bölümüne bakın). `sk:install`'i zaten kurulu bir uygulamaya dokunmak için yanlış araç yapan şey, yukarıdaki "Consumer tarafından değiştirilmiş bir published dosya varsayılan olarak atlanıyor" bölümünde anlatılan consumer-edit davranışıdır: `--force` verilmeden düzenlenmiş bir dosya tazelenmek yerine atlanıp raporlanıyor, `--force` ile ise doğrudan üzerine yazılıyor — ikisi de `sk:update` ya da kapsamı daraltılmış `sk:publish --tag=<alan>`'ın verdiği seçici, düzenlemeyi koruyan tazelemeyi vermiyor. Kurulu bir uygulamayı değiştirmek için bunları kullanın.
 
 ### `DATA_ENCRYPTION_CIPHER` ile `app.cipher` eşleşmek zorunda — zorunlu kılındı
 
@@ -171,6 +179,26 @@ Bu düzeltme vendor query sınıflarında yaşıyor (`Lvntr\StarterKit\Domain\Us
 ### `DatatableQueryBuilder::columns()` payload şekillendirmesi fail-closed
 
 `columns()` tanımlayan ve **hiçbir tanımlı sütunla eşleşmeyen** bir `?columns=` istek parametresi alan bir backend artık her satırı yalnızca `alwaysInclude()` anahtarlarına indirger — artık tam satıra geri dönmez. `columns` parametresinin hiç bulunmaması bu davranıştan etkilenmez ve tam satır dönmeye devam eder. Frontend sütun anahtarı ile karşılık gelen backend `columns()` anahtarı bir tarafta yeniden adlandırılıp diğerinde kalmışsa, etkilenen hücreler artık tam payload'ın uyumsuzluğu maskelemesi yerine boş render edilir; güncelleme sonrası eksik hücre verisi görürseniz her iki tarafı da denetleyin.
+
+### `definitions.lang` daraltılıyor — migration reddedebilir
+
+`create_definitions_table`, üç varsayılan `string()` (255 karakter, utf8mb4) sütun üzerinde `unique(['key', 'value', 'lang'])` tanımlıyordu — MySQL/MariaDB'nin 3072 byte'lık InnoDB anahtar sınırının 3060'ında, herhangi bir sütunun tek bir karakter genişlemesi bu sınırı kırardı. Yeni bir migration **yalnızca `lang`'i** 35 karaktere daraltıyor — 35, kitin herhangi bir yerde kabul ettiği en geniş locale değeri olan `content_languages.code`'dan alındı; böylece kitin kendi ekranlarından saklayabileceğiniz her etiket sığmaya devam ediyor ve aşağıdaki ret bu değerler için erişilemez kalıyor. `key` ve `value` yayımlanmış 255 genişliğini koruyor: tek başına `lang` indeksi 2180 byte'a indiriyor, yani sınırın ~892 byte altına; onları da daraltmak yalnızca mevcut şemanın kabul ettiği veriyi bloke ederdi.
+
+**Şemaya dokunmadan önce migration, mevcut her satırı ölçer** (`lang` karakter uzunluğu, soft-delete edilenler dahil — bunlar hâlâ unique indeksi işgal eder) ve herhangi bir satır yeni sınırda karakter kaybedecekse — şemayı değiştirmeden — reddeder. Verinizde reddederse:
+
+1. Hatayı okuyun — sütunu, sınırı aşan satır sayısını ve bulunan en uzun değeri adlandırır.
+2. Sorunlu `definitions` satırlarını kısaltın veya silin (soft-delete edilenler dahil — `deleted_at`, bir satırı unique indeksten muaf tutmaz).
+3. `php artisan migrate`'i yeniden çalıştırın.
+
+Migration doğrudan geri alınabilir (`down()` `lang`'i 255'e geri genişletir — bir genişletme asla kırpmaz, dolayısıyla ölçüme gerek duymaz). Her iki yön de unique indeksin var olduğunu doğrulayarak biter; böylece indeksi zaten eksik hâlde bu migration'a ulaşan bir tablo (yarıda kalmış önceki bir koşu) garantisi olmadan "migrate edildi" diye kaydedilmek yerine indeksi yeniden kurulur. Kit'in kendi ~34 tohumlanmış satırının çok ötesine büyümüş bir tabloda `ALTER TABLE` + indeks yeniden kurma işlemi süresince bir metadata kilidi tutar; büyük bir tablodaki başka herhangi bir ALTER kadar dikkatle planlayın.
+
+### `media` tablosu migration'ı artık bir rollback yoluna sahip — yıkmak yerine reddeden bir yol
+
+`create_media_table`'ın bir `down()`'ı yoktu. Laravel'in migrator'ı bu çağrıyı `method_exists` ile koruduğu için `php artisan migrate:rollback` hata vermiyordu — tabloyu sessizce atlıyor, ama migration'ın kayıt defteri satırını yine de siliyordu; geriye uygulamanın artık kaydını tutmadığı bir `media` tablosu ve o tabloda patlayan bir yeniden `migrate` kalıyordu. Artık bir `down()` tanımlıyor: tablo boşsa düşürülüyor, içinde satır varken denenen bir rollback ise tabloyu adıyla anan bir hatayla duruyor. Aynı zincirdeki iki sonraki migration (`add_folder_id_to_media_table`, `add_soft_deletes_to_media_table`) da birebir aynı reddi taşıyor; çünkü bir batch en yeniden en eskiye doğru geri alınır: bu olmadan, create migration'ının koruması hiç devreye girmeden dolu bir tablodan `folder_id` ve `deleted_at` düşürülmüş olurdu.
+
+**Bu, mevcut tüketiciler için bir davranış değişikliği**: bu migration'ın ait olduğu batch'i kapsayan bir `migrate:rollback` daha önce `media`'yı sessizce atlıyordu; media satırı olan bir kurulumda artık **hata veriyor**. Bu hata özelliğin kendisi. Dolu bir `media`'yı düşürmek **satırları** kaldırırdı, **dosyaları** değil: her satır yapılandırılmış bir disk üzerindeki bir blob'a işaret eder ve Spatie bu blob'u yalnızca modelin deleting event'i üzerinden siler — bir şema rollback'i Eloquent'i tamamen atlar, yani storage dizinleri bozulmadan kalırken onların tek indeksi yok edilir ve uygulamanın artık numaralandıramayacağı öksüz dosyalar geriye kalırdı.
+
+Migration'ı bilerek geri almak için önce media'yı **uygulama üzerinden** silin — böylece blob'lar satırlarla birlikte gider — sonra rollback'i tekrar çalıştırın. Korumayı aşmak için tabloyu ham SQL ile boşaltmayın; bu, korumanın engellemek için var olduğu öksüzleşmeyi bire bir üretir.
 
 ## v13.6.8 → v13.6.9
 

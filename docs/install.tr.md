@@ -17,18 +17,18 @@ Bu rehber, sıfır bir proje için önerilen kurulum akışını anlatır.
 > ```bash
 > composer create-project laravel/laravel my-app
 > cd my-app
-> composer require lvntr/laravel-starter-kit:^13.6
+> composer require lvntr/laravel-starter-kit:^13.7
 > php artisan sk:install
 > ```
 >
 > **Başlamadan önce `php -v` çıktısının 8.4 veya üzeri olduğunu doğrulayın.**
 > `composer create-project laravel/laravel` yalnızca PHP 8.3 ister; bu yüzden
 > 8.3'te sorunsuz tamamlanır ve sizi bu kit'in tabanının bir adım altında
-> bırakır. Paketi gevşek bir `:^13.0` yerine `:^13.6` ile ekleyin — gevşek
+> bırakır. Paketi gevşek bir `:^13.0` yerine `:^13.7` ile ekleyin — gevşek
 > constraint, Composer'ın gerçek engeli bildirmek yerine PHP 8.3'e uyan eski bir
 > sürümü sessizce kurmasına yol açar (ardından `composer update` "nothing to
 > update" der). Kurulum beklenmedik bir sürüme düşerse
-> `composer why-not lvntr/laravel-starter-kit 13.6.14` komutu engeli gösterir.
+> `composer why-not lvntr/laravel-starter-kit 13.7.0` komutu engeli gösterir.
 
 ## Gereksinimler
 
@@ -108,7 +108,7 @@ DATA_ENCRYPTION_PREVIOUS_KEYS=
 ## 2. Paketi Ekleyin
 
 ```bash
-composer require lvntr/laravel-starter-kit:^13.6
+composer require lvntr/laravel-starter-kit:^13.7
 ```
 
 ## 3. Kurulum Komutunu Çalıştırın
@@ -117,7 +117,7 @@ composer require lvntr/laravel-starter-kit:^13.6
 php artisan sk:install
 ```
 
-> **`sk:install` bir ilk-kurulum komutudur, onarım aracı değildir.** Kit'in henüz kurulmadığı bir projede bir kez çalıştırın. Kurulu bir uygulamada tekrar çalıştırmak güvenli **değildir**: yalnızca `lang/` korunabilir, yayınlanan diğer her yol `--force` olmadan da üzerine yazılır ve hash kaydı yalnızca sildiğiniz bir dosyayı korur — düzenlediğinizi değil. Kayıt, git tarafından yok sayılan `storage/starter-kit/hashes.json` altında durur; stateless bir deploy onu kaybederse komut uygulamayı ilk kurulum sayar ve mevcut `.env` dosyanızın üzerine `.env.example` kopyalar. Kurulu bir uygulamayı değiştirmek için [`sk:update`](update.tr.md) ya da `sk:publish --tag=<alan>` kullanın.
+> **`sk:install` bir ilk-kurulum komutudur, onarım aracı değildir.** Kit'in henüz kurulmadığı bir projede bir kez çalıştırın. Kurulu bir uygulamada tekrar çalıştırmak güvenli **değildir**: yayınlama hash-farkındalıklıdır, yani bir dosya — o yolu kurulum sırasında hariç tuttuysanız, paket o dosya için yeni bir şey göndermediyse, yeni bir sürüm var ve siz kendi kopyanızı düzenlediyseniz ya da hash kaydında o dosya için hiç iz yoksa — korunur; yeniden kurulumda kaydın hiç izlemediği bir dosya sizin dosyanız sayılır ve `--force` verilmedikçe üzerine yazılmak yerine korunup raporlanır. Bu koruma yalnızca ortada bir kayıt varken geçerlidir: gerçek bir ilk kurulumda henüz yetkili bir kayıt olmadığından, kaydı olmayan bir dosya dahil her yol normal şekilde yayınlanır. `.env` dosyanız asla üzerine yazılmaz. Kayıt, git tarafından yok sayılan `storage/starter-kit/hashes.json` altında durur; kayıt kaybolursa (stateless bir deploy, temizlenmiş bir `storage/` dizini) installer artık uygulamayı ilk kurulum saymaz — uygulamayı kit'in zaten kurulu olduğuna dair kanıt için inceler ve bir kanıt bulursa `--force` verilmedikçe tek bir bayt bile yazmadan hata ile durur. Bitiremeyen bir çalışma (örneğin ulaşılamayan bir veritabanı) sıfırdan farklı bir çıkış koduyla `INCOMPLETE` olarak kapanır ve hash kaydını yazmaz; böylece başarılı bir kurulum olarak kaydedilmek yerine `sk:install --resume` ile devam ettirilebilir kalır. Kurulu bir uygulamayı değiştirmek için [`sk:update`](update.tr.md) ya da `sk:publish --tag=<alan>` kullanın.
 
 Herhangi bir dosyaya dokunmadan önce installer bir **preflight** kontrolü çalıştırır (Node.js sürümü — Node eksikse ya da Vite 7 motor tabanı olan 20.19'dan eskiyse uyarı verir ve npm adımının kendi kendine düşmesine izin verir; asla hard-fail olmaz) ve önceki yarıda kalmış bir çalışmadan **checkpoint** varsa yükler (`storage/starter-kit/install-progress.json`). Bir adım hata fırlatırsa installer ham stack trace yerine somut bir mesajla durur ("Step failed: `<adım>` — sorunu düzelt, sonra `sk:install --resume` çalıştır"); tamamlanmış adımlar checkpoint'e yazıldığından `--resume` onları atlayıp kaldığı yerden devam eder. Kurulum başarıyla bitince progress dosyası otomatik silinir.
 
@@ -127,14 +127,14 @@ Sihirbaz ardından her adımda sizinle interaktif olarak ilerler:
 | ---- | ---------------------------------------------------------------------------------------------------- |
 | 1    | Uygulama iskeletini yayınlar (Controller, Model, Route, Vue sayfaları, Enum, Provider, vb.)          |
 | 2    | `package.json` bağımlılıklarını birleştirir                                                          |
-| 3    | Taze yayınlanan `.env.example`'dan `.env` dosyasını doldurur, sonra boşsa `APP_KEY` üretir            |
+| 3    | Taze yayınlanan `.env.example`'dan `.env` dosyasını doldurur, sonra boşsa `APP_KEY` üretir. Mevcut bir `.env` **birleştirilir, asla üzerine yazılmaz**: `.env.example` içindeki eksik anahtarlar eklenir, yalnızca ilk kuruluma özgü anahtarlar sadece yoksa yazılır ve mevcut hiçbir değer değiştirilmez. Dosya yalnızca hiç yoksa `.env.example`'dan oluşturulur |
 | 4    | Veritabanı bağlantısını yapılandırır (sürücü, host, port, veritabanı, kimlik bilgileri) — `--no-interaction`'da atlanır |
-| 5    | Çakışan varsayılan Laravel dosyalarını siler (`vite.config.js`, `welcome.blade.php`, vb.)            |
+| 5    | Çakışan varsayılan Laravel dosyalarını siler (`vite.config.js`, `welcome.blade.php`, vb.) — **yalnızca ilk kurulumda**; sonraki her çalıştırmada dosyalar korunur ve kapanış raporunda listelenir |
 | 6    | Kit'in `.gitignore` girdilerini projenin mevcut dosyasıyla birleştirir                                |
 | 7    | Config dosyalarını yayınlar ve enjekte eder (`APP_DISPLAY_TIMEZONE` tabanlı `display_timezone` dahil `app.php`; mevcut MySQL/MariaDB bağlantı dizilerini `+00:00` değerine sabitleyen `database.php`; `filesystems.php`; Turnstile için `services.php`; `media-library.php`), `bootstrap/app.php`'yi bağlar, service provider'ları kaydeder ve custom-helpers autoload girdisini ekler |
 | 8    | `User` + `Role` domain runtime'ını `app/Domain/` altına eject eder (`--without-eject` verildiğinde ya da `storage/starter-kit/hashes.json` zaten mevcutsa atlanır) |
 | 9    | Composer autoload'u yeniden oluşturur                                                                |
-| 10   | Veritabanı migration'larını çalıştırır — veritabanına ulaşılamıyorsa uyarıyla atlanır; bağlantıyı düzelt, `--resume` ile tekrar çalıştır |
+| 10   | Veritabanı migration'larını çalıştırır — aşağıdaki [Migration stratejisi seçimi](#migration-stratejisi-seçimi) bölümüne bakın. Veritabanına ulaşılamıyorsa veritabanı adımları atlanır ve çalıştırma `INCOMPLETE` olarak, **sıfırdan farklı çıkış koduyla** kapanır (hash kaydı yazılmaz); bağlantıyı düzelt, `--resume` ile tekrar çalıştır |
 | 11   | Seeder'ları çalıştırır (Roller, Yetkiler, Tanımlar, Ayarlar)                                         |
 | 12   | `config/permission-resources.php`'den yetkileri seed eder                                            |
 | 13   | Passport şifreleme anahtarlarını oluşturur                                                           |
@@ -145,6 +145,27 @@ Sihirbaz ardından her adımda sizinle interaktif olarak ilerler:
 Config adımında `sk:install`, `config/database.php` içindeki mevcut `mysql` ve `mariadb` dizilerine literal `'timezone' => '+00:00'` sözleşmesini ekler. Consumer'ın tanımladığı bir `timezone` değerinin üzerine yazmaz, eksik bir bağlantı oluşturmaz; `sqlite`, `pgsql` veya `sqlsrv` bağlantılarına dokunmaz.
 
 Sıfır kurulumlarda veri dönüşümü gerekmez. Consumer `sk:install` komutunu zaten veri barındıran bir veritabanına yöneltebileceği için, önce varsayılan MySQL/MariaDB bağlantısının UTC dışı bir oturumda veri taşıyıp taşımadığını kontrol eder — taşıyorsa pin adımını **atlar** ve bu durumu onay kapısıyla ele alan `sk:upgrade` komutunu, [tek seferlik dönüşüm rehberini](timezone.tr.md#mevcut-veriler-için-tek-seferlik-dönüşüm) okuduktan sonra çalıştırmanızı söyler. Ulaşılamayan bir veritabanı sıfır kurulum gibi değerlendirilir ve adımı bloke etmez.
+
+### Migration stratejisi seçimi
+
+Varsayılan bağlantı zaten tablo taşıyorsa, migration adımı nasıl ilerleneceğini sorar:
+
+| Seçenek | Ne yapar |
+| --- | --- |
+| `Yalnızca bekleyen migration'ları çalıştır (mevcut veriyi koru)` | **Her zaman ilk sırada, her zaman varsayılan.** Ek yapıcı `migrate`; hiçbir şey düşürülmez. |
+| `Tüm tabloları düşür ve migration'ları sıfırdan çalıştır (TÜM VERİ KAYBOLUR)` | `migrate:fresh`. Yalnızca aşağıdaki koşullar altında ve yalnızca yazılı onaydan sonra sunulur. |
+| `Migration'ları atla` | Hiç migration çalıştırmaz. |
+
+Prompt açamayan bir oturuma (`--no-interaction`, CI, TTY yok) yıkıcı dal asla sunulmaz ve onun adına asla seçilmez — yalnızca bekleyen migration'lar çalışır.
+
+Yıkıcı seçenek, aşağıdakilerden herhangi biri geçerliyse **tamamen sunulmaz** ve gerekçesi ekrana yazılır:
+
+- `APP_ENV` production'a benziyor;
+- `APP_DEBUG` kapalı, yani uygulama deploy edilmiş sayılıyor;
+- oturum onay için prompt açamıyor;
+- mevcut herhangi bir tablo zaten satır tutuyor. Bu yoklama **fail-closed**'dır — okunamayan bir tablo (izin kısıtlı, kimlik bilgilerinin select edemediği bir view, yoklama sırasında düşürülmüş) asla boş değil, canlı veri tutuyor sayılır. `migrations` defteri hariç tutulur; onun satırları operatörün kaybedebileceği bir veri değildir.
+
+Seçenek **sunulduğunda**, seçilmesi hâlinde bağlantı ve veritabanı adı yazdırılır ve sizden veritabanı adını (veya `fresh` kelimesini) **yazmanız** istenir. Baştaki ve sondaki boşluk affedilir; başka hiçbir şey affedilmez. Boş satır, `y`, `yes` veya başka herhangi bir cevap, hiçbir şey düşürmeden ek yapıcı `migrate` yoluna döner — bilinçli olarak `Atla`'ya değil; o, hiç kurulmamış bir şema üzerinde seeder'lara devam ederdi.
 
 ### Varsayılan domain eject'i (User + Role)
 
@@ -172,13 +193,17 @@ Domain'ler vendor'da kalır ve `class_alias` aracılığıyla çözülür; eject
 
 ```bash
 php artisan sk:install --force
+php artisan sk:install --adopt
+php artisan sk:install --adopt --dry-run
 php artisan sk:install --no-interaction
 php artisan sk:install --without-ai-skill
 php artisan sk:install --without-eject
 php artisan sk:install --resume
 ```
 
-- `--force` mevcut yayınlanabilir dosyaların üzerine yazar
+- `--force` mevcut yayınlanabilir dosyaların üzerine yazar — düzenlediğiniz bir dosya ve kaydın hiç izlemediği bir dosya dâhil — ve "zaten kurulu" güvenlik durdurmasını atlar. `--force` çalıştırması artık ilk kurulum sayılmaz
+- `--adopt`, kurulu **olan** ama `storage/starter-kit/hashes.json` dosyasını kaybetmiş bir uygulama için kurtarma yoludur. Kaydı gönderilen stub'lardan yeniden kurar, başka hiçbir şey yapmaz: dosya kopyalanmaz, migration çalışmaz, `.env` dosyasına dokunulmaz. Yazacağı kaydı önce görmek için `--dry-run` ile birlikte kullanın
+- `--dry-run` neyin yazılacağını yazdırır ve hiçbir şey yazmadan çıkar
 - `--no-interaction` CI veya script tabanlı kurulumlar için uygundur; tüm varsayılanları otomatik olarak kabul eder; admin parolası, girecek bir operatör olmadığından her zaman taze bir rastgele değerdir (sonunda ekrana basılır)
 - `--without-ai-skill` Lvntr Starter Kit AI skill'lerinin yayınlanmasını tamamen atlar — hem Claude Code kopyaları (`.claude/skills/`) hem de Codex aynası (`.codex/skills/`). Kit'in skill bundle'ını ne Claude Code ne Codex ile kullanan consumer'lar için
 - `--without-eject` varsayılan `User` ve `Role` domain eject'ini atlar; runtime vendor'da kalır ve `class_alias` ile çözülür
@@ -259,6 +284,8 @@ php artisan sk:publish --tag=config
 | `app_namespace` | `STARTER_KIT_APP_NAMESPACE` | `App` | Yalnızca `sk:publish` tarafından okunur (`sk:install`'ın ana scaffolding adımı tarafından değil): varsayılan olmayan bir değere set edildiğinde, bu komutun kopyaladığı `.php` dosyalarındaki (`--tag=config` ile `config/starter-kit.php`, `--tag=helpers` ile `app/Helpers/sk-helpers.php`) `namespace App\…` / `use App\…` / `App\…` referanslarını yapılandırılan namespace'e yeniden yazar. `sk:install`'ın kendisinin kopyaladığı dosyalar olduğu gibi kopyalanır — varsayılan olmayan bir uygulama namespace'i `sk:install` sonrasında hâlâ manuel düzenleme gerektirir. |
 | `strict_models` | `STARTER_KIT_STRICT_MODELS` | `true` | `true` olduğunda `StarterKitServiceProvider`, Eloquent'in `Model::shouldBeStrict()` modunu production dışında (local/staging/testing) etkinleştirir — lazy-loading, eksik bir attribute'a erişme ve fillable olmayan bir mass-assignment'ı sessizce yok sayma hepsi throw eder, böylece bug'lar erken ortaya çıkar. Bu ayardan bağımsız olarak production trafiği asla etkilenmez. Bu guard'lara takılan legacy bir şema entegre ederken olduğu gibi, tamamen opt-out olmak için `false` yapın. |
 
+Aynı dosyanın `security` bloğunun env değişkeni yoktur ve yayınlanmış config üzerinden düzenlenir: `enforce_active_status`, `active_status_denied`, `active_status_guards` (oturum açıkken pasifleştirilen bir hesabın kesilmesi — bkz. [Kimlik Doğrulama](auth.tr.md#zaten-açık-olan-bir-oturumu-kesmek)) ve `csp_extra_origins` (kitin Content-Security-Policy başlığına eklenen ek origin'ler).
+
 ## Veritabanını Sıfırlama (site:install)
 
 Geliştirme sırasında `site:install` komutu tüm tabloları silip sıfırdan kurar:
@@ -321,7 +348,7 @@ Mevcut bir Starter Kit projeniz Laravel 12 üzerindeyse:
 
 ```bash
 # 1. composer.json'da Laravel 13 gereksinimini güncelleyin
-composer require laravel/framework:^13.0 lvntr/laravel-starter-kit:^13.6 -W
+composer require laravel/framework:^13.0 lvntr/laravel-starter-kit:^13.7 -W
 
 # 2. Yükseltme sihirbazını çalıştırın
 php artisan sk:upgrade

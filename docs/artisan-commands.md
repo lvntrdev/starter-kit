@@ -94,17 +94,27 @@ Use this on first setup.
 ```bash
 php artisan sk:install
 php artisan sk:install --force
+php artisan sk:install --adopt
+php artisan sk:install --adopt --dry-run
 php artisan sk:install --no-interaction
 php artisan sk:install --without-ai-skill
 php artisan sk:install --without-eject
 php artisan sk:install --resume
 ```
 
-- `--force` overwrites existing publishable files
+- `--force` overwrites existing publishable files, **and** bypasses the already-installed safety stop described below. It is the opt-out for every preservation rule: a consumer-edited published file and a file the hash registry has no record of are both overwritten
+- `--adopt` rebuilds `storage/starter-kit/hashes.json` from the shipped stubs for an app that is already installed but lost its registry (a stateless deploy, a cleared `storage/`). It copies no file, runs no migration and never touches `.env`; combine with `--dry-run` to preview the registry it would write
+- `--dry-run` prints what would be written and exits without writing anything
 - `--no-interaction` accepts all defaults automatically; useful for CI or scripted installs
 - `--without-ai-skill` skips publishing the Lvntr Starter Kit AI skills entirely — both the Claude Code copies (`.claude/skills/`) and their Codex mirror (`.codex/skills/`). Useful when the consumer uses neither Claude Code nor Codex with the kit's skill bundle
 - `--without-eject` skips the default `User` and `Role` domain eject on a first install; the runtime stays in vendor and resolves via `class_alias`. Omit this flag to have `app/Domain/User/` and `app/Domain/Role/` created automatically. See [install.md](./install.md) for the ownership trade-off.
 - `--resume` resumes a previously interrupted install, skipping steps already checkpointed as completed. See [install.md](./install.md) for the full resume workflow.
+
+**It is a first-install command, not a repair tool.** Before the banner is printed, a fail-closed detection pass looks for kit schema tables and install-only paths; if it finds any without a matching hash registry, the command **stops before writing a single byte** and points at `sk:update`, `sk:publish --tag=<area>` or `--adopt`. An existing `.env` is never overwritten, on a first install or a re-run: missing `.env.example` keys are appended and first-install-only keys are seeded only where absent, and no existing value is ever rewritten.
+
+**Exit codes.** A failed **mandatory** step (publish, migrations, seeders, permission seeding, Passport keys, encryption keys) aborts the run, leaves the checkpoint pending for `--resume`, skips the hash-registry write and exits non-zero. Frontend steps (`npm install`, Wayfinder generation, `npm run build`, `composer dump-autoload`, cache clears) stay non-fatal on purpose — they warn, print the command to run by hand, and are listed again in the closing summary.
+
+**The migration step asks how to proceed** when the database already holds tables. The default (and the only option a non-interactive session ever gets) is `Run pending migrations only`; `Skip migrations` is always offered. The destructive `Drop all tables and run fresh migrations` entry is **withheld entirely** when `APP_ENV` looks production-like, `APP_DEBUG` is off, the session cannot prompt, or any existing table already holds rows — and when it is offered, choosing it requires typing the database name (or the word `fresh`) at a text prompt. Anything else, an empty answer included, falls back to the additive `migrate` path with nothing dropped.
 
 The config phase idempotently adds `'timezone' => '+00:00'` to existing `mysql` and `mariadb` arrays in `config/database.php`. It preserves an existing value, skips a missing connection, and does not touch other drivers. On a re-run against a database that already holds data on a non-UTC session, the step is skipped and points at `sk:upgrade` instead. See [install.md](./install.md) and [Timezones](timezone.md).
 
@@ -422,6 +432,11 @@ Permanently deletes soft-deleted File Manager items older than the configured ag
 ```bash
 php artisan file-manager:purge-trash
 php artisan file-manager:purge-trash --days=30
+php artisan file-manager:purge-trash --chunk=1000
 ```
 
-The default is 7 days. The command only targets File Manager media (`collection_name = files`) and trashed folders; avatar, logo, editor upload and other MediaLibrary collections are not touched. The shipped `routes/console.php` schedules it daily.
+The default is 7 days. The command only targets File Manager media (`collection_name = files`) and trashed folders; avatar, logo, editor upload and other MediaLibrary collections are not touched. The shipped `routes/console.php` schedules it daily, with `withoutOverlapping()`.
+
+- `--chunk=<n>` (default 500, range 1–5000) rows are loaded per round trip and walked with `chunkById`, so the whole trash is never held in memory.
+- The run takes a **cache lock** (`starter-kit:file-manager:purge-trash`, 1 h TTL) so two schedulers — or an operator racing the cron — cannot hand the same rows to two `forceDelete()` calls. A second concurrent run warns and exits `0` without purging.
+- One failing item does not stop the run; the remaining items are still processed and the command **exits non-zero** when anything was left behind.

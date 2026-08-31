@@ -263,6 +263,9 @@ The handler auto-maps Laravel's built-ins: `ModelNotFoundException → 404`, `Va
 5. **Editing `vendor/lvntr/laravel-starter-kit/`** — every change is lost on `composer update`. Use `sk:publish` / `sk:eject` to extract what you need.
 6. **Skipping `vendor/bin/pint --dirty --format agent`** — the pre-commit hook rejects the commit. Don't `--amend`; create a new commit after the fix.
 7. **Subclassing `ApiResponse`** — it's a vendor alias with covariance constraints; use the fluent API or `to_api()` instead.
+8. **Assuming an authenticated request means an enabled account.** `EnsureUserIsActive` (alias `sk.active`, appended to the `web` and `api` groups) terminates a session whose `status` is on `starter-kit.security.active_status_denied` (default `['inactive', 'banned']`) — 403 in the `ApiResponse` envelope for JSON, logout + redirect to `login` for web. It is deliberately fail-open on every ambiguous input (no `status` attribute, a non-string value, an unlisted status) and `security.enforce_active_status = false` disables it — and the matching `RevokeUserAccessAction` (Passport access + refresh tokens, unredeemed authorization/device codes, DB session rows) — outright.
+9. **Widening a bulk-selection query past what the table showed.** `BulkFilterSnapshot::normalize()` fails closed: an active `filter[...]` key it cannot apply 422s (`sk-bulk.unknown_filters`) rather than being dropped, and `'true'`/`'false'` are coerced to booleans exactly as Spatie's `QueryBuilderRequest` does. Search predicates and date bounds must go through `DatatableQueryBuilder::applySearchWords()` / `::applyCalendarDateRange()` — the same helpers the table's own query uses — so the two paths cannot drift.
+10. **Storing a locale wider than 35 characters in `definitions.lang`.** The column is narrowed to 35 so the `(key, value, lang)` unique index stays under InnoDB's 3072-byte key limit; `key` and `value` keep 255.
 
 ---
 

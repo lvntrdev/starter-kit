@@ -24,9 +24,11 @@ Definitions kayıtları veritabanında tutulur. Admin arayüzünden CRUD işlemi
 | `is_active` | boolean | varsayılan `true` |
 | `order` | integer | varsayılan `0`; sıralamayı belirler |
 | `visibility` | boolean | varsayılan `true` |
-| `lang` | string | varsayılan `en`; i18n desteği sağlar |
+| `lang` | string(35) | varsayılan `en`; i18n desteği sağlar |
 
 `(key, value, lang)` üçlüsü üzerinde tekil kısıt uygulanır.
+
+> **`lang` neden 255 değil 35 karakter?** Üç adet varsayılan 255 karakterlik `utf8mb4` kolon üzerindeki bileşik tekil indeks, InnoDB'nin 3072 baytlık anahtar sınırına karşı 3060 bayt ölçer — herhangi bir kolonda tek bir karakterlik pay kaldığı için tamamen kırılmaya bir adım uzaktadır. `2026_08_31_120000_narrow_definitions_unique_index_columns` migration'ı `lang` kolonunu 35'e daraltır; bu, kitin herhangi bir yerde kabul ettiği en geniş locale değeridir (`content_languages.code`) ve ~892 baytlık pay bırakır. `key` ve `value` yayınlanmış 255 genişliğini korur. Migration önce mevcut tüm satırları ölçer — soft-delete edilmiş olanlar dahil — ve **tek bir satır bile kırpılacaksa şemayı hiç değiştirmeden reddeder**. Her iki yön de tekil indeksin varlığını doğrulayarak biter (isim, tekillik ve tam olarak `{key, value, lang}` kolon kümesi); böylece indeksi kaymış veya eksik gelen bir tablo, garantisi olmadan "migrate edildi" diye kaydedilmek yerine gerçek indeksi yeniden kurar. Bkz. [UPGRADE.tr.md](UPGRADE.tr.md).
 
 ## Erişim Noktaları
 

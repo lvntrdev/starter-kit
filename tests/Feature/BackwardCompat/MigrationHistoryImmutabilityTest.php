@@ -102,6 +102,13 @@ it('does not contain unexpected migration files in the vendor directory', functi
         // kit-owned table, so the cleanup must land on the same `migrate` run
         // as the composer update rather than waiting for an sk:update file sync.
         '2026_08_15_120000_redact_secrets_from_activity_log.php',
+        // Unreleased: narrows definitions.lang to 35 so the (key, value, lang)
+        // unique index stops sitting 12 bytes under InnoDB's 3072-byte ceiling.
+        // `key` and `value` keep their published 255 — lang alone buys ~892
+        // bytes of headroom, so narrowing them would only block consumer data
+        // the current schema accepts. Fail-closed — it measures the longest
+        // existing value first and refuses rather than truncate a single row.
+        '2026_08_31_120000_narrow_definitions_unique_index_columns.php',
     ];
 
     $actual = collect(scandir($migrationDir))

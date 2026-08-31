@@ -192,3 +192,78 @@ it('reports a failing artisan sub-command with its exit code and output tail', f
         ->toContain('`php artisan sk-test:failing-step` exited with code 1.')
         ->toContain('Connection refused');
 });
+
+// ── Process runner: failures that never produce an exit code ──────────────
+
+/**
+ * Invoke the private runProcessStep runner.
+ *
+ * @param  list<string>  $command
+ */
+function runProcess(InstallCommand $installer, array $command, int $timeout): bool
+{
+    $method = new ReflectionMethod($installer, 'runProcessStep');
+    $method->setAccessible(true);
+
+    return (bool) $method->invoke($installer, $command, $timeout);
+}
+
+it('turns a process timeout into a checked failure instead of an exception', function (): void {
+    // THE regression this guards: a timeout raises ProcessTimedOutException from
+    // inside Process::run(). Left to escape, it flies past the caller's
+    // `mandatory: false` classification straight into handle()'s outer catch —
+    // so a slow `npm install` (300s cap) aborted an otherwise complete install,
+    // contradicting the documented "frontend and tooling steps stay non-fatal".
+    [$command] = stepCommand();
+
+    expect(runProcess($command, ['sleep', '5'], 1))->toBeFalse();
+
+    expect(stepProperty($command, 'stepFailureDetail'))
+        ->toContain('`sleep 5` did not complete:')
+        ->toContain('timeout');
+});
+
+it('reports a process that produced no exit code without throwing on its output', function (): void {
+    // A process that never started has no pipes, so asking it for its output
+    // throws a LogicException on top of the failure being reported. Whichever
+    // way the platform fails this one, the runner has to come back with a bool
+    // and a detail naming the command.
+    [$command] = stepCommand();
+
+    $binary = 'sk-nonexistent-binary-'.bin2hex(random_bytes(4));
+
+    expect(runProcess($command, [$binary], 5))->toBeFalse();
+    expect(stepProperty($command, 'stepFailureDetail'))->toContain($binary);
+});
+
+it('escapes a console tag inside the exception message', function (): void {
+    // step() prints the detail through the console formatter, and a
+    // ProcessTimedOutException quotes the whole commandline back. An unescaped
+    // tag in it would be interpreted, or break the render outright — the same
+    // reason outputTail() escapes.
+    [$command] = stepCommand();
+
+    expect(runProcess($command, ['sh', '-c', 'sleep 5 # <HY000>'], 1))->toBeFalse();
+    expect(stepProperty($command, 'stepFailureDetail'))->toContain('\\<HY000\\>');
+});
+
+it('lets a non-mandatory step survive a process timeout instead of aborting the install', function (): void {
+    // THE end-to-end regression the two layers exist to prevent: runProcessStep()
+    // classifies a ProcessTimedOutException as a checked `false` (proven above)
+    // instead of letting it escape, and step()'s mandatory:false branch turns
+    // that `false` into a warning (proven for a plain callback above). Wired
+    // together the way `installFrontend()`'s `npm install` step actually calls
+    // them, a slow install must warn and let the run continue — not abort it.
+    [$command, $output] = stepCommand();
+
+    $failed = runStep($command, 'Installing npm dependencies', function () use ($command) {
+        return runProcess($command, ['sleep', '5'], 1);
+    }, mandatory: false);
+
+    expect($failed)->toBeFalse();
+    expect(stepProperty($command, 'bestEffortFailures'))->toBe(['Installing npm dependencies']);
+    expect(stepProperty($command, 'completedSteps'))->toBe([]);
+    expect($output->fetch())
+        ->toContain('FAILED (non-fatal)')
+        ->toContain('did not complete');
+});

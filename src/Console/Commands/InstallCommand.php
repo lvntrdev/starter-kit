@@ -92,7 +92,10 @@ class InstallCommand extends Command
      */
     private const EXISTING_APP_DIRECTORY_MARKERS = [
         'app/Http/Controllers/Admin',
-        'resources/js/Pages/Admin',
+        // Lowercase `pages` — that is what the stub tree ships. The uppercase
+        // spelling this used to carry never matched on a case-sensitive
+        // filesystem (macOS masked it), so the marker was dead in production.
+        'resources/js/pages/Admin',
     ];
 
     /**
@@ -111,7 +114,10 @@ class InstallCommand extends Command
      */
     private const KIT_SCHEMA_TABLES = [
         'settings',
-        'file_manager_folders',
+        // `file_folders`, not `file_manager_folders` — the latter is not a table
+        // this kit has ever created, so it could never match. See
+        // database/migrations/2026_04_13_100100_create_file_folders_table.php.
+        'file_folders',
         'permissions',
     ];
 
@@ -190,6 +196,28 @@ class InstallCommand extends Command
      * @var list<string>
      */
     private array $bestEffortFailures = [];
+
+    /**
+     * Set when a step the install cannot substitute for was skipped rather than
+     * run — today only the database block (migrations, seeders, permissions)
+     * when the connection is unreachable.
+     *
+     * It is NOT a best-effort failure: those leave a working application minus
+     * an optional convenience, whereas this one leaves an app with no schema, no
+     * permissions and no admin user. So it withholds the hash registry, keeps
+     * the resume checkpoint, and makes the command exit non-zero — a consumer CI
+     * that went green here deployed a shell of an application.
+     */
+    private bool $installIncomplete = false;
+
+    /**
+     * Conflicting default files found on a NON-first install and deliberately
+     * left on disk. Reported in the closing summary so the operator knows the
+     * kit noticed them and chose not to act.
+     *
+     * @var list<string>
+     */
+    private array $conflictingFilesKept = [];
 
     /**
      * Default Laravel files that conflict with Starter Kit stubs.
@@ -438,14 +466,18 @@ class InstallCommand extends Command
             // 2. Database configuration (writes DB_* into the now-seeded .env)
             $this->configureDatabaseStep();
 
-            // 3. Remove conflicting default Laravel files
-            $this->step('Removing conflicting default files', function () {
-                foreach ($this->conflictingFiles as $file) {
-                    $path = base_path($file);
-                    if ($this->files->exists($path)) {
-                        $this->files->delete($path);
-                    }
-                }
+            // 3. Remove conflicting default Laravel files — FIRST INSTALL ONLY.
+            //
+            // On a fresh project these are stock-Laravel leftovers the kit
+            // replaces, and deleting them costs nothing. On a re-install or an
+            // update they are live project artifacts: package-lock.json pins the
+            // consumer's whole dependency tree, vite.config.* carries whatever
+            // build config they added, and resources/js/app.js may be their own
+            // entry point. Deleting those unconditionally destroyed work the
+            // installer had no mandate over, so a non-first run reports them and
+            // leaves the decision with the operator.
+            $this->step('Removing conflicting default files', function () use ($isFirstInstall) {
+                $this->removeConflictingDefaults($isFirstInstall);
             });
 
             // 3b. Ensure .gitignore entries — merge the kit's ignore set into the
@@ -579,6 +611,12 @@ class InstallCommand extends Command
                     });
                 }
             } else {
+                // Skipping these leaves an application with no schema. The run
+                // continues (the remaining filesystem work is still worth
+                // doing), but it is now an INCOMPLETE install: no hash registry,
+                // no checkpoint clear, and a non-zero exit code at the end.
+                $this->installIncomplete = true;
+
                 $this->newLine();
                 $this->components->warn('Database is not reachable — skipping migrations, seeders, and permission seeding.');
                 $this->line('  <fg=gray>Create/fix the database connection, then run: php artisan sk:install --resume</>');
@@ -613,7 +651,7 @@ class InstallCommand extends Command
 
             // 12. Install npm dependencies
             if ($this->confirmStep('Install npm dependencies and build assets?')) {
-                $this->installFrontend();
+                $this->installFrontend($isFirstInstall);
             }
 
             // 12b. Finalize the encryption keys as the last setup action. Both
@@ -638,8 +676,15 @@ class InstallCommand extends Command
                 return true;
             });
 
-            // 13. Save stub hashes for update tracking
-            $this->saveStubHashes();
+            // 13. Save stub hashes for update tracking.
+            //
+            // Withheld on an incomplete install. The registry is the marker that
+            // says "this application is installed" — writing it over a run that
+            // never migrated would make the NEXT sk:install read a half-installed
+            // app as a finished one and skip the guard that protects it.
+            if (! $this->installIncomplete) {
+                $this->saveStubHashes();
+            }
 
             // Best-effort: the .codex mirror is a regenerable artifact — a
             // failure here must not mark an otherwise completed install failed.
@@ -658,13 +703,37 @@ class InstallCommand extends Command
             return self::FAILURE;
         }
 
+        return $this->renderInstallSummary();
+    }
+
+    /**
+     * Close the run: settle the checkpoint, print the summary, and return the
+     * exit code the operator's shell (and CI) will see.
+     *
+     * Kept out of handle() because it is the whole fail-closed verdict in one
+     * place — checkpoint retention, registry suppression and exit code have to
+     * agree, and they are only assertable together.
+     */
+    private function renderInstallSummary(): int
+    {
         // Install completed end-to-end — drop the checkpoint so the next run is
         // treated as a clean re-install, not a resume.
-        $this->clearProgress();
+        //
+        // An INCOMPLETE run keeps its checkpoint on purpose: the filesystem
+        // steps that did finish stay recorded, so the `--resume` this command is
+        // about to recommend genuinely resumes instead of republishing over
+        // files the operator may have edited in the meantime.
+        if (! $this->installIncomplete) {
+            $this->clearProgress();
+        }
 
         // Summary
         $this->newLine();
-        $this->components->info('Lvntr Starter Kit installed successfully!');
+        if ($this->installIncomplete) {
+            $this->components->error('Lvntr Starter Kit install is INCOMPLETE — the database steps did not run.');
+        } else {
+            $this->components->info('Lvntr Starter Kit installed successfully!');
+        }
         $this->newLine();
 
         if (! empty($this->published)) {
@@ -698,12 +767,100 @@ class InstallCommand extends Command
             }
         }
 
+        $this->printConflictingFilesKept();
+
         $this->newLine();
         $this->components->warn('Run the following commands to ensure all components work correctly:');
         $this->line('  <fg=cyan>npm install && npm run build</>');
         $this->newLine();
 
+        // Last thing on screen, and the exit code to match: whatever scrolled
+        // past, the operator and their CI must both read this run as unfinished.
+        if ($this->installIncomplete) {
+            $this->renderIncompleteInstall();
+
+            return self::FAILURE;
+        }
+
         return self::SUCCESS;
+    }
+
+    /**
+     * Delete the stock-Laravel files the kit stubs replace — on a FIRST install
+     * only; on any other run record them for the closing report instead.
+     *
+     * The distinction is not cosmetic. package-lock.json pins the consumer's
+     * entire dependency tree, vite.config.* carries whatever build config they
+     * added, and resources/js/app.js may be their own entry point. Deleting
+     * those on a re-install or an update destroyed work the installer has no
+     * mandate over, and it happened silently.
+     */
+    private function removeConflictingDefaults(bool $isFirstInstall): void
+    {
+        $present = array_values(array_filter(
+            $this->conflictingFiles,
+            fn (string $file): bool => $this->files->exists(base_path($file)),
+        ));
+
+        if (! $isFirstInstall) {
+            $this->conflictingFilesKept = $present;
+
+            return;
+        }
+
+        foreach ($present as $file) {
+            $this->files->delete(base_path($file));
+        }
+    }
+
+    /**
+     * Closing report for a run whose filesystem work finished but whose database
+     * work never ran.
+     *
+     * The exit code is the load-bearing half of this: a consumer pipeline that
+     * saw 0 here shipped an application with no schema, no permissions and no
+     * admin user. The screen text exists so the operator reading the terminal
+     * reaches the same conclusion the pipeline does.
+     */
+    private function renderIncompleteInstall(): void
+    {
+        $this->line('  <fg=yellow>Still missing:</>');
+        $this->line('  <fg=gray>  migrations, seeders and permission seeding — the database was unreachable.</>');
+        $this->line('  <fg=gray>  The update tracking registry was NOT written, and the resume checkpoint was</>');
+        $this->line('  <fg=gray>  kept, so the steps that did finish will not be redone.</>');
+        $this->newLine();
+        $this->line('  <fg=yellow>Create/fix the database connection, then run:</>');
+        $this->line('  <fg=cyan>php artisan sk:install --resume</>');
+        $this->newLine();
+        $this->line('  <fg=red;options=bold>Install INCOMPLETE — exiting non-zero.</>');
+        $this->newLine();
+    }
+
+    /**
+     * Report the stock-Laravel files a re-install found and deliberately did not
+     * delete. Silence here would read as "there was nothing to do", which is the
+     * opposite of the truth: the operator is the one who has to decide whether
+     * their package-lock.json / vite.config still belongs next to the kit's.
+     */
+    private function printConflictingFilesKept(): void
+    {
+        if ($this->conflictingFilesKept === []) {
+            return;
+        }
+
+        $this->newLine();
+        $this->components->twoColumnDetail(
+            '<fg=yellow>Kept</>',
+            count($this->conflictingFilesKept).' default Laravel file(s) that conflict with the kit stubs',
+        );
+
+        foreach ($this->conflictingFilesKept as $path) {
+            $this->line("  <fg=yellow>~</> {$path}");
+        }
+
+        $this->newLine();
+        $this->line('  <fg=gray>Only a FIRST install deletes these — on a re-run they may be yours.</>');
+        $this->line('  <fg=gray>Delete by hand if they are stock Laravel leftovers you no longer need.</>');
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -1241,8 +1398,16 @@ class InstallCommand extends Command
      * The count alone is useless here — the operator needs the paths, because
      * the whole point of preserving a file is that they now have to decide
      * whether the version they kept is missing something the release shipped.
-     * One line of instruction, not a paragraph: diff against the stub, or
-     * re-run with --force and lose the edits knowingly.
+     * One line of instruction, not a paragraph: diff against the stub, or take
+     * the packaged version knowingly — for everything (--force) or for the one
+     * area they care about (sk:publish --tag).
+     *
+     * Two populations land here and read the same way to the operator: a file
+     * they edited after the kit shipped it, and a file of their own at a path
+     * the kit has only now started shipping to. In both cases the copy on disk
+     * differs from the packaged version and the packaged version was not
+     * written, which is why the wording talks about the difference rather than
+     * about who made it.
      */
     private function printPreservedFiles(bool $dryRun = false): void
     {
@@ -1255,7 +1420,7 @@ class InstallCommand extends Command
         $this->newLine();
         $this->components->twoColumnDetail(
             "<fg=yellow>{$verb}</>",
-            count($this->preserved).' locally modified files (the shipped version was NOT written)',
+            count($this->preserved).' files that differ from the packaged version (it was NOT written)',
         );
 
         foreach ($this->preserved as $path) {
@@ -1264,8 +1429,11 @@ class InstallCommand extends Command
 
         $this->newLine();
         $this->line('  <fg=gray>Diff each against the same relative path under vendor/lvntr/laravel-starter-kit/stubs/</>');
-        $this->line('  <fg=gray>and merge by hand, or re-run with `php artisan sk:install --force` to take the package</>');
-        $this->line('  <fg=gray>version and DISCARD these edits.</>');
+        $this->line('  <fg=gray>and merge by hand, or take the packaged version and DISCARD what is on disk with</>');
+        $this->line('  <fg=gray>`php artisan sk:install --force` (all of them) or</>');
+        // {area} rather than <area>: the console formatter reads angle brackets
+        // as style tags, and a placeholder is not worth the ambiguity.
+        $this->line('  <fg=gray>`php artisan sk:publish --tag={area} --force` (one area only).</>');
     }
 
     /**
@@ -1968,6 +2136,9 @@ class InstallCommand extends Command
      * same three-way comparison `sk:update` uses ({@see ComparesPublishedStubs})
      * now guards this loop too — a file that differs from what we shipped is
      * the consumer's, and it is preserved and reported instead of clobbered.
+     * On a re-install that extends to a path the registry has NO record of:
+     * once the registry is authoritative, "never shipped here" is as good a
+     * proof of consumer ownership as "shipped, then edited".
      * `--force` still takes the package version, as documented.
      */
     private function publishDirectory(string $source, string $destination, bool $force): void
@@ -1983,6 +2154,43 @@ class InstallCommand extends Command
         // Read once. The old re-install guard re-read and re-decoded the whole
         // registry inside the loop, once per stub file.
         $registry = $this->loadHashRegistry();
+
+        // Is the registry authoritative for this run? Only if the kit has
+        // published into this application before — read from the same file, via
+        // the same accessor, that decides first-install everywhere else, so the
+        // two can never disagree.
+        //
+        // This is the fact the decision was missing. With an authoritative
+        // registry, "no record for this path" stops being a shrug and becomes
+        // evidence: the kit knows what it shipped here, so a path it has NO
+        // record of is a path it has never shipped here — and the file sitting
+        // at that path is therefore the consumer's own, not a stale copy of
+        // ours. A newer package version that starts shipping into an occupied
+        // path used to overwrite it silently.
+        //
+        // On a first install there is no registry to be authoritative with:
+        // every path reads as untracked, and preserving them would leave a
+        // fresh Laravel skeleton half-scaffolded while reporting success. That
+        // direction keeps today's behaviour byte for byte, with the
+        // detectExistingApp() stop above as its guard.
+        $registryIsAuthoritative = ! $this->isFirstInstall();
+
+        // A registry file that exists but decodes to nothing (truncated by a
+        // killed run, corrupted, hand-edited) is authoritative and empty: every
+        // single path then reads UNTRACKED and is preserved, so the run
+        // publishes nothing and still reports success. Preserving is the right
+        // direction — the alternative is overwriting consumer files on the
+        // strength of a file we could not read — but silence is not: the
+        // operator has to be told why nothing was published and how to get the
+        // registry back.
+        if ($registryIsAuthoritative && $registry === []) {
+            $this->components->warn(
+                'The published-file registry exists but is empty or unreadable, so every existing '
+                .'target is being preserved and this run will publish almost nothing. Rebuild it with '
+                .'`php artisan sk:install --adopt`, or force a republish with `php artisan sk:install --force` '
+                .'(--force OVERWRITES files you have edited).'
+            );
+        }
 
         foreach ($this->files->allFiles($source, true) as $file) {
             $relativePath = $file->getRelativePathname();
@@ -2036,11 +2244,9 @@ class InstallCommand extends Command
             //   - UP_TO_DATE  we have shipped nothing new, so the difference on
             //                 disk is theirs
             //   - MODIFIED    a new version exists AND they edited their copy
+            //   - UNTRACKED   only when the registry is authoritative (below)
             // IDENTICAL and WRITE fall through (an identical copy is a harmless
-            // no-op write that keeps the published count honest), and UNTRACKED
-            // keeps the documented install behaviour of writing the scaffold:
-            // with no record there is nothing to compare against, and the
-            // already-installed stop guards the case that actually matters.
+            // no-op write that keeps the published count honest).
             // md5_file() returns false for an unreadable path (and for a
             // directory sitting where a file should be). Falling back to null
             // keeps the pre-guard behaviour — publish — instead of raising a
@@ -2055,6 +2261,23 @@ class InstallCommand extends Command
 
                 if ($decision === self::STUB_OPTED_OUT) {
                     $this->skipped[] = $relativePath;
+
+                    continue;
+                }
+
+                // No record, a file on disk that differs, and a registry that
+                // knows what this application was given: the kit has never
+                // shipped this path here, so the file is the consumer's and it
+                // is preserved and reported rather than overwritten.
+                //
+                // Both boundaries stay exactly where they were. `--force`
+                // never reaches here — decidePublishedStub() answers WRITE for
+                // it first, the same escape hatch MODIFIED has always had. And
+                // without an authoritative registry (first install, or a resume
+                // of one) UNTRACKED still falls through and publishes the
+                // scaffold, because there every path is untracked.
+                if ($decision === self::STUB_UNTRACKED && $registryIsAuthoritative) {
+                    $this->preserved[] = $normalizedPath;
 
                     continue;
                 }
@@ -2524,50 +2747,31 @@ class InstallCommand extends Command
     // ══════════════════════════════════════════════════════════════════════
 
     /**
-     * Run migrations with existing data check.
+     * Run migrations, with a narrowly guarded escape hatch for a database that
+     * already holds tables.
+     *
+     * The destructive branch (migrate:fresh) exists for one situation: an
+     * operator, at a real terminal, pointing an install at a database left
+     * half-populated by an earlier aborted attempt. Every other shape —
+     * automation, a deployed environment, a connection whose tables demonstrably
+     * hold rows — takes the additive `migrate` path, and the reason the
+     * destructive option is missing is printed rather than left to guesswork.
+     *
+     * Note what the gate does NOT check: whether this is a first install.
+     * `destructiveMigrationBlockReason()` never asks, so an interactive
+     * re-install onto an all-empty schema is offered the option too. That is
+     * deliberate — the row probe is the guarantee that matters, and it blocks
+     * the moment any table holds a row.
      */
     private function runMigrations(): void
     {
-        // Check if database has existing tables
-        $hasExistingTables = false;
+        $appTables = $this->existingApplicationTables();
 
-        try {
-            $tables = Schema::getTables();
-            // Filter out the migrations table itself
-            $appTables = array_filter($tables, fn ($table) => ($table['name'] ?? $table) !== 'migrations');
-            $hasExistingTables = ! empty($appTables);
-        } catch (\Exception) {
-            // Connection failed or database doesn't exist — will be handled by migrate
-        }
-
-        if ($hasExistingTables) {
+        if ($appTables !== []) {
             $this->newLine();
             $this->components->warn('The database already contains tables.');
 
-            // Never offer a destructive full reset in production-like environments.
-            // Mirrors site:install's guard so a mis-set APP_ENV cannot wipe live
-            // data through the installer.
-            $allowFresh = ! $this->isProductionLikeEnvironment();
-
-            if (! $allowFresh) {
-                $this->line('  <fg=gray>Detected a production-like environment — the destructive "fresh" option is disabled.</>');
-            }
-
-            $options = ['migrate' => 'Run pending migrations only (keep existing data)'];
-
-            if ($allowFresh) {
-                $options = [
-                    'fresh' => 'Drop all tables and run fresh migrations (data will be lost)',
-                ] + $options;
-            }
-
-            $options['skip'] = 'Skip migrations';
-
-            $action = select(
-                label: 'How would you like to proceed?',
-                options: $options,
-                default: 'migrate',
-            );
+            $action = $this->chooseMigrationStrategy($appTables);
 
             if ($action === 'skip') {
                 $this->components->info('Migrations skipped.');
@@ -2575,15 +2779,7 @@ class InstallCommand extends Command
                 return;
             }
 
-            // `$allowFresh` re-checked as belt-and-suspenders: in production the
-            // option is never presented, so select() cannot return it here.
-            if ($action === 'fresh' && $allowFresh) {
-                if (! confirm('Are you sure? ALL existing data will be permanently deleted.', default: false)) {
-                    $this->components->info('Migrations skipped.');
-
-                    return;
-                }
-
+            if ($action === 'fresh') {
                 $this->step('Running migrate:fresh', function () {
                     return $this->runArtisan('migrate:fresh', ['--force' => true]);
                 });
@@ -2598,8 +2794,280 @@ class InstallCommand extends Command
     }
 
     /**
-     * Whether the current environment looks like production, where a destructive
-     * full reset (migrate:fresh) must never be offered.
+     * Decide how to proceed against a database that already holds tables.
+     *
+     * Returns 'fresh' only once the destructive option was both offered AND
+     * confirmed by a typed answer; every other route resolves to the additive
+     * 'migrate' or to 'skip'.
+     *
+     * @param  list<string>  $appTables
+     * @return 'migrate'|'fresh'|'skip'
+     */
+    private function chooseMigrationStrategy(array $appTables): string
+    {
+        // A session with no human on the other end is never offered a
+        // destructive branch and never has one selected for it. Deciding that
+        // here, rather than leaning on select()'s non-interactive default, keeps
+        // the guarantee independent of laravel/prompts internals: the Windows
+        // and unit-test paths route through a Symfony fallback that resolves
+        // defaults through a different code path than $interactive === false.
+        if (! $this->canPrompt()) {
+            $this->line('  <fg=gray>Non-interactive session — running pending migrations only; existing data is kept.</>');
+
+            return 'migrate';
+        }
+
+        $blockReason = $this->destructiveMigrationBlockReason($appTables);
+
+        if ($blockReason !== null) {
+            $this->line('  <fg=gray>The destructive "fresh" option is withheld: '.$blockReason.'.</>');
+        }
+
+        $action = select(
+            label: 'How would you like to proceed?',
+            options: $this->migrationStrategyOptions($blockReason === null),
+            default: 'migrate',
+        );
+
+        if ($action === 'skip') {
+            return 'skip';
+        }
+
+        if ($action !== 'fresh') {
+            return 'migrate';
+        }
+
+        // A refused destructive reset falls back to `migrate`, NOT to `skip`.
+        // The two are not interchangeable: `skip` runs no migrations at all and
+        // then lets the install walk on into seeders and permission seeding
+        // against a schema that was never built, which is the half-install this
+        // command was hardened to stop reporting as success. `migrate` is the
+        // additive path the operator would have got by pressing Enter, and it
+        // is what the changelog and UPGRADE guide promise for this case.
+        //
+        // $blockReason is re-checked rather than trusted: select() cannot return
+        // an option that was never offered, but an irreversible drop must not
+        // rest on that being true.
+        if ($blockReason !== null) {
+            return 'migrate';
+        }
+
+        if (! $this->confirmDestructiveReset()) {
+            $this->line('  <fg=gray>Confirmation did not match — nothing was dropped, running pending migrations instead.</>');
+
+            return 'migrate';
+        }
+
+        return 'fresh';
+    }
+
+    /**
+     * The migration choices offered to the operator.
+     *
+     * `migrate` is always first AND always the default: the highlighted row of a
+     * select is one Enter away, so the entry that destroys data must never
+     * occupy it — whatever else is on the list.
+     *
+     * @return array<string, string>
+     */
+    private function migrationStrategyOptions(bool $allowFresh): array
+    {
+        $options = ['migrate' => 'Run pending migrations only (keep existing data)'];
+
+        if ($allowFresh) {
+            $options['fresh'] = 'Drop all tables and run fresh migrations (ALL DATA WILL BE LOST)';
+        }
+
+        $options['skip'] = 'Skip migrations';
+
+        return $options;
+    }
+
+    /**
+     * Table names already present on the default connection, excluding the
+     * migrations ledger.
+     *
+     * A connection that cannot be reached or read answers `[]`: a first install
+     * against a database that is not up yet must not be pushed down the
+     * "existing tables" branch — `migrate` reports that failure with a far
+     * better message than this probe could.
+     *
+     * The connection prefix is STRIPPED here. `Schema::getTables()` reports the
+     * real names the database carries, prefix included, while every consumer of
+     * this list speaks the query-builder's language: `DB::table()` re-applies
+     * the prefix itself, so passing a prefixed name back to it asks for
+     * `pfx_pfx_users` and throws. On a prefixed connection that turned the
+     * fail-closed row probe into a permanent block with a false reason, and hid
+     * the `migrations` ledger from the filter below.
+     *
+     * @return list<string>
+     */
+    private function existingApplicationTables(): array
+    {
+        try {
+            $tables = Schema::getTables();
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $prefix = (string) DB::getTablePrefix();
+        $names = [];
+
+        foreach ($tables as $table) {
+            $name = is_array($table) ? (string) ($table['name'] ?? '') : (string) $table;
+
+            if ($prefix !== '' && str_starts_with($name, $prefix)) {
+                $name = substr($name, strlen($prefix));
+            }
+
+            // The ledger is written by migrate itself. Its rows are not data an
+            // operator can lose, so it neither proves "existing tables" here nor
+            // counts as live data in the row probe below — without this the
+            // destructive option would be withheld from every database that has
+            // ever been migrated, which is the whole case it exists for.
+            if ($name === '' || $name === 'migrations') {
+                continue;
+            }
+
+            $names[] = $name;
+        }
+
+        return $names;
+    }
+
+    /**
+     * Why the destructive "fresh" option must not be offered, or null when it may be.
+     *
+     * The environment NAME is the weakest of these signals — an operator who
+     * never set APP_ENV is not thereby running a throwaway database — so it is
+     * no longer the only one. A session that cannot prompt, a non-debug (i.e.
+     * deployed) application, and a connection whose tables demonstrably hold
+     * rows each withhold the option on their own.
+     *
+     * The row probe fails CLOSED: a table that cannot be read — permission-limited,
+     * a view the credentials cannot select from, dropped mid-probe — counts as
+     * holding live data, never as empty.
+     *
+     * Every branch below blocks equally; their order only decides which cause is
+     * printed when several hold at once, and "your APP_ENV says production" is
+     * more actionable than "there is no TTY".
+     *
+     * @param  list<string>  $appTables
+     */
+    private function destructiveMigrationBlockReason(array $appTables): ?string
+    {
+        if ($this->isProductionLikeEnvironment()) {
+            return sprintf('APP_ENV is "%s"', (string) app()->environment());
+        }
+
+        if (! (bool) config('app.debug')) {
+            return 'APP_DEBUG is off, so this is treated as a deployed environment';
+        }
+
+        if (! $this->canPrompt()) {
+            return 'this session cannot prompt for confirmation (--no-interaction, CI, or no TTY)';
+        }
+
+        foreach ($appTables as $table) {
+            try {
+                $populated = DB::table($table)->exists();
+            } catch (\Throwable) {
+                return sprintf(
+                    'the existing table "%s" could not be read, so it is treated as holding live data',
+                    $table,
+                );
+            }
+
+            if ($populated) {
+                return sprintf('the existing table "%s" already holds rows', $table);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Take an explicitly TYPED confirmation before dropping every table.
+     *
+     * A yes/no confirm is one keystroke from the wrong answer and reads exactly
+     * like the half-dozen other confirms this install asks. Dropping every table
+     * is not that kind of decision, so the operator has to reproduce a string
+     * that names what is about to be destroyed.
+     */
+    private function confirmDestructiveReset(): bool
+    {
+        // No human, no confirmation — and therefore no reset. Reached only
+        // defensively; chooseMigrationStrategy() already returned 'migrate'.
+        if (! $this->canPrompt()) {
+            return false;
+        }
+
+        $database = $this->currentDatabaseName();
+
+        $this->newLine();
+        $this->components->warn('migrate:fresh DROPS EVERY TABLE on this connection. There is no undo.');
+        $this->line(sprintf(
+            '  <fg=gray>Connection: %s · Database: %s</>',
+            (string) config('database.default'),
+            $database !== '' ? $database : 'unknown',
+        ));
+
+        $typed = (string) text(
+            label: $database !== ''
+                ? sprintf('Type the database name (%s) or the word "fresh" to confirm', $database)
+                : 'Type the word "fresh" to confirm',
+            placeholder: $database !== '' ? $database : 'fresh',
+        );
+
+        return $this->destructiveResetConfirmationMatches($typed);
+    }
+
+    /**
+     * Whether a typed confirmation authorises the reset.
+     *
+     * Surrounding whitespace is forgiven (a pasted database name carries it);
+     * nothing else is. Every reflex answer — an empty line, 'y', 'yes' — is
+     * rejected, and so is the empty string a non-interactive prompt fallback
+     * would hand back.
+     */
+    private function destructiveResetConfirmationMatches(string $typed): bool
+    {
+        $typed = trim($typed);
+
+        if ($typed === '') {
+            return false;
+        }
+
+        if (strtolower($typed) === 'fresh') {
+            return true;
+        }
+
+        $database = $this->currentDatabaseName();
+
+        return $database !== '' && $typed === $database;
+    }
+
+    /**
+     * The database name behind the default connection.
+     *
+     * Answers '' when the connection carries no plain-string database name (a
+     * DSN-configured or unset connection), in which case the literal word
+     * 'fresh' is the only confirmation the operator can type.
+     */
+    private function currentDatabaseName(): string
+    {
+        $connection = (string) config('database.default');
+        $database = config("database.connections.{$connection}.database");
+
+        return is_string($database) ? trim($database) : '';
+    }
+
+    /**
+     * Whether the current environment looks like production.
+     *
+     * One signal among several for the destructive migration branch — see
+     * destructiveMigrationBlockReason(), which also weighs APP_DEBUG and whether
+     * the connection actually holds rows.
      *
      * Matches 'prod'/'production' as a case-insensitive substring so 'prod',
      * 'production', 'prod-eu', 'my-prod' all trip the guard — mirrors the
@@ -2688,6 +3156,18 @@ class InstallCommand extends Command
      * a real TTY on STDIN (or a unit-test run). A genuinely TTY-less session
      * (--no-interaction, real CI, piped stdin) must fall back to defaults rather
      * than fire a required prompt that would throw NonInteractiveValidationException.
+     *
+     * The `runningUnitTests()` arm reads like a test-only escape hatch and is
+     * not one: it is copied from ConfiguresPrompts because this method has to
+     * answer the same question that framework does — "will a prompt() call
+     * actually run here?" — and under `php artisan test` the framework answers
+     * yes. Dropping the arm would make canPrompt() disagree with the machinery
+     * it is predicting, so a test could not exercise the interactive branch at
+     * all. It does not weaken the destructive-migration gate either: prompts in
+     * a test run resolve to their DEFAULT, and chooseMigrationStrategy()'s
+     * default is 'migrate', never the fresh/destructive option — that one also
+     * has to clear destructiveMigrationBlockReason() (APP_ENV, APP_DEBUG, the
+     * row probe) and then a typed confirmation string. Behaviour unchanged.
      */
     private function canPrompt(): bool
     {
@@ -2807,8 +3287,12 @@ class InstallCommand extends Command
      * failure warns, prints the command to run by hand, and leaves the install's
      * exit code alone — promoting these to mandatory would start failing
      * installs that work today.
+     *
+     * `$isFirstInstall` decides the fate of `package-lock.json` — see the
+     * lockfile branch below. It must agree with the flag `removeConflictingDefaults()`
+     * was given, or the install reports a file as kept and then deletes it.
      */
-    private function installFrontend(): void
+    private function installFrontend(bool $isFirstInstall): void
     {
         // Guard the npm work behind a Node preflight so an old / missing Node
         // toolchain produces a clear skip + follow-up instructions instead of a
@@ -2827,22 +3311,23 @@ class InstallCommand extends Command
             return;
         }
 
-        // Remove old node_modules and lock file to ensure clean install with new package.json
         $nodeModules = base_path('node_modules');
         $lockFile = base_path('package-lock.json');
 
-        if ($this->files->isDirectory($nodeModules)) {
-            $this->step('Removing old node_modules', function () use ($nodeModules) {
-                $this->files->deleteDirectory($nodeModules);
-            }, mandatory: false);
-        }
-
-        if ($this->files->exists($lockFile)) {
-            $this->files->delete($lockFile);
-        }
-
         // 1. npm install
-        if (! $this->step('Installing npm dependencies', function () {
+        //
+        // BOTH pre-steps — clearing node_modules and deciding the lockfile —
+        // live INSIDE the step, deliberately. On a `--resume` run this step is
+        // already checkpointed and gets skipped, so anything sitting in front of
+        // it would run against a tree the skipped step is supposed to own: the
+        // lockfile the FIRST run's `npm install` had just written would be
+        // deleted with nothing left to regenerate it, and the node_modules that
+        // same run installed would be wiped while the install that fills it is
+        // skipped — leaving the build step to fail on missing dependencies.
+        if (! $this->step('Installing npm dependencies', function () use ($nodeModules, $lockFile, $isFirstInstall) {
+            $this->clearNodeModules($nodeModules);
+            $this->prepareLockFile($lockFile, $isFirstInstall);
+
             return $this->runProcessStep(['npm', 'install'], timeout: 300);
         }, mandatory: false)) {
             $this->renderFrontendGuidance('npm install && npm run build');
@@ -2870,6 +3355,55 @@ class InstallCommand extends Command
         }, mandatory: false)) {
             $this->renderFrontendGuidance('npm run build');
         }
+    }
+
+    /**
+     * Clear a stale `node_modules` right before `npm install` refills it.
+     *
+     * The tree is regenerated from the lockfile and holds no work of the
+     * operator's, so removing it is always safe — but only when the install
+     * that refills it actually runs. Called from inside the npm-install step so
+     * a resumed run that skips that step leaves the tree the first run
+     * installed alone.
+     */
+    private function clearNodeModules(string $nodeModules): void
+    {
+        if (! $this->files->isDirectory($nodeModules)) {
+            return;
+        }
+
+        $this->line('  <fg=gray>Removing the old node_modules tree…</>');
+
+        $this->files->deleteDirectory($nodeModules);
+    }
+
+    /**
+     * Decide what happens to `package-lock.json` right before `npm install`.
+     *
+     * The lockfile is the app's pinned dependency graph, not a build artefact:
+     * deleting it lets `npm install` resolve versions the app was never tested
+     * against. On a FIRST install there is nothing of the operator's to lose,
+     * and a stale lock left over from an unrelated package.json only gets in
+     * the way. On a re-install it is kept — which is also what
+     * removeConflictingDefaults() has already reported to the operator, so the
+     * two must not disagree.
+     *
+     * Called from inside the npm-install step so a resumed run that skips that
+     * step does not touch the lockfile either.
+     */
+    private function prepareLockFile(string $lockFile, bool $isFirstInstall): void
+    {
+        if (! $this->files->exists($lockFile)) {
+            return;
+        }
+
+        if ($isFirstInstall) {
+            $this->files->delete($lockFile);
+
+            return;
+        }
+
+        $this->components->info('Keeping the existing package-lock.json — npm install will resolve against your pinned versions. Delete it by hand if you want a clean resolution.');
     }
 
     /**

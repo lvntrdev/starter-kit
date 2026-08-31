@@ -51,6 +51,8 @@ php artisan encryption:key
 ```
 
 - Mevcut birincil anahtarı `.env`'den çözer (önbelleklenmiş config'ten değil), yapılandırılmış cipher için bellekte rastgele yeni bir anahtar üretir, `DATA_ENCRYPTION_PREVIOUS_KEYS`'i eski birincili başa ekleyerek yazar ve ancak ondan sonra yeni `DATA_ENCRYPTION_KEY`'i yazar. Bu sıra kasıtlıdır: iki yazma arasında bir çökme, eski anahtarı hâlâ birincil ve fazladan listelenmiş bırakır — asla tersi değil, tersi her şifreli satırı sahipsiz bırakırdı.
+- `.env`, uygulamanın önyüklendiği aynı ayrıştırıcıyla (phpdotenv) okunur, regex ile değil — `${VAR}` ile enterpolasyonlu bir atama (örn. `DATA_ENCRYPTION_KEY=${APP_KEY}`), `DATA_ENCRYPTION_PREVIOUS_KEYS`'e yazılmadan önce gerçek anahtar materyaline çözülür, hiçbir zaman `${APP_KEY}` referansı olarak değil. Ayrıştırıcının anlam veremediği bir `.env`, hiçbir anahtar üretilmeden veya hiçbir şey yazılmadan önce komutu durdurur — yarım uygulanmış bir rotasyon kalmaz — ve ayrıştırıcının kendi hata mesajı gösterilmez, çünkü bozuk satırı olduğu gibi alıntılayabilir ve bu satır anahtar materyali olabilir.
+- **Yetki dosyada olmalı.** Süreç ortamı bu anahtarlardan birini ayarlıyorsa — ya da `.env` içindeki enterpolasyonlu bir değerin işaret ettiği bir değişkeni ayarlıyorsa — çalışan uygulama dosyanın söylediği değeri değil, o değeri çözer. `encryption:key` bu ayrışmayı tespit edip hiçbir şey üretmeden durur; anahtarın adını söyler, iki değerden hiçbirini yazmaz. `.env`'i yeniden yazmak işe yaramaz: süreçteki değer kazanmaya devam eder ve rotasyon, uygulamanın hiç kullanmadığı bir anahtarı emekliye ayırıp gerçekten kullandığını listeden düşürür — mevcut şifreli veri okunamaz hale gelir. Süreç değişkenini kaldırın (ya da dosyayla aynı değere getirin) ve komutu tekrar çalıştırın.
 - `APP_KEY` bu komut tarafından hiçbir seçenekte okunmaz, değiştirilmez, yeniden yazılmaz.
 - `--show` yeni üretilen bir anahtarı stdout'a yazar, hiçbir şey diske yazmaz. `.env`'e dokunmadan bir anahtarın neye benzediğine bakmak için kullanın.
 - Production gibi görünen bir ortamda çalıştırmak için `--force` gerekir, çünkü anahtarı burada döndürmek `encryption:rekey` tamamlanana kadar her şifreli değeri okunamaz yapar. `--force`'u ancak bir veritabanı yedeğiniz ve bir bakım penceresi varken tekrar çalıştırın.
@@ -88,11 +90,20 @@ Sonuçlar (exit kodu makine tarafından okunabilir yarısıdır):
 | --- | --- | --- |
 | `safe-to-clear` | 0 | Taranan her değer yalnızca birincil anahtarla okunuyor; her yüzey tamamen tarandı. `DATA_ENCRYPTION_PREVIOUS_KEYS` temizlenebilir. |
 | `rekey-required` | 1 | En az bir değer birincil olmayan bir anahtara ihtiyaç duyuyor. Henüz hiçbir şey kaybolmadı, ama previous-key listesini şimdi temizlemek kaybettirir. `encryption:rekey` çalıştırın. |
-| `incomplete` | 1 | Bir yüzey tam olarak taranamadı, dolayısıyla "safe" iddia edilemez. |
+| `not-covered` | 1 | Bir yüzey, bu kitin kurmadığı bir encrypter tarafından servis ediliyor ya da `starter-kit.encryption` config bloğu yok olduğu için yapılandırılan anahtar etkisiz. Hiçbir şey kaybolmadı, ama aşağıdaki atıf kurulumun gerçek okuma/yazma yolunu tarif etmiyor; bu yüzden buradan "safe to clear" iddia edilemez. Bkz. aşağıdaki [Yüzey kapsamı](#yüzey-kapsamı). |
+| `incomplete` | 1 | Bir yüzey tam olarak taranamadı, dolayısıyla "safe" iddia edilemez — çözdüğü anahtar zinciri artık `.env`/süreç ortamıyla eşleşmeyen önbelleklenmiş bir config de buna dahildir. `php artisan config:clear` çalıştırın (production'da config önbelleği kullanıyorsanız ardından yeniden önbelleğe alın) ve tekrar çalıştırın. |
 | `unreadable` | 2 | Yapılandırılmış hiçbir anahtarın okuyamadığı bir değer var. Onu yazan anahtar `.env`'den eksik ve geri eklenmeli — asla temizlenmemeli. |
 | `key-error` | 2 | Anahtar zincirinin kendisi çözülmüyor; hiçbir şey atfedilemedi. |
 
 Sonuç yalnızca aşağı düşer, asla yükselmez — yanlış bir "safe to clear" bu komutun veri kaybına yol açabilecek tek çıktısıdır.
+
+### Yüzey kapsamı
+
+Her iki komut da yalnızca kitin kendi anahtar zincirini değil, **her yüzeyi gerçekte hangi encrypter'ın servis ettiğini** raporlar. Bu önemlidir, çünkü 2FA yüzeyi zorunlu olarak kit üzerinden okunmaz: Fortify `Fortify::$encrypter ?? Model::$encrypter ?? Crypt` sırasını çözer ve kit, tüketicinin kendi ayarladığı bir encrypter'ı bilinçli olarak ezmez (`StarterKitServiceProvider::configureDataEncryption()`).
+
+- `encryption:health` her yüzeyin arkasındaki encrypter'ı isimlendirir. Kitin kurmadığı bir encrypter tarafından servis edilen yüzey **unvouched** (kefil olunamayan) olarak raporlanır ve sonuç `not-covered`'a (exit 1) düşer — satır atfı saklanan baytlar hakkında hâlâ doğrudur, ama bu kurulumun okuyup yazdığı yol hakkında hiçbir şey söylemez.
+- **Eski yayınlanmış config boşluğu ayrı bir teşhis olarak raporlanır.** Encryption bloğundan önce yayınlanmış bir `config/starter-kit.php`, `starter-kit.encryption` değerini null yapar; böylece `DATA_ENCRYPTION_KEY` etkisiz kalır ve birincil anahtar sessizce `APP_KEY` yedeğine düşer — bu durum önceden "safe to clear" olarak okunabiliyordu. Artık `not-covered` verir; config'i yeniden yayınlayın (`php artisan vendor:publish --tag=starter-kit-config --force`) ve tekrar çalıştırın.
+- Seçilen bir yüzey unvouched ise `encryption:rekey` **tek bir satır bile okumadan reddeder** ve hem yüzeyi hem de onu dışarıda bırakan `--only=` bayrağını isimlendirir. Sessizce daraltılıp ardından eksiksiz bir rekey gibi raporlanan bir çalıştırma, hatadan daha kötüdür: satırları, okuyan encrypter'ın elinde olmayan bir anahtara yeniden yazar ve her 2FA girişini başarısız bir challenge'a çevirir. Seçilen yüzeylerin tamamı kapsam içindeyse çalıştırma bundan etkilenmez.
 
 ## Mevcut bir kurulumda adanmış anahtarı benimsemek
 
@@ -100,9 +111,12 @@ Sonuç yalnızca aşağı düşer, asla yükselmez — yanlış bir "safe to cle
 
 ```bash
 php artisan encryption:key
+php artisan config:clear   # config önbelleklenmişse rekey HÂLÂ eski birincil anahtarı çözer
 php artisan encryption:rekey
 php artisan encryption:health
 ```
+
+`config:clear` iki komutun **arasında** durur, sonrasında değil. `encryption:key` `.env`'i yazar ama önbelleklenmiş config önceki zinciri sunmaya devam eder — dolayısıyla temizlemeden önce çalıştırılan bir rekey, her satırı az önce emekliye ayrılan anahtara yeniden şifreler ya da yapacak hiçbir şey bulamaz. Önce temizlemek, `encryption:rekey`'in veriyi taşıması gereken anahtarı görmesini sağlayan adımdır.
 
 Ardından, yalnızca `encryption:health` `safe-to-clear` raporladıktan sonra:
 
@@ -112,8 +126,11 @@ DATA_ENCRYPTION_PREVIOUS_KEYS=
 ```
 
 ```bash
+php artisan config:clear
 php artisan encryption:health
 ```
+
+Production'da config önbelleği kullanıyorsanız yukarıdaki her `config:clear`'dan hemen sonra `php artisan config:cache`'i tekrar çalıştırın.
 
 Düzenlemeden sonraki ikinci `encryption:health` çalıştırması da `safe-to-clear` raporlamadan `DATA_ENCRYPTION_PREVIOUS_KEYS`'i temizlemeyin. Başka bir şey raporlarsa eski değeri geri koyun ve araştırın — her satır birincil anahtarda doğrulanmadan previous-key listesini temizlemek, bir rotasyonu kalıcı veri kaybına çevirir.
 
@@ -123,11 +140,12 @@ Rotasyon aynı üç komutu, aynı sırayla, aynı bakım penceresi gerekliliğiy
 
 ```bash
 php artisan encryption:key --force   # --force yalnızca production gibi bir ortamda gerekli
+php artisan config:clear             # config önbelleklenmişse rekey HÂLÂ eski birincil anahtarı çözer
 php artisan encryption:rekey
 php artisan encryption:health
 ```
 
-Ardından `DATA_ENCRYPTION_PREVIOUS_KEYS`'i elle temizleyin ve yukarıdaki benimseme akışındaki gibi tekrar `encryption:health` çalıştırıp doğrulayın. `encryption:rekey`'i bir bakım penceresi içinde çalıştırın — komut eşzamanlı okuma/yazmaya karşı güvenli yazılmış olsa da büyük bir tabloyu aktif trafik ortasında rekey'lemek doğru değildir.
+Ardından `DATA_ENCRYPTION_PREVIOUS_KEYS`'i elle temizleyin, `config:clear` çalıştırın ve yukarıdaki benimseme akışındaki gibi tekrar `encryption:health` çalıştırıp doğrulayın. `encryption:rekey`'i bir bakım penceresi içinde çalıştırın — komut eşzamanlı okuma/yazmaya karşı güvenli yazılmış olsa da büyük bir tabloyu aktif trafik ortasında rekey'lemek doğru değildir.
 
 ## Bu özelliğin geri alınması (rollback)
 

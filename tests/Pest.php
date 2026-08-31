@@ -1,6 +1,7 @@
 <?php
 
 use Lvntr\StarterKit\Tests\DatabaseTestCase;
+use Lvntr\StarterKit\Tests\MigrationTestCase;
 use Lvntr\StarterKit\Tests\PermissionMiddlewareTestCase;
 use Lvntr\StarterKit\Tests\TestCase;
 
@@ -23,6 +24,19 @@ use Lvntr\StarterKit\Tests\TestCase;
 uses(DatabaseTestCase::class)->in('Feature/SchemaDrift');
 uses(DatabaseTestCase::class)->in('Feature/FileManager');
 uses(DatabaseTestCase::class)->in('Feature/Settings');
+
+// Paket migration zincirinin GERÇEK sürücü üzerinde koşturulması: SQLite'ta
+// (varsayılan `composer test`) bütün dizin kendini skip eder, MySQL/MariaDB'de
+// stubs + vendor migration'larını tek batch halinde uygular. Tabloları inline
+// kuran DatabaseTestCase'ten kasıtlı olarak ayrı — bkz. MigrationTestCase.
+uses(MigrationTestCase::class)->in('Feature/Migration');
+
+// Rollback-path guard: her migration dosyasının down() taşıdığını STATİK olarak
+// (dosyayı okuyup reflection ile) doğrular. Feature/Migration'a KOYULAMAZ —
+// orası MigrationTestCase'e bağlı ve SQLite'ta kendini skip eder; guard'ın
+// değeri ise varsayılan `composer test` koşusunda çalışmasında. Pest bir dosyayı
+// tek base class'a bağladığı için ayrı dizin gerekiyor. DB gerektirmez.
+uses(TestCase::class)->in('Feature/MigrationSafety');
 
 // Logs audit listener regresyonu: activity('system') yazımı için DB gerekli.
 uses(DatabaseTestCase::class)->in('Feature/Logs');

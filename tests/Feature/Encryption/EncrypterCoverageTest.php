@@ -129,6 +129,46 @@ function ecvCoverage(array $payload, string $surface): array
     throw new RuntimeException("No coverage entry for surface [{$surface}].");
 }
 
+/**
+ * Every variable the environment-divergence tests plant in the real process
+ * environment. `$_SERVER` is what Env's ServerConstAdapter reads, and it is
+ * process-global — hence the snapshot/restore below.
+ *
+ * @return list<string>
+ */
+function ecvSimulatedEnvKeys(): array
+{
+    return [
+        DataEncrypterFactory::PRIMARY_ENV_KEY,
+        DataEncrypterFactory::PREVIOUS_ENV_KEY,
+        DataEncrypterFactory::APP_ENV_KEY,
+        DataEncrypterFactory::APP_PREVIOUS_ENV_KEY,
+    ];
+}
+
+/**
+ * Make Application::configurationIsCached() answer true for this test.
+ *
+ * Binds the memo the framework itself reads instead of planting a cache FILE:
+ * configurationIsCached() caches its answer in the container the first time it
+ * is asked, and the service provider asks during boot — so a file appearing on
+ * disk once a test body is running would already be too late.
+ */
+function ecvPretendConfigIsCached(): void
+{
+    app()->instance('config_loaded_from_cache', true);
+}
+
+/**
+ * Define a variable in the real process environment, which is what a cached
+ * config leaves visible to env(): the environment file is never loaded, so only
+ * externally defined variables remain.
+ */
+function ecvPutEnv(string $key, string $value): void
+{
+    $_SERVER[$key] = $value;
+}
+
 beforeEach(function (): void {
     Schema::dropIfExists('settings');
     Schema::dropIfExists('users');
@@ -137,10 +177,28 @@ beforeEach(function (): void {
     // service provider installed so a test that swaps it cannot leak into the
     // next file in the run.
     $this->ecvOriginalFortifyEncrypter = Fortify::$encrypter;
+
+    $this->ecvOriginalEnv = [];
+
+    foreach (ecvSimulatedEnvKeys() as $key) {
+        $this->ecvOriginalEnv[$key] = $_SERVER[$key] ?? null;
+    }
 });
 
 afterEach(function (): void {
     Fortify::$encrypter = $this->ecvOriginalFortifyEncrypter;
+
+    // Restore rather than unset: a value that was already there belongs to the
+    // run, and dropping it would sabotage every later test file.
+    foreach ($this->ecvOriginalEnv as $key => $value) {
+        if ($value === null) {
+            unset($_SERVER[$key]);
+
+            continue;
+        }
+
+        $_SERVER[$key] = $value;
+    }
 
     Schema::dropIfExists('settings');
     Schema::dropIfExists('users');
@@ -284,7 +342,140 @@ it('refuses a clean verdict when the starter-kit.encryption config block is abse
 
 /*
 |--------------------------------------------------------------------------
-| 4. encryption:rekey refuses what it cannot re-encrypt
+| 4. A CACHED config that no longer matches the environment
+|--------------------------------------------------------------------------
+|
+| config:cache freezes every env() call into a PHP array and Laravel then stops
+| loading .env at all. config() and the environment become two sources that
+| drift apart in silence, and health attributes rows with the CACHED one. If it
+| then says "safe to clear", the operator empties DATA_ENCRYPTION_PREVIOUS_KEYS,
+| the cache is rebuilt on the next deploy, and the app comes back on a chain
+| that no longer holds the key those rows were written with — with the list that
+| held it already gone.
+|
+| Locked here: divergence, and "could not tell", both cost the clean verdict —
+| but an agreeing cached install keeps it, because a warning every healthy
+| production box prints for ever is a warning nobody reads.
+|
+*/
+
+it('keeps safe-to-clear when the configuration is cached and the chains still agree', function (): void {
+    ecvCreateTables();
+    ecvConfigureKeys();
+
+    // The environment imposes exactly what the cache resolved.
+    ecvPutEnv(DataEncrypterFactory::PRIMARY_ENV_KEY, ecvKey('primary'));
+    ecvPutEnv(DataEncrypterFactory::APP_ENV_KEY, ecvKey('app'));
+
+    ecvPretendConfigIsCached();
+
+    $payload = ecvHealthJson();
+
+    expect($payload['config_block']['configuration_cached'])->toBeTrue()
+        ->and($payload['config_block']['env_chain_diverges'])->toBeFalse()
+        ->and($payload['summary']['env_chain_diverged'])->toBeFalse()
+        ->and($payload['verdict'])->toBe(EncryptionHealthCommand::VERDICT_SAFE)
+        ->and($payload['safe_to_clear'])->toBeTrue()
+        ->and($payload['exit_code'])->toBe(0);
+
+    Artisan::call('encryption:health');
+
+    // No nagging on a healthy cached install.
+    expect(Artisan::output())->not->toContain('config:clear');
+});
+
+it('downgrades to incomplete when the cached chain and the environment disagree', function (): void {
+    ecvCreateTables();
+    ecvConfigureKeys();
+
+    // .env moved on to a rotated key; the cached config still serves the old
+    // one. Nothing in the row scan can see this.
+    ecvPutEnv(DataEncrypterFactory::PRIMARY_ENV_KEY, ecvKey('rotated-in-env'));
+    ecvPutEnv(DataEncrypterFactory::APP_ENV_KEY, ecvKey('app'));
+
+    ecvPretendConfigIsCached();
+
+    $payload = ecvHealthJson();
+
+    expect($payload['config_block']['env_chain_diverges'])->toBeTrue()
+        ->and($payload['summary']['env_chain_diverged'])->toBeTrue()
+        ->and($payload['verdict'])->toBe(EncryptionHealthCommand::VERDICT_INCOMPLETE)
+        ->and($payload['safe_to_clear'])->toBeFalse()
+        ->and($payload['exit_code'])->toBe(1);
+
+    Artisan::call('encryption:health');
+
+    $output = Artisan::output();
+
+    // The fix has to be NAMED, not implied by "config is cached".
+    expect($output)->toContain('config:clear')
+        // The probe reads real key material out of the environment. None of it
+        // may reach the report — the divergence is a boolean, nothing else.
+        ->and($output)->not->toContain(ecvKey('rotated-in-env'))
+        ->and($output)->not->toContain(ecvKey('primary'))
+        ->and($output)->not->toContain(ecvKey('app'));
+});
+
+it('fails closed when the configuration is cached and no chain can be read from the environment', function (): void {
+    ecvCreateTables();
+    ecvConfigureKeys();
+
+    // No .env in the testbench app and no variable in the process environment:
+    // the chain a config:clear would leave behind cannot be determined at all.
+    // "Could not check" must never resolve to "safe".
+    ecvPretendConfigIsCached();
+
+    $payload = ecvHealthJson();
+
+    expect($payload['config_block']['env_chain_diverges'])->toBeTrue()
+        ->and($payload['verdict'])->toBe(EncryptionHealthCommand::VERDICT_INCOMPLETE)
+        ->and($payload['safe_to_clear'])->toBeFalse()
+        ->and($payload['exit_code'])->toBe(1);
+});
+
+it('only ever downgrades: a divergence never masks a row still riding a previous key', function (): void {
+    ecvCreateTables();
+    ecvConfigureKeys();
+
+    // Written under APP_KEY, which the chain keeps as a read-only fallback —
+    // rekey-required, and it outranks the new signal.
+    DB::table('settings')->insert([
+        'group' => 'mail',
+        'key' => 'password',
+        'value' => ecvEncrypter('app')->encryptString('mail-secret'),
+        'encrypted' => 1,
+    ]);
+
+    ecvPretendConfigIsCached();
+
+    $payload = ecvHealthJson();
+
+    expect($payload['summary']['env_chain_diverged'])->toBeTrue()
+        ->and($payload['verdict'])->toBe(EncryptionHealthCommand::VERDICT_REKEY_REQUIRED)
+        ->and($payload['exit_code'])->toBe(1);
+});
+
+it('reports no divergence at all while the configuration is not cached', function (): void {
+    ecvCreateTables();
+    ecvConfigureKeys();
+
+    // A variable that contradicts config() outright. Without a cached config
+    // this is not a divergence to report: config() reads the live files, so
+    // there is nothing for it to be stale against, and downgrading here would
+    // punish every ordinary install.
+    ecvPutEnv(DataEncrypterFactory::PRIMARY_ENV_KEY, ecvKey('something-else'));
+
+    $payload = ecvHealthJson();
+
+    expect($payload['config_block']['configuration_cached'])->toBeFalse()
+        ->and($payload['config_block']['env_chain_diverges'])->toBeNull()
+        ->and($payload['summary']['env_chain_diverged'])->toBeFalse()
+        ->and($payload['verdict'])->toBe(EncryptionHealthCommand::VERDICT_SAFE);
+});
+
+/*
+|--------------------------------------------------------------------------
+| 5. encryption:rekey refuses what it cannot re-encrypt
 |--------------------------------------------------------------------------
 */
 

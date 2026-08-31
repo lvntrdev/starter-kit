@@ -2,6 +2,8 @@
 
 namespace Lvntr\StarterKit\Console\Commands;
 
+use BadMethodCallException;
+use Error;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Contracts\Console\Isolatable;
@@ -161,11 +163,18 @@ class PurgeFileManagerTrashCommand extends Command implements Isolatable
      * nothing, but refusing to purge would be worse still for an install that
      * has always run without it.
      *
-     * `Throwable`, not `BadMethodCallException`: `Cache::lock()` is not
-     * declared on `Repository` and reaches the store through `__call`, so a
-     * store that does not implement it — Laravel's own `session`, `storage`
-     * and `apc` stores among them — raises an `Error`, which is not an
-     * `Exception`.
+     * `Error|BadMethodCallException`, and both halves of that pair are needed.
+     * `Cache::lock()` is not declared on `Repository` and reaches the store
+     * through `__call`, so a store that does not implement it — Laravel's own
+     * `session`, `storage` and `apc` stores among them — raises an `Error`,
+     * which is not an `Exception`; catching only `BadMethodCallException`
+     * would abort on a store that never supported locks in the first place.
+     *
+     * It is deliberately NOT `Throwable`. "This store has no locks" is a
+     * static fact about the driver and is safe to run without. An unreachable
+     * or misconfigured lock backend is an outage, and purging unprotected
+     * through an outage is exactly the overlap this lock exists to stop — that
+     * failure propagates and aborts the run.
      *
      * @return Lock|null|false the held lock, null when unsupported, false when another run holds it
      */
@@ -173,7 +182,7 @@ class PurgeFileManagerTrashCommand extends Command implements Isolatable
     {
         try {
             $lock = Cache::lock(self::LOCK_KEY, self::LOCK_TTL_SECONDS);
-        } catch (Throwable) {
+        } catch (Error|BadMethodCallException) {
             return null;
         }
 

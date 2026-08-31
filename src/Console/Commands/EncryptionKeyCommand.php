@@ -4,6 +4,15 @@ declare(strict_types=1);
 
 namespace Lvntr\StarterKit\Console\Commands;
 
+use Dotenv\Dotenv;
+use Dotenv\Exception\InvalidFileException;
+use Dotenv\Loader\Loader;
+use Dotenv\Parser\Parser;
+use Dotenv\Repository\Adapter\ArrayAdapter;
+use Dotenv\Repository\Adapter\EnvConstAdapter;
+use Dotenv\Repository\Adapter\ServerConstAdapter;
+use Dotenv\Repository\RepositoryBuilder;
+use Dotenv\Store\StringStore;
 use Illuminate\Console\Command;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Filesystem\Filesystem;
@@ -194,9 +203,19 @@ final class EncryptionKeyCommand extends Command
         // (1) Resolve the current primary from the FILE, not from config().
         // A cached config (`config:cache`) can disagree with .env, and the key
         // that must be preserved is the one the file will keep feeding the app.
+        //
+        // The file is parsed ONCE, here, and the resolved values are passed down
+        // by value. Two reasons, both about the write order below: a single
+        // parse is the single place a malformed `.env` can abort the run, and it
+        // happens before the key is even generated, so there is no state to
+        // unwind; and $content is rewritten twice further down, so a parse that
+        // re-read it later would be reading a body this command wrote rather
+        // than the one it found. Every read below is about $initial.
         $initial = $this->files->get($envPath);
 
-        [$currentPrimary, $primarySource] = $this->currentPrimary($initial);
+        $values = $this->parseEnv($initial, $envPath);
+
+        [$currentPrimary, $primarySource] = $this->currentPrimary($values);
 
         // (2) Generate in memory. Nothing is on disk yet.
         $newKey = $this->generateKey($cipher);
@@ -217,7 +236,7 @@ final class EncryptionKeyCommand extends Command
             $content = $this->setEnvValue(
                 $content,
                 DataEncrypterFactory::PREVIOUS_ENV_KEY,
-                implode(',', $this->prependPreviousKey($initial, $currentPrimary, $primarySource)),
+                implode(',', $this->prependPreviousKey($values, $currentPrimary, $primarySource)),
             );
 
             $this->assertAppKeyUntouched($initial, $content);
@@ -331,17 +350,18 @@ final class EncryptionKeyCommand extends Command
      * from. Mirrors DataEncrypterFactory's primary-key contract: the dedicated
      * key when set, otherwise APP_KEY (first adoption).
      *
+     * @param  array<string, string|null>  $values  the parsed `.env` body
      * @return array{0: string|null, 1: string|null}
      */
-    private function currentPrimary(string $content): array
+    private function currentPrimary(array $values): array
     {
-        $dedicated = $this->readEnvValue($content, DataEncrypterFactory::PRIMARY_ENV_KEY);
+        $dedicated = $this->readEnvValue($values, DataEncrypterFactory::PRIMARY_ENV_KEY);
 
         if ($dedicated !== null) {
             return [$dedicated, DataEncrypterFactory::PRIMARY_ENV_KEY];
         }
 
-        $appKey = $this->readEnvValue($content, DataEncrypterFactory::APP_ENV_KEY);
+        $appKey = $this->readEnvValue($values, DataEncrypterFactory::APP_ENV_KEY);
 
         if ($appKey !== null) {
             return [$appKey, DataEncrypterFactory::APP_ENV_KEY];
@@ -361,13 +381,14 @@ final class EncryptionKeyCommand extends Command
      * material; this list is intentionally not smart about that, because
      * dropping an entry here is irreversible and dropping one there is not.
      *
+     * @param  array<string, string|null>  $values  the parsed `.env` body
      * @return list<string>
      */
-    private function prependPreviousKey(string $content, #[SensitiveParameter] string $currentPrimary, string $source): array
+    private function prependPreviousKey(array $values, #[SensitiveParameter] string $currentPrimary, string $source): array
     {
         $list = [$this->envSafeValue($currentPrimary, $source)];
 
-        foreach ($this->existingPreviousKeys($content) as $entry) {
+        foreach ($this->existingPreviousKeys($values) as $entry) {
             if (! in_array($entry, $list, true)) {
                 $list[] = $entry;
             }
@@ -379,11 +400,12 @@ final class EncryptionKeyCommand extends Command
     /**
      * Existing DATA_ENCRYPTION_PREVIOUS_KEYS entries, trimmed, blanks dropped.
      *
+     * @param  array<string, string|null>  $values  the parsed `.env` body
      * @return list<string>
      */
-    private function existingPreviousKeys(string $content): array
+    private function existingPreviousKeys(array $values): array
     {
-        $raw = $this->readEnvValue($content, DataEncrypterFactory::PREVIOUS_ENV_KEY);
+        $raw = $this->readEnvValue($values, DataEncrypterFactory::PREVIOUS_ENV_KEY);
 
         if ($raw === null) {
             return [];
@@ -425,36 +447,163 @@ final class EncryptionKeyCommand extends Command
     }
 
     /**
-     * Read one key's effective value out of an `.env` body.
+     * Parse an `.env` body with phpdotenv, or abort the rotation.
      *
-     * Commented lines are ignored, `export ` is tolerated and surrounding
-     * quotes are stripped. A blank value reads as null, matching the factory's
-     * treatment of the shipped `DATA_ENCRYPTION_KEY=` placeholder.
+     * This runs before a key is generated and long before anything is written,
+     * so a body this parser rejects costs nothing but the run. That is the point:
+     * the alternative is guessing at a file we cannot read and then writing key
+     * material according to the guess.
+     *
+     * The parser's own message is deliberately DISCARDED rather than forwarded.
+     * `InvalidFileException` quotes the offending fragment back —
+     * `Encountered a missing closing quote at ['…]` — and when the malformed
+     * line is the key line, that fragment is key material on the operator's
+     * terminal and in their scrollback. The replacement names the file and the
+     * variables that could not be read, and nothing else.
+     *
+     * A THROWN parse is not the only way this file can be unreadable, and it is
+     * not the dangerous one. phpdotenv's commonest real malformation — a quote
+     * opened and never closed — throws nothing: the value simply runs to EOF and
+     * every assignment after it silently disappears from the result. That is the
+     * shape that destroys key material, because the read side would then report
+     * "no previous keys" while setEnvValue()'s line-level regex still sees, and
+     * overwrites, the DATA_ENCRYPTION_PREVIOUS_KEYS line that is right there in
+     * the file. So the parse is cross-checked against the raw body: a variable
+     * the file assigns but the parser did not return means the parse is partial,
+     * and a partial parse aborts exactly like a rejected one.
+     *
+     * @return array<string, string|null>
+     *
+     * @throws RuntimeException naming the file and the env vars, never a value
      */
-    private function readEnvValue(string $content, string $key): ?string
+    private function parseEnv(string $content, string $path): array
     {
-        if (! preg_match_all($this->assignmentPattern($key), $content, $matches)) {
-            return null;
-        }
+        try {
+            $values = Dotenv::parse($content);
 
-        // Duplicate assignments: Laravel builds an IMMUTABLE dotenv repository,
-        // but that only protects variables defined OUTSIDE the file --
-        // ImmutableWriter::isExternallyDefined() stops reporting a name once it
-        // is in its own $loaded set, so a later line in the SAME .env does
-        // overwrite an earlier one. The LAST assignment is therefore what the
-        // running app reads, and preserving anything else here would save a key
-        // the data was not encrypted with.
-        $value = trim((string) end($matches[1]));
-
-        if (strlen($value) >= 2) {
-            $quote = $value[0];
-
-            if (($quote === '"' || $quote === "'") && str_ends_with($value, $quote)) {
-                $value = substr($value, 1, -1);
+            foreach ([
+                DataEncrypterFactory::APP_ENV_KEY,
+                DataEncrypterFactory::PRIMARY_ENV_KEY,
+                DataEncrypterFactory::PREVIOUS_ENV_KEY,
+            ] as $key) {
+                if (preg_match($this->assignmentPattern($key), $content) === 1
+                    && ! array_key_exists($key, $values)) {
+                    throw new InvalidFileException;
+                }
             }
-        }
 
-        return $value === '' ? null : $value;
+            $this->assertFileDecidesTheKeys($content, $values, $path);
+
+            return $values;
+        } catch (InvalidFileException) {
+            throw new RuntimeException(sprintf(
+                'Could not read [%s] in full, so %s and %s cannot be trusted. Nothing was written. '
+                .'The parser error is withheld here because it would quote the malformed line, '
+                .'which may be key material. Fix the file by hand — and do NOT clear %s while '
+                .'fixing it, because a key dropped from that list is unrecoverable.',
+                $path,
+                DataEncrypterFactory::PRIMARY_ENV_KEY,
+                DataEncrypterFactory::PREVIOUS_ENV_KEY,
+                DataEncrypterFactory::PREVIOUS_ENV_KEY,
+            ));
+        }
+    }
+
+    /**
+     * Stop unless the FILE is what decides these three variables.
+     *
+     * `Dotenv::parse()` resolves against an isolated array repository: the file
+     * and nothing but the file. The booted application resolves against an
+     * IMMUTABLE repository whose readers are `$_SERVER`, `$_ENV` and `getenv()`,
+     * so anything the process injects WINS over the same name in `.env` — and
+     * wins for interpolation too, which is the quiet version: with
+     * `DATA_ENCRYPTION_KEY=${BASE_KEY}` in the file, an injected `BASE_KEY`
+     * makes the app encrypt with one key while this command reads another.
+     *
+     * Rotating on the file's answer there would prepend a key the data was
+     * never encrypted with, and the real one would never enter the list —
+     * unrecoverable. Rewriting `.env` would not even change what the app uses,
+     * because the injection still wins on the next boot. So this is a stop, not
+     * a preference: the operator has to resolve the override themselves.
+     *
+     * The comparison runs through phpdotenv's own resolver: `$_SERVER` and
+     * `$_ENV` are added as READERS, and an `ArrayAdapter` — an in-memory store
+     * that dies with this call — is the only thing written to. Reader order is
+     * what encodes "the process wins", exactly as the immutable repository the
+     * framework boots with does.
+     *
+     * @param  array<string, string|null>  $fileValues
+     *
+     * @throws RuntimeException naming the file and the env var, never a value
+     */
+    private function assertFileDecidesTheKeys(string $content, array $fileValues, string $path): void
+    {
+        $repository = RepositoryBuilder::createWithNoAdapters()
+            ->addReader(ServerConstAdapter::class)
+            ->addReader(EnvConstAdapter::class)
+            ->addAdapter(ArrayAdapter::class)
+            ->immutable()
+            ->make();
+
+        (new Dotenv(new StringStore($content), new Parser, new Loader, $repository))->load();
+
+        foreach ([
+            DataEncrypterFactory::APP_ENV_KEY,
+            DataEncrypterFactory::PRIMARY_ENV_KEY,
+            DataEncrypterFactory::PREVIOUS_ENV_KEY,
+        ] as $key) {
+            $effective = $repository->get($key);
+            $fromFile = $fileValues[$key] ?? null;
+
+            if ($effective === $fromFile) {
+                continue;
+            }
+
+            throw new RuntimeException(sprintf(
+                'The process environment overrides [%s] from [%s] — directly or through a variable '
+                .'that its value interpolates — so the application is using a different value than '
+                .'this file states. Nothing was written: rotating the file would record the wrong '
+                .'key as previous AND would not change what the application loads. Unset the '
+                .'process override (or rotate through it instead) and run this again.',
+                $key,
+                $path,
+            ));
+        }
+    }
+
+    /**
+     * One key's effective value out of an already-parsed `.env` body.
+     *
+     * phpdotenv resolves this, not a regex, because this is the WRITE path: the
+     * value it returns is the one prepended to DATA_ENCRYPTION_PREVIOUS_KEYS,
+     * and a read that disagrees with the running app preserves a key the data
+     * was never encrypted with while the real one is overwritten. Only the
+     * parser the app boots with can agree with the app by construction. The
+     * regex this replaced did not: it kept the inline comment in
+     * `KEY=base64:… # rotated`, and handed back `${APP_KEY}` verbatim for an
+     * interpolated assignment the app resolves — see
+     * `Support\Encryption\EncrypterCoverage::environmentFileValue()`, which made
+     * the same move for the read-only health path and records the reasoning in
+     * full.
+     *
+     * Every promise the regex made is kept, and each is pinned by a test rather
+     * than assumed: a commented-out line is ignored, `export ` is tolerated,
+     * surrounding quotes are stripped, and the LAST of several assignments wins
+     * (phpdotenv's immutable repository only protects variables defined OUTSIDE
+     * the file, so a later line in the same file does overwrite an earlier one).
+     * Inline comments, escapes and `${VAR}` interpolation are now handled too.
+     *
+     * A key that is PRESENT but blank stays null, so the shipped
+     * `DATA_ENCRYPTION_KEY=` placeholder keeps meaning "not set" and first
+     * adoption still falls through to APP_KEY.
+     *
+     * @param  array<string, string|null>  $values
+     */
+    private function readEnvValue(array $values, string $key): ?string
+    {
+        $value = $values[$key] ?? null;
+
+        return $value === null || trim($value) === '' ? null : $value;
     }
 
     /**
@@ -581,6 +730,15 @@ final class EncryptionKeyCommand extends Command
      * The mandatory next steps. Clearing the previous-key list before
      * `encryption:health` reports OK is the one operator action in this feature
      * that destroys data, so it is spelled out every run.
+     *
+     * When config is cached, `config:clear` is listed as its own numbered step
+     * BEFORE the rekey rather than only as a warning above the list. The key
+     * this command just wrote lives in `.env`; a cached config keeps serving the
+     * previous chain, so a rekey run first re-encrypts every row onto the key
+     * that was just retired, or finds nothing to do. The documented runbook puts
+     * the clear between the two commands and this output has to say the same
+     * thing — an operator following the numbered list must not end up somewhere
+     * else than one following docs/encryption.md.
      */
     private function report(?string $primarySource): void
     {
@@ -593,15 +751,29 @@ final class EncryptionKeyCommand extends Command
 
         $this->components->twoColumnDetail(DataEncrypterFactory::APP_ENV_KEY, '<fg=green>untouched</>');
 
-        if (method_exists($this->laravel, 'configurationIsCached') && $this->laravel->configurationIsCached()) {
+        $configIsCached = method_exists($this->laravel, 'configurationIsCached') && $this->laravel->configurationIsCached();
+
+        if ($configIsCached) {
             $this->components->warn('Config is cached — run `php artisan config:clear` or the new key will not be read.');
         }
 
+        $steps = [];
+
+        if ($configIsCached) {
+            $steps[] = 'php artisan config:clear   <fg=gray>(before the rekey — otherwise it still resolves the OLD key)</>';
+        }
+
+        $steps[] = 'php artisan encryption:rekey';
+        $steps[] = 'php artisan encryption:health';
+        $steps[] = 'Clear '.DataEncrypterFactory::PREVIOUS_ENV_KEY.' in .env — ONLY after encryption:health reports OK.';
+
         $this->newLine();
         $this->line('  <fg=gray>Next steps:</>');
-        $this->line('  <fg=yellow>1.</> php artisan encryption:rekey');
-        $this->line('  <fg=yellow>2.</> php artisan encryption:health');
-        $this->line('  <fg=yellow>3.</> Clear '.DataEncrypterFactory::PREVIOUS_ENV_KEY.' in .env — ONLY after encryption:health reports OK.');
+
+        foreach ($steps as $index => $step) {
+            $this->line('  <fg=yellow>'.($index + 1).'.</> '.$step);
+        }
+
         $this->newLine();
     }
 

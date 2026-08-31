@@ -61,6 +61,31 @@ Setting `auth.password_expiry_days` to a value greater than `0` enables the `Ens
 - the forgot-password POST route receives Turnstile middleware dynamically when the route is matched
 - **self-delete is blocked on the API.** `UserPolicy::delete` returns `false` when actor === target, so `DELETE /api/v1/users/{self}` returns 403 even for users holding `users.delete`. The only supported self-removal flow is the password-confirmed Fortify path in the Profile UI.
 
+### Cutting off an account that is already signed in
+
+The login-time check above cannot reach a session that is *already open* — an admin who deactivates a user would otherwise wait for that user's cookie to expire. Two pieces close that window.
+
+**`EnsureUserIsActive` middleware.** Registered by `StarterKitServiceProvider::boot()` as the `sk.active` alias and appended to the `web` and `api` groups, so an existing install picks it up on `composer update` without touching `bootstrap/app.php`. On every request it reads `status` on the authenticated model and terminates when the value is on the operator's deny-list:
+
+- **API / JSON request** → `403` in the kit's documented `ApiResponse` envelope (built in the middleware, so the shape does not depend on `ApiExceptionHandler` being registered).
+- **Web request** → the stateful guard is logged out, the session invalidated, the CSRF token regenerated, then a redirect to the named `login` route carrying the same `sk-auth.inactive` copy the login-time block uses.
+- **Web request whose credential cannot be cut** (a token guard reached through the `web` group), or an app with no `login` route → a plain `403`. Redirecting would loop, because the next request arrives with the same credential attached.
+
+**It is deliberately fail-open.** It ships into apps whose `users.status` column the kit does not control, and a mass lockout is far worse than one extra request served to an account disabled a second ago. The request passes through whenever: no listed guard has a user; a listed guard is not declared under `auth.guards` or throws while resolving; the model carries no `status` attribute; `status` is null, a bool, or anything that does not normalise to a string; or the normalised value is simply **not** on the deny-list — unknown strings included. The middleware never infers "not active, therefore blocked"; it can only block a status that was explicitly listed.
+
+**`RevokeUserAccessAction`.** The middleware only acts on requests that pass through the `web`/`api` groups. When a user's normalised status *transitions into* a denied value, this action additionally revokes Passport access **and** refresh tokens, unredeemed authorization/device codes (which could otherwise still be exchanged for a fresh access token), and the user's database session rows. It fires on a real transition only — editing the name of a user who has been inactive for a year revokes nothing — and never throws into the caller, because the status write has already committed.
+
+**Configuration** — `config/starter-kit.php`, `security` block:
+
+| Key | Default | What it does |
+|---|---|---|
+| `security.enforce_active_status` | `true` | Kill switch. `false` short-circuits the middleware **and** the token revocation. |
+| `security.active_status_denied` | `['inactive', 'banned']` | The only statuses that terminate a session. Limited on purpose to the two non-active values the shipped `userStatus` definition produces. |
+| `security.active_status_guards` | `['web', 'api']` | Guards inspected on each request. |
+| `security.csp_extra_origins` | `[]` | Extra origins appended to the kit's Content-Security-Policy header. |
+
+> `mergeConfigFrom` merges **top-level** keys only. A `config/starter-kit.php` published before this release has no `security` key at all and inherits the vendor block whole; a file carrying a *partial* `security` array replaces the vendor one for every nested key it omits. The middleware therefore falls back to class constants (`EnsureUserIsActive::ENFORCE_DEFAULT` / `::DENIED_DEFAULT` / `::GUARDS_DEFAULT`) that reproduce the shipped literals exactly, so both populations resolve the same values.
+
 ## API Authentication
 
 Passport powers the API side:

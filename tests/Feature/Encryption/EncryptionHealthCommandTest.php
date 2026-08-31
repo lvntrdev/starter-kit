@@ -404,12 +404,21 @@ it('--json emits the documented shape and never any key material', function (): 
         ->and($decoded['keys']['app_key_in_chain'])->toBeTrue();
 
     expect(array_keys($decoded['summary']))
-        ->toBe(['scanned', 'primary', 'previous', 'unreadable', 'incomplete', 'unvouched', 'config_block_missing']);
+        ->toBe([
+            'scanned', 'primary', 'previous', 'unreadable', 'incomplete', 'unvouched',
+            'config_block_missing', 'env_chain_diverged',
+        ]);
 
     // Coverage: WHO serves each surface, reported beside the row attribution.
     expect(array_keys($decoded['config_block']))
-        ->toBe(['present', 'configuration_cached', 'primary_key_in_environment'])
-        ->and($decoded['config_block']['present'])->toBeTrue();
+        ->toBe(['present', 'configuration_cached', 'primary_key_in_environment', 'env_chain_diverges'])
+        ->and($decoded['config_block']['present'])->toBeTrue()
+        // NULL, not false: the configuration is not cached in a test run, so
+        // config() reads the live values and there is nothing to be stale
+        // against. Reporting an unperformed check as a pass is the mistake this
+        // tri-state exists to prevent.
+        ->and($decoded['config_block']['env_chain_diverges'])->toBeNull()
+        ->and($decoded['summary']['env_chain_diverged'])->toBeFalse();
 
     expect($decoded['coverage'])->toHaveCount(2)
         ->and(array_keys($decoded['coverage'][0]))

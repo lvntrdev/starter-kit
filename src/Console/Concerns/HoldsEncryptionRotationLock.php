@@ -2,9 +2,10 @@
 
 namespace Lvntr\StarterKit\Console\Concerns;
 
+use BadMethodCallException;
+use Error;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
-use Throwable;
 
 /**
  * Serialise the commands that rewrite the encryption key chain.
@@ -37,12 +38,25 @@ trait HoldsEncryptionRotationLock
      * always behaved, and blocking a rotation outright would be the larger
      * regression.
      *
-     * The catch is `Throwable`, not `BadMethodCallException`. `Cache::lock()`
-     * is not declared on `Repository`; it reaches the store through `__call`,
-     * so a store that does not implement it — Laravel's own `session`,
-     * `storage` and `apc` stores among them — raises an `Error`, which is not
-     * an `Exception` at all. Catching the narrower type let a supported cache
-     * driver abort the command before it did any work.
+     * The catch is `Error`/`BadMethodCallException`, and the width of that pair
+     * is load-bearing in BOTH directions.
+     *
+     * Too narrow was the first bug: `Cache::lock()` is not declared on
+     * `Repository`; it reaches the store through `__call`, so a store that does
+     * not implement it — Laravel's own `session`, `storage` and `apc` stores
+     * among them — raises an `Error`, which is not an `Exception` at all.
+     * Catching only `BadMethodCallException` let a supported cache driver abort
+     * the command before it did any work.
+     *
+     * Too wide was the second: catching every `Throwable` also swallowed an
+     * OPERATIONAL failure — a misconfigured or unreachable lock backend — and
+     * ran the rotation unprotected, which is exactly the state this lock
+     * exists to prevent. "This store has no locks" is a static fact about the
+     * driver and is safe to fall back on; "the lock backend is down" is an
+     * outage, and rotating the key chain through an outage is how two
+     * concurrent runs drop a key the data still needs. So only the
+     * unsupported-store signal falls back; every other failure propagates and
+     * aborts the command.
      *
      * @param  callable(): int  $callback
      */
@@ -50,7 +64,7 @@ trait HoldsEncryptionRotationLock
     {
         try {
             $lock = Cache::lock(self::ROTATION_LOCK_KEY, self::ROTATION_LOCK_TTL_SECONDS);
-        } catch (Throwable) {
+        } catch (Error|BadMethodCallException) {
             return $callback();
         }
 

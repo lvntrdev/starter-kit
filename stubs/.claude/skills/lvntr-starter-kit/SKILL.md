@@ -1,6 +1,6 @@
 ---
 name: lvntr-starter-kit
-description: "Use this skill whenever working in a Laravel project that has the Lvntr Starter Kit (lvntr/laravel-starter-kit) installed. ALWAYS activate when: writing or modifying controllers under app/Http/Controllers/Admin, Api or Service; adding business logic under app/Domain/; creating FormRequests, API Resources, Actions, DTOs, Queries, Events, Listeners; touching routes/web/*-route.php or routes/api/*-route.php; building Vue pages under resources/js/pages/Admin/**; using @lvntr/components/* (SkForm, SkDatatable, SkTabs, AppDialog, AvatarUpload, PageLoading); calling FB/DB/TB builders or composables (useDialog, useConfirm, useApi, useDefinition, useRefreshBus, useCan, useFlash, useSidebar, useDarkMode, useTheme, useAccentColor, useDatatableSelection, useMenuBuilder); editing lang/{locale}/sk-*.php translations; running sk:install / sk:update / sk:publish / sk:upgrade / sk:doctor / sk:eject / make:sk-domain / remove:sk-domain / sk:seed-permissions / site:install / env:sync / file-manager:purge-trash; updating config/permission-resources.php, config/starter-kit.php, config/settings.php; working with the file manager, activity log, definitions, settings panel, or theme system (VITE_SK_THEME); or when the user mentions: starter kit, sk-, ApiResponse, to_api, ApiException, BaseAction, BaseDTO, ActionPipeline, DatatableQueryBuilder, RoleEnum, PermissionEnum, definitionOptions, refreshKey, dtApi, eject, vendor-first. Also triggers on Turkish: yeni domain, domain ekle, tablo ekle, form ekle, dialog aç. Enforces the kit's hard rules and upgrade-safety, and routes builder/domain detail to the lvntr-kit-frontend / lvntr-kit-domain skills."
+description: "Use this skill whenever working in a Laravel project that has the Lvntr Starter Kit (lvntr/laravel-starter-kit) installed. ALWAYS activate when: writing or modifying controllers under app/Http/Controllers/Admin, Api or Service; adding business logic under app/Domain/; creating FormRequests, API Resources, Actions, DTOs, Queries, Events, Listeners; touching routes/web/*-route.php or routes/api/*-route.php; building Vue pages under resources/js/pages/Admin/**; using @lvntr/components/* (SkForm, SkDatatable, SkTabs, AppDialog, AvatarUpload, PageLoading); calling FB/DB/TB builders or composables (useDialog, useConfirm, useApi, useDefinition, useRefreshBus, useCan, useFlash, useSidebar, useDarkMode, useTheme, useAccentColor, useDatatableSelection, useMenuBuilder); editing lang/{locale}/sk-*.php translations; running sk:install / sk:update / sk:publish / sk:upgrade / sk:doctor / sk:eject / make:sk-domain / remove:sk-domain / sk:seed-permissions / site:install / env:sync / file-manager:purge-trash / encryption:key / encryption:rekey / encryption:health; updating config/permission-resources.php, config/starter-kit.php, config/settings.php; working with the file manager, activity log, definitions, settings panel, or theme system (VITE_SK_THEME); or when the user mentions: starter kit, sk-, ApiResponse, to_api, ApiException, BaseAction, BaseDTO, ActionPipeline, DatatableQueryBuilder, RoleEnum, PermissionEnum, definitionOptions, refreshKey, dtApi, eject, vendor-first. Also triggers on Turkish: yeni domain, domain ekle, tablo ekle, form ekle, dialog aç. Enforces the kit's hard rules and upgrade-safety, and routes builder/domain detail to the lvntr-kit-frontend / lvntr-kit-domain skills."
 ---
 
 # Lvntr Starter Kit — Core Gate
@@ -127,6 +127,14 @@ rules about *what not to touch* are kit-specific.
    change. The pre-commit hook will reject otherwise.
 8. **Never edit a committed migration** — add a new one. Two-step destructive
    changes (write, then drop in a follow-up migration) keep production safe.
+9. **Never re-run `sk:install` on an installed app.** It is a first-install
+   command, not a repair tool: it stops fail-closed when it detects the kit is
+   already there without a hash registry. Use `sk:update`, a scoped
+   `sk:publish --tag=<area>`, or `sk:install --adopt` (rebuilds
+   `storage/starter-kit/hashes.json` only — copies no file, runs no migration,
+   never touches `.env`). Never suggest `--force` to get past the stop, and
+   never suggest the installer's `migrate:fresh` branch on a database that
+   holds data.
 
 ---
 
@@ -241,7 +249,7 @@ vendor-precompiled JSON. Only the active locale is lazy-loaded at runtime.
 
 This skill is a lean gate; heavy reference is read on demand:
 - Project file shape after `sk:install` (vendor-first layout, what is app-owned) → `references/project-shape.md`
-- Command reference (install/update/publish/upgrade/doctor/eject, make:sk-domain incl. `--with=`, seed-permissions, purge-trash, site:install, env:sync, wayfinder:generate) → `references/commands.md`
+- Command reference (install incl. `--adopt`/first-install-only rules, update/publish/upgrade/doctor/eject, make:sk-domain incl. `--with=`, seed-permissions, purge-trash, encryption key/rekey/health, site:install, env:sync, wayfinder:generate) → `references/commands.md`
 - Built-in modules (file manager, activity & audit log, settings panel, definitions, OAuth/Passport, theme system) → `references/modules.md`
 - Safe update flow (`sk:update`, hash registry, SAFE_UPDATE vs NEVER_UPDATE vs vendor-resident) → `references/update-flow.md`
 - "Where to look" lookup table (which pattern lives in which file) → `references/lookup.md`

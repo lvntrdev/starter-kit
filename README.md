@@ -77,13 +77,13 @@ Start from a clean Laravel install:
 ```bash
 composer create-project laravel/laravel my-app
 cd my-app
-composer require lvntr/laravel-starter-kit:^13.6
+composer require lvntr/laravel-starter-kit:^13.7
 php artisan sk:install
 ```
 
 > **Check `php -v` first — this kit requires PHP 8.4+.** The `laravel/laravel`
 > skeleton itself only requires PHP 8.3, so `create-project` succeeds on 8.3 and
-> the failure surfaces later. Always require the kit with `:^13.6` (not a looser
+> the failure surfaces later. Always require the kit with `:^13.7` (not a looser
 > `:^13.0`): with a loose constraint Composer silently resolves down to an
 > ancient release that still fits PHP 8.3 instead of reporting the real blocker.
 
@@ -107,7 +107,7 @@ receive breaking changes from a newer Laravel target.
 
 | Laravel | Constraint                                            | Branch  | Status      |
 |---------|-------------------------------------------------------|---------|-------------|
-| 13.x    | `composer require lvntr/laravel-starter-kit:^13.6`    | `13.x`  | active      |
+| 13.x    | `composer require lvntr/laravel-starter-kit:^13.7`    | `13.x`  | active      |
 
 `main` tracks the currently active major (today: `13.x`). When a future
 Laravel release is targeted, `main` will move to that next-major dev

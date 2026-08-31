@@ -51,6 +51,8 @@ php artisan encryption:key
 ```
 
 - Resolves the current primary key from `.env` (not from cached config), generates a new random key for the configured cipher in memory, writes `DATA_ENCRYPTION_PREVIOUS_KEYS` with the old primary prepended, and only then writes the new `DATA_ENCRYPTION_KEY`. That order is deliberate: a crash between the two writes leaves the old key still primary and redundantly listed — never the reverse, which would orphan every encrypted row.
+- `.env` is read with the same parser the app boots with (phpdotenv), not a regex — a `${VAR}`-interpolated assignment (e.g. `DATA_ENCRYPTION_KEY=${APP_KEY}`) resolves to the actual key material before it is written into `DATA_ENCRYPTION_PREVIOUS_KEYS`, never as the literal `${APP_KEY}` reference. A `.env` the parser cannot make sense of aborts the command before a key is generated or anything is written — no half-applied rotation — and the parser's own error message is withheld, because it can quote the malformed line back and that line may itself be key material.
+- **The file has to be the authority.** If the process environment sets one of these keys — or sets a variable that an interpolated value in `.env` points at — the running app resolves that value, not the one the file states. `encryption:key` detects the divergence and stops before generating anything, naming the key but never either value. Rewriting `.env` would not help: the process value would keep winning, and the rotation would retire a key the app never used while dropping the one it did, leaving existing ciphertext unreadable. Unset the process variable (or bring it in line with the file) and re-run.
 - `APP_KEY` is never read, modified, or re-emitted by this command, under any option.
 - `--show` prints a freshly generated key to stdout and writes nothing. Use it to inspect what a key looks like without touching `.env`.
 - `--force` is required to run in an environment that looks like production, because rotating the key here makes every encrypted value unreadable until `encryption:rekey` completes. Re-run with `--force` only once you have a database backup and a maintenance window.
@@ -88,11 +90,20 @@ Verdicts (exit code is the machine-readable half):
 | --- | --- | --- |
 | `safe-to-clear` | 0 | Every scanned value reads with the primary key alone; every surface was fully scanned. `DATA_ENCRYPTION_PREVIOUS_KEYS` can be cleared. |
 | `rekey-required` | 1 | At least one value needs a non-primary key. Nothing is lost yet, but clearing the previous-key list now would lose it. Run `encryption:rekey`. |
-| `incomplete` | 1 | A surface could not be fully scanned, so "safe" cannot be asserted. |
+| `not-covered` | 1 | A surface is served by an encrypter this kit did not build, or the `starter-kit.encryption` config block is absent so the configured key is inert. Nothing is lost, but the attribution below does not describe the install's real read/write path, so "safe to clear" cannot be asserted from it. See [Surface coverage](#surface-coverage) below. |
+| `incomplete` | 1 | A surface could not be fully scanned, so "safe" cannot be asserted — including a cached config whose resolved key chain no longer matches `.env`/the process environment. Run `php artisan config:clear` (and re-cache afterwards if you cache config in production) and re-run. |
 | `unreadable` | 2 | A value exists that no configured key can read. The key that wrote it is missing from `.env` and must be added back — never cleared away. |
 | `key-error` | 2 | The key chain itself does not resolve; nothing could be attributed. |
 
 The verdict only ever downgrades, never upgrades — a false "safe to clear" is the one output of this command that destroys data.
+
+### Surface coverage
+
+Both commands report **which encrypter actually serves each surface**, not just what the kit's own key chain looks like. This matters because the 2FA surface is not necessarily read through the kit: Fortify resolves `Fortify::$encrypter ?? Model::$encrypter ?? Crypt`, and the kit deliberately does not overwrite an encrypter a consumer set themselves (`StarterKitServiceProvider::configureDataEncryption()`).
+
+- `encryption:health` names the encrypter behind each surface. A surface served by an encrypter the kit did not build is reported as **unvouched** and the verdict drops to `not-covered` (exit 1) — the row attribution is still true about the stored bytes, but it says nothing about the path this install reads and writes through.
+- **The stale-published-config gap is reported as its own diagnosis.** A `config/starter-kit.php` published before the encryption block exists makes `starter-kit.encryption` resolve to null, so `DATA_ENCRYPTION_KEY` is inert and the primary key is silently the `APP_KEY` fallback — previously this could still read as "safe to clear". It now yields `not-covered`; re-publish the config (`php artisan vendor:publish --tag=starter-kit-config --force`) and re-run.
+- `encryption:rekey` **refuses before it reads a single row** when a selected surface is unvouched, and names both the surface and the `--only=` flag that excludes it. A run that was silently narrowed and then reported as a complete rekey is worse than an error: it would rewrite rows onto a key the reading encrypter does not hold, turning every 2FA login into a failed challenge. A run whose selected surfaces are all covered is unaffected.
 
 ## Adopting the dedicated key on an existing install
 
@@ -100,9 +111,12 @@ An install that has never run `encryption:key` is not required to. If you choose
 
 ```bash
 php artisan encryption:key
+php artisan config:clear   # if config is cached, rekey would still resolve the OLD primary key
 php artisan encryption:rekey
 php artisan encryption:health
 ```
+
+`config:clear` sits **between** the two commands, not after them. `encryption:key` writes `.env`, but a cached config keeps serving the previous chain — so a rekey run before the clear re-encrypts every row onto the key that was just retired, or finds nothing to do at all. Clearing first is what makes `encryption:rekey` see the key it is supposed to move the data onto.
 
 Then, only after `encryption:health` reports `safe-to-clear`:
 
@@ -112,8 +126,11 @@ DATA_ENCRYPTION_PREVIOUS_KEYS=
 ```
 
 ```bash
+php artisan config:clear
 php artisan encryption:health
 ```
+
+If you cache config in production, run `php artisan config:cache` again immediately after each `config:clear` above.
 
 Do not clear `DATA_ENCRYPTION_PREVIOUS_KEYS` until the second `encryption:health` run (after the edit) also reports `safe-to-clear`. If it reports anything else, put the old value back and investigate — clearing the previous-key list before every row is confirmed on the primary key is what turns a rotation into permanent data loss.
 
@@ -123,11 +140,12 @@ Rotation uses the same three commands, in the same order, with the same maintena
 
 ```bash
 php artisan encryption:key --force   # --force only needed in a production-like environment
+php artisan config:clear             # if config is cached, rekey would still resolve the OLD primary key
 php artisan encryption:rekey
 php artisan encryption:health
 ```
 
-Then clear `DATA_ENCRYPTION_PREVIOUS_KEYS` by hand and run `encryption:health` again to confirm, exactly as in adoption above. Run `encryption:rekey` inside a maintenance window — a large table under active writes should not be rekeyed mid-traffic even though the command is written to tolerate concurrent reads/writes safely.
+Then clear `DATA_ENCRYPTION_PREVIOUS_KEYS` by hand and run `config:clear` followed by `encryption:health` again to confirm, exactly as in adoption above. Run `encryption:rekey` inside a maintenance window — a large table under active writes should not be rekeyed mid-traffic even though the command is written to tolerate concurrent reads/writes safely.
 
 ## Reverting a rollback of this feature
 

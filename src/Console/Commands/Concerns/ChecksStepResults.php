@@ -76,24 +76,64 @@ trait ChecksStepResults
             $process->setTty(true);
         }
 
-        $process->run();
+        try {
+            $process->run();
+        } catch (\Throwable $e) {
+            // A process can fail WITHOUT ever producing an exit code: the
+            // timeout above raises ProcessTimedOutException, a missing binary or
+            // an unusable cwd raises ProcessStartFailedException/RuntimeException.
+            // Left to escape, those fly straight past the caller's `mandatory:
+            // false` contract into its outer catch — so a slow `npm install`
+            // aborted an otherwise complete install, which is exactly what the
+            // best-effort classification exists to prevent.
+            //
+            // The message is escaped for the same reason outputTail() escapes:
+            // it embeds the commandline, and a console tag inside it would
+            // otherwise be interpreted by (or break) the caller's formatter.
+            $this->stepFailureDetail = sprintf(
+                '`%s` did not complete: %s%s',
+                implode(' ', $command),
+                OutputFormatter::escape($e->getMessage()),
+                $this->outputTail($this->processOutput($process)),
+            );
+
+            return false;
+        }
 
         if ($process->isSuccessful()) {
             return true;
         }
 
-        // A TTY process streams straight to the terminal and buffers nothing, so
-        // there is nothing to read back — the operator has already seen it.
-        $error = $process->isTty() ? '' : ($process->getErrorOutput() ?: $process->getOutput());
-
         $this->stepFailureDetail = sprintf(
             '`%s` exited with code %s.%s',
             implode(' ', $command),
             $process->getExitCode() ?? 'unknown',
-            $this->outputTail($error),
+            $this->outputTail($this->processOutput($process)),
         );
 
         return false;
+    }
+
+    /**
+     * Whatever a failed process left readable, or '' when there is nothing.
+     *
+     * Two cases yield nothing and must not be read: a TTY process streams
+     * straight to the terminal and buffers no pipes (the operator has already
+     * seen it), and a process that never started has no pipes at all — asking
+     * either for its output throws a LogicException on top of the failure being
+     * reported.
+     */
+    private function processOutput(Process $process): string
+    {
+        if ($process->isTty() || ! $process->isStarted()) {
+            return '';
+        }
+
+        try {
+            return $process->getErrorOutput() ?: $process->getOutput();
+        } catch (\Throwable) {
+            return '';
+        }
     }
 
     /**

@@ -4,7 +4,7 @@ This file is the cross-major-version migration guide. Every release gets its own
 
 ---
 
-## Unreleased
+## v13.6.16 → v13.7.0
 
 ### `sk:install` now refuses to run on an app it did not install
 
@@ -20,6 +20,8 @@ A first install used to copy `.env.example` over an existing `.env` outright —
 
 Both `sk:install` and `sk:update` now decide whether to overwrite a published path through the same three-way comparison (shipped stub hash vs. on-disk hash vs. the hash recorded in the registry at the last install/update). When the on-disk copy no longer matches what was recorded, the difference is treated as a consumer edit and the file is **skipped and reported**, instead of being silently overwritten — this now also covers `sk:install`'s re-publish path, not only `sk:update`'s. Pass `--force` to overwrite anyway; commit first so Git keeps the previous version reachable.
 
+This closes the one remaining gap in that guard: on a re-install, a file the hash registry has **no record of at all** — because a newer package version started shipping into a path it never shipped into on this app before — used to be overwritten regardless of `--force`. It is now treated the same as a consumer edit: preserved and reported, not overwritten, unless `--force` is passed. The protection only applies once a registry exists to be authoritative; a genuine first install still publishes every path, tracked or not, because there is nothing yet to compare against.
+
 ### Inactive users are cut off mid-session
 
 The login path already refused a non-active account, but it could not reach a session that was already open — an operator deactivating a user had to wait for that user's session cookie to expire on its own. A new `EnsureUserIsActive` middleware (wired automatically onto the `web` and `api` guards) now checks the authenticated user's `status` on every request and, if it matches the operator's deny-list, logs a web session out and redirects to login, or returns a 403 for an API request.
@@ -32,11 +34,17 @@ This is deliberately **fail-open** on every ambiguous case: a guard with no auth
 
 If a CI pipeline currently passes despite a silently failing installer step, it will start failing after this upgrade — that is the intended signal, not a regression to work around. Frontend and tooling steps (`npm install`, Wayfinder generation, `npm run build`, `composer dump-autoload`, cache clears) deliberately stay non-fatal: they warn, print the command to run by hand, and are listed again in the closing summary, so a machine without Node or Composer still installs exactly as it does today. The `site:install` change ships through `stubs/`, so it reaches new installs and `sk:update`-refreshed apps only — an existing, untouched consumer copy of `site:install` is not changed.
 
+An unreachable database at install time used to still print `Lvntr Starter Kit installed successfully!` and exit `0` — the database block (migrations, seeders, permission seeding) was skipped with only an on-screen warning. That run now ends the install as **incomplete**: no stub-hash registry is written, the resume checkpoint from the filesystem steps that did finish is kept, and the command exits non-zero. Fix the database connection and run `php artisan sk:install --resume` to pick up exactly where it stopped, rather than starting over.
+
+### `migrate:fresh` now demands a typed confirmation
+
+When `sk:install` finds an existing database with tables already in it, it offers a `select()` menu that included a "Drop all tables and run fresh migrations" option, confirmed by the ordinary yes/no `select()` answer — one accidental keystroke away from an irreversible `migrate:fresh`. That option is now gated behind a **typed** confirmation: the operator must type the database name (or the literal word `fresh`) at a `text()` prompt before the drop runs; anything else, including an empty answer or a reflexive `y`, falls back to the additive `migrate` path with nothing dropped. The destructive option is also withheld outright — the prompt explains why — when `APP_ENV` looks production-like, `APP_DEBUG` is off, the session cannot prompt at all (`--no-interaction`, CI, no TTY), or any existing table already holds rows (a table that cannot be read counts as holding data). There is no escape hatch around the typed confirmation itself; the only way to skip it is to run against an empty database or use `migrate` instead.
+
 ### `sk:install` is no longer documented as a recovery path
 
-`docs/install.md` and `docs/update.md` previously described re-running `php artisan sk:install` on an existing project as an idempotent whole-project recovery step. It is not, and that advice is withdrawn. `sk:install` publishes over every path except `lang/` regardless of `--force`, its hash registry only protects a file you deleted (not one you edited), and the registry is stored under the git-ignored `storage/starter-kit/hashes.json` — losing it makes the command classify an installed app as a **first install**, at which point it copies `.env.example` over the existing `.env` and can regenerate `APP_KEY`.
+`docs/install.md` and `docs/update.md` previously described re-running `php artisan sk:install` on an existing project as an idempotent whole-project recovery step. It is not, and that advice is withdrawn — treat `storage/starter-kit/` as persistent operational state in your deploy strategy — it must survive a release the same way `storage/app/` does.
 
-No code changed in this release; the command behaves as it always has. Use `sk:update` or a scoped `sk:publish --tag=<area>` to change an installed app, and treat `storage/starter-kit/` as persistent operational state in your deploy strategy — it must survive a release the same way `storage/app/` does.
+Two of the risks that originally motivated withdrawing that advice are now addressed above rather than open: a missing registry no longer makes `sk:install` silently treat an installed app as a first install (see "`sk:install` now refuses to run on an app it did not install" above), and a first install onto an app that already has `.env` no longer overwrites it (see "`.env` is never overwritten" above). What still makes `sk:install` the wrong tool for touching an already-installed app is the consumer-edit handling described in "A consumer-modified published file is skipped by default" above: without `--force` an edited file is skipped and reported rather than refreshed, and with `--force` it is overwritten outright, so neither mode gives you the selective, edit-preserving refresh `sk:update` or a scoped `sk:publish --tag=<area>` gives you. Use those commands to change an installed app instead.
 
 ### `DATA_ENCRYPTION_CIPHER` must match `app.cipher` — enforced
 
@@ -171,6 +179,26 @@ This fix lives in the vendor query classes (`Lvntr\StarterKit\Domain\User\Querie
 ### `DatatableQueryBuilder::columns()` payload shaping is fail-closed
 
 A backend that declares `columns()` and receives a `?columns=` request parameter with **no key matching a declared column** now reduces every row to the `alwaysInclude()` keys only — it no longer falls back to returning the full row. An absent `columns` parameter is unaffected and still returns the full row. If a frontend column key and the corresponding backend `columns()` key have ever drifted apart (a rename on one side only), affected cells now render empty instead of masking the mismatch with the full payload; audit both sides if you see missing cell data after upgrading.
+
+### `definitions.lang` is narrowed — the migration can refuse
+
+`create_definitions_table` declared `unique(['key', 'value', 'lang'])` over three default `string()` (255-character, utf8mb4) columns — 3060 of MySQL/MariaDB's 3072-byte InnoDB key limit, one column-width away from breaking outright. A new migration narrows **`lang` only**, to 35 characters — the widest locale value the kit already accepts anywhere, taken from `content_languages.code`, so any tag you could have stored through the kit's own screens still fits and the refusal below stays unreachable for it. `key` and `value` keep their published 255: `lang` alone brings the index down to 2180 bytes, ~892 under the ceiling, so narrowing them would only have blocked data the current schema accepts.
+
+**Before touching the schema, the migration measures every existing row** (`lang` character length, soft-deleted rows included — they still occupy the unique index) and refuses, unchanged, if any row would lose characters at the new limit. If it refuses on your data:
+
+1. Read the error — it names the column, the row count over the limit, and the longest value found.
+2. Shorten or delete the offending `definitions` rows (including soft-deleted ones — `deleted_at` does not exempt a row from the unique index).
+3. Re-run `php artisan migrate`.
+
+The migration is a straight rollback (`down()` widens `lang` back to 255 — a widening never truncates, so it needs no probe). Either direction ends by asserting the unique index is present, so a table that reached it with the index already missing (a half-finished earlier run) gets it rebuilt rather than recorded as migrated without its guarantee. On a table grown well beyond the kit's own ~34 seeded rows, the `ALTER TABLE` + index rebuild holds a metadata lock for its duration; schedule it with the same care as any other ALTER on a large table.
+
+### `media` table migration now has a rollback path — one that refuses rather than destroys
+
+`create_media_table` had no `down()`. Laravel's migrator guards that call with `method_exists`, so `php artisan migrate:rollback` did not error — it silently skipped the table and deleted the migration's ledger row anyway, leaving a `media` table that the app no longer had a record of and a re-`migrate` that failed on it. It now declares a `down()`: the table is dropped when it is empty, and a rollback attempted while rows remain stops with an error naming the table. The two later migrations in the same chain (`add_folder_id_to_media_table`, `add_soft_deletes_to_media_table`) carry the identical refusal, because a batch rolls back newest-first: without it they would have dropped `folder_id` and `deleted_at` off a populated table before the create migration's guard was ever reached.
+
+**This is a behaviour change for existing consumers**: a `migrate:rollback` covering the batch this migration belongs to used to walk past `media` in silence; on an install that has media rows it now **fails**. That failure is the feature. Dropping a populated `media` would remove the **rows**, not the **files**: every row points at a blob on a configured disk, and Spatie deletes that blob only through the model's deleting event — a schema rollback bypasses Eloquent entirely, so the storage directories would survive intact while the only index of them was destroyed, leaving orphaned files nothing in the app can enumerate afterwards.
+
+To roll the migration back deliberately, delete the media **through the application** first, so the blobs go with the rows, then run the rollback again. Do not empty the table with raw SQL to get past the guard — that reproduces exactly the orphaning the guard exists to prevent.
 
 ## v13.6.8 → v13.6.9
 
