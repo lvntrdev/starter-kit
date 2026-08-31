@@ -2,6 +2,14 @@
 
 Starter kit'e yeni eklenen özellikler ve iyileştirmeler burada listelenir.
 
+## Unreleased
+
+### Düzeltildi
+
+- **`encryption:key` artık mevcut bir `DATA_ENCRYPTION_PREVIOUS_KEYS` girdisinin anlamını değiştirmiyor.** Komut yalnızca emekliye ayırdığı anahtarı normalize ediyordu; listede zaten bulunan girdiler olduğu gibi kopyalanıyordu. Liste phpdotenv üzerinden okunur (çevreleyen tırnaklar soyulur, `${VAR}` çözülür) ve tırnaksız geri yazılır; bu yüzden `#`, `$` veya boşluk içeren bir girdi bir sonraki boot'ta farklı bir anahtar olarak dönüyordu — `#` bir yorum açıp anahtarı kısaltıyor. Artık her girdi, ham hâli bir `.env` satırında hayatta kalamıyorsa env-güvenli hâle getiriliyor (aynı baytlara çözülen `base64:` biçiminde yeniden yazılıyor).
+- **`encryption:key` artık geçici `.env` dosyasının tam yazıldığını doğruluyor ve yerine taşımadan önce `fsync` ediyor.** Dolu bir disk `Filesystem::put()`'un hata fırlatması yerine kısa bir bayt sayısı döndürmesine yol açar; bu yüzden kırpılmış bir gövde eksiksiz bir `.env`'in yerine geçebiliyordu — komutun iki yazmasından ilkinde o gövde, emekliye ayrılan anahtarın tek kopyasını taşır.
+- **`encryption:key` artık `.env`'in sahip ve grup bilgisini yazdığı dosyaya taşıyor.** `www-data:www-data` sahipli bir `.env` üzerinde `sudo php artisan encryption:key`, web kullanıcısının okuyamadığı root sahipli bir dosya bırakıyordu. Sahiplik en iyi çaba ile geri veriliyor (yalnızca root bir dosyayı başka bir kullanıcıya devredebilir) ve onaran `chown` komutunu adıyla söyleyen bir uyarı basılıyor; mode geri yüklemesi ise artık doğrulanıyor — genişlemiş bir mode, hiçbir şey değiştirilmeden önce işlemi durduruyor.
+
 ## 2026-08-31 — v13.7.0
 
 ### Eklendi

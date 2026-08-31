@@ -5,6 +5,14 @@ All notable changes to `lvntr/laravel-starter-kit` will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`encryption:key` no longer changes what an existing `DATA_ENCRYPTION_PREVIOUS_KEYS` entry means.** The command normalised only the key it was retiring; the entries already in the list were copied through verbatim. Since the list is READ through phpdotenv (surrounding quotes stripped, `${VAR}` resolved) and WRITTEN back unquoted, an entry holding `#`, `$` or whitespace — legal in a raw 32-byte key, and reachable by anyone who quoted the value in `.env` — came back as a different key on the next boot: `#` opens a comment and truncates it, `$` interpolates. The rows encrypted with that key then decrypt with nothing, and no copy of the key survives anywhere. Every entry is now put through the same env-safe check as the primary and re-emitted as `base64:` (decoding to the identical bytes) when the raw form cannot survive an `.env` line; a value that is already safe is still written verbatim.
+- **`encryption:key` now checks that its temporary `.env` was written in full before renaming it into place.** `Filesystem::put()` reports a full disk or a refused open by RETURNING `false` or a short byte count rather than throwing, so the unchecked call could rename a truncated body over a complete `.env` — and on the first of the command's two writes, that truncated body is the only copy of the key being retired. The write is now verified and the bytes are `fsync`-ed before the rename, so "the previous-key list reached the disk before the primary changed" holds across a power loss, not just across a clean exit. The generic `WritesFilesAtomically::atomicPut()` already did both; the `.env` writer, which cannot use it (it has to follow a symlinked `.env` and preserve its mode), did not.
+- **`encryption:key` now carries the `.env` owner and group onto the file it writes.** The atomic write installs a new inode owned by whoever ran the command, so `sudo php artisan encryption:key` over an app whose `.env` is `www-data:www-data` left a root-owned file the web user could no longer read — the app stopped booting on the key it had just rotated in. Ownership is restored best-effort (only root can hand a file to another user) with a warning naming the `chown` that repairs it, and the mode restore is now verified rather than assumed: a mode that came back wider than the file it replaces aborts before the rename, and one pinned narrower by the filesystem warns.
+
 ## [13.7.0] - 2026-08-31
 
 ### Added

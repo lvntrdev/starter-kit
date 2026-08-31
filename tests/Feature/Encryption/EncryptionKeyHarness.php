@@ -31,8 +31,12 @@ use Symfony\Component\Console\Output\BufferedOutput;
  * sequence of candidate .env bodies the command flushed to disk. Recording the
  * payload rather than re-reading the file is what makes the intermediate state
  * observable at all.
+ *
+ * Not final: a test that needs the write itself to misbehave (a short put(),
+ * the shape a full disk produces) subclasses this so the payloads stay
+ * recorded and ekcRun()'s contract still holds.
  */
-final class EkcRecordingFilesystem extends Filesystem
+class EkcRecordingFilesystem extends Filesystem
 {
     /** @var list<string> */
     public array $writes = [];
@@ -109,12 +113,16 @@ function ekcRead(string $content, string $key): ?string
  * Filesystem is the whole point, and binding one into the container would hand
  * it to every other consumer of that class as well.
  *
+ * A caller may pass its own recorder to make the write itself misbehave (a
+ * short or refused put(), the shape a full disk produces); the default is the
+ * plain recorder.
+ *
  * @param  array<string, mixed>  $parameters
  * @return array{status: int, output: string, files: EkcRecordingFilesystem}
  */
-function ekcRun(array $parameters = []): array
+function ekcRun(array $parameters = [], ?EkcRecordingFilesystem $files = null): array
 {
-    $files = new EkcRecordingFilesystem;
+    $files ??= new EkcRecordingFilesystem;
 
     $command = new EncryptionKeyCommand($files);
     $command->setLaravel(app());

@@ -271,11 +271,24 @@ final class EncryptionKeyCommand extends Command
      *    hardened `0600` `.env` comes back as `0644` (umask-dependent) — and
      *    the temp file itself was world-readable WHILE holding the new key.
      *
+     * 3. **Ownership loss.** `rename()` also installs a NEW inode, owned by
+     *    whoever ran the command. A `sudo php artisan encryption:key` over an
+     *    app whose `.env` is `www-data:www-data` leaves a root-owned `0640`
+     *    file the web user can no longer read — the app stops booting with the
+     *    key it just rotated onto.
+     *
      * So: resolve the link first and write onto its target; capture the
-     * target's mode and restore it before the rename; and narrow the temp file
-     * to `0600` while it is still EMPTY, so key material never exists in a
-     * wide-mode file. Atomicity is kept — the temp file stays in the target's
-     * own directory, so the rename never crosses a filesystem.
+     * target's mode, owner and group and restore them before the rename; and
+     * narrow the temp file to `0600` while it is still EMPTY, so key material
+     * never exists in a wide-mode file. Atomicity is kept — the temp file stays
+     * in the target's own directory, so the rename never crosses a filesystem.
+     *
+     * Two more things the generic writer already gets right and this one must
+     * not skip: the `put()` return value is CHECKED (a full disk returns a short
+     * byte count instead of throwing, and an unchecked call renames a truncated
+     * body over a good `.env`), and the bytes are fsync-ed before the rename, so
+     * the "previous list is on disk before the primary changes" ordering is a
+     * durability guarantee and not just a call order.
      */
     private function putEnvPreservingIdentity(string $path, string $contents): void
     {
@@ -283,7 +296,11 @@ final class EncryptionKeyCommand extends Command
         // temp directory, rename target) must be about the real file.
         $target = is_link($path) ? (realpath($path) ?: $path) : $path;
 
-        $mode = file_exists($target) ? (fileperms($target) & 0777) : 0600;
+        $exists = file_exists($target);
+
+        $mode = $exists ? (fileperms($target) & 0777) : 0600;
+        $owner = $exists ? @fileowner($target) : false;
+        $group = $exists ? @filegroup($target) : false;
 
         $dir = dirname($target);
         $temp = $dir.DIRECTORY_SEPARATOR.'.'.basename($target).'.tmp'.bin2hex(random_bytes(6));
@@ -301,9 +318,23 @@ final class EncryptionKeyCommand extends Command
 
             $this->narrowOrFail($temp);
 
-            $this->files->put($temp, $contents);
+            // put() reports a full disk or a failed open by RETURNING (false, or
+            // a short byte count), not by throwing. Renaming that temp file into
+            // place would replace a complete .env with a truncated one — and on
+            // step (3) the truncated body is the one holding the only copy of
+            // the retired key.
+            $written = $this->files->put($temp, $contents);
 
-            @chmod($temp, $mode);
+            if ($written === false || $written !== strlen($contents)) {
+                throw new RuntimeException(
+                    "Refusing to replace [{$target}]: the temporary file was written short or not at all "
+                    .'(a full disk reports itself this way). The existing file is untouched.'
+                );
+            }
+
+            $this->restoreIdentity($temp, $target, $mode, $owner, $group);
+
+            $this->flushToDisk($temp);
 
             if (! @rename($temp, $target)) {
                 throw new RuntimeException("Atomic write failed: could not move temp file into place for [{$target}].");
@@ -342,6 +373,141 @@ final class EncryptionKeyCommand extends Command
                 .'The filesystem may not support permissions (FAT, some network mounts). '
                 .'Nothing was written.'
             );
+        }
+    }
+
+    /**
+     * Give the temp file the identity of the file it is about to replace.
+     *
+     * Mode alone is not the identity. `rename()` installs a NEW inode owned by
+     * whoever ran the command, so a `sudo` rotation over a `www-data:www-data`
+     * `.env` produces a root-owned file: the mode says `0640`, the web user
+     * still cannot read it, and the app stops booting on the key that was just
+     * rotated in. Ownership therefore has to be carried over explicitly — the
+     * same reason {@see InstallCommand::putEnvAtomically()} carries it.
+     *
+     * Ownership is BEST-EFFORT: only root can hand a file to another user, and a
+     * non-root run already owns the file it replaces. When it does not stick we
+     * warn with the command that repairs it rather than aborting — the rotation
+     * itself is sound, and refusing here would leave an operator unable to
+     * rotate at all.
+     *
+     * The mode restore, in contrast, is VERIFIED, because chmod() reporting
+     * success is not the mode being applied (see {@see self::narrowOrFail()}).
+     * A mode that came back WIDER than the target is a privilege leak on a file
+     * holding key material and aborts — nothing has been renamed yet, so the
+     * real `.env` is untouched. A mode that stayed NARROWER (a mount that pins
+     * permissions) only warns: the key is safe, the app may not be able to read
+     * it, and that is the operator's call to make.
+     *
+     * @param  int|false  $owner  the replaced file's uid, false when unknown
+     * @param  int|false  $group  the replaced file's gid, false when unknown
+     *
+     * @throws RuntimeException
+     */
+    private function restoreIdentity(string $temp, string $target, int $mode, int|false $owner, int|false $group): void
+    {
+        // Group before owner, both before chmod: chown() clears setuid/setgid on
+        // most systems, so the mode has to be the last word.
+        if ($group !== false) {
+            @chgrp($temp, $group);
+        }
+
+        if ($owner !== false) {
+            @chown($temp, $owner);
+        }
+
+        @chmod($temp, $mode);
+
+        clearstatcache(true, $temp);
+
+        $actual = @fileperms($temp);
+
+        if ($actual === false) {
+            throw new RuntimeException(
+                "Refusing to replace [{$target}]: the permissions of the temporary file could not be read back, "
+                .'so the key would land under unknown access. The existing file is untouched.'
+            );
+        }
+
+        $actual &= 0777;
+
+        if (($actual & ~$mode) !== 0) {
+            throw new RuntimeException(sprintf(
+                'Refusing to replace [%s]: the replacement file came back mode %o where the existing file is %o, '
+                .'which would widen who can read the encryption key. The existing file is untouched.',
+                $target,
+                $actual,
+                $mode,
+            ));
+        }
+
+        if ($actual !== $mode) {
+            $this->components->warn(sprintf(
+                'The rotated .env is mode %o, not the %o the previous file carried — this filesystem pins '
+                .'permissions. The key is not exposed, but a service running as another user may no longer '
+                .'read .env. Fix it with: chmod %o %s',
+                $actual,
+                $mode,
+                $mode,
+                $target,
+            ));
+        }
+
+        $ownerKept = $owner === false || @fileowner($temp) === $owner;
+        $groupKept = $group === false || @filegroup($temp) === $group;
+
+        if (! $ownerKept || ! $groupKept) {
+            $this->components->warn(sprintf(
+                'The rotated .env is owned by %s:%s, not the %s:%s the previous file carried (only root can '
+                .'hand a file to another user). A service running as that user can no longer read .env. '
+                .'Fix it with: chown %s:%s %s',
+                (string) @fileowner($temp),
+                (string) @filegroup($temp),
+                $owner === false ? '?' : (string) $owner,
+                $group === false ? '?' : (string) $group,
+                $owner === false ? '?' : (string) $owner,
+                $group === false ? '?' : (string) $group,
+                $target,
+            ));
+        }
+    }
+
+    /**
+     * Push the temp file's bytes out of the kernel page cache before the rename.
+     *
+     * `rename()` makes the SWAP atomic, not the CONTENT durable: on a power loss
+     * or host crash the metadata change can reach the disk while the data behind
+     * it has not. For this command that is the whole safety property — step (3)
+     * writes the retired key into DATA_ENCRYPTION_PREVIOUS_KEYS and step (4)
+     * replaces the primary, and "step 3 is on disk first" is only true if step 3
+     * was actually flushed. Without this, a crash between the two can leave a
+     * correctly named `.env` whose previous-key line is zeroes and whose primary
+     * is a key nothing was encrypted with.
+     *
+     * Deliberately not {@see WritesFilesAtomically}: that trait's atomicPut() is
+     * wrong for this file (see {@see self::putEnvPreservingIdentity()}), and
+     * importing the trait for one helper would put the wrong writer within reach.
+     *
+     * The flush opens its own handle so the content write can keep going through
+     * $this->files->put(), which the write-order tests observe.
+     *
+     * Best-effort by design: a filesystem that cannot fsync (some network and
+     * container mounts) must not fail an otherwise complete write.
+     */
+    private function flushToDisk(string $temp): void
+    {
+        $handle = @fopen($temp, 'r+');
+
+        if ($handle === false) {
+            return;
+        }
+
+        try {
+            @fflush($handle);
+            @fsync($handle);
+        } finally {
+            fclose($handle);
         }
     }
 
@@ -389,8 +555,23 @@ final class EncryptionKeyCommand extends Command
         $list = [$this->envSafeValue($currentPrimary, $source)];
 
         foreach ($this->existingPreviousKeys($values) as $entry) {
-            if (! in_array($entry, $list, true)) {
-                $list[] = $entry;
+            // Existing entries are made env-safe too, never copied through
+            // verbatim. They were READ through phpdotenv — surrounding quotes
+            // stripped, `${VAR}` resolved — and they are WRITTEN back UNQUOTED,
+            // so an entry carrying `#`, `$`, a quote or whitespace comes back
+            // meaning something else on the next boot: `#` opens a comment and
+            // truncates the key, `$` interpolates. A retired key that changes
+            // meaning between two boots is unrecoverable data — the one failure
+            // this command exists to prevent. The re-emitted `base64:` form
+            // decodes to the identical bytes. The source name is
+            // PREVIOUS_ENV_KEY so a malformed entry aborts naming the right
+            // variable, and aborting is not a new break: DataEncrypterFactory
+            // parses every entry of the chain at boot, so that entry was
+            // already failing the application.
+            $safe = $this->envSafeValue($entry, DataEncrypterFactory::PREVIOUS_ENV_KEY);
+
+            if (! in_array($safe, $list, true)) {
+                $list[] = $safe;
             }
         }
 

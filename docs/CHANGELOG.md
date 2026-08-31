@@ -2,6 +2,14 @@
 
 Newly added features and improvements to the starter kit are listed here.
 
+## Unreleased
+
+### Fixed
+
+- **`encryption:key` no longer changes what an existing `DATA_ENCRYPTION_PREVIOUS_KEYS` entry means.** The command normalised only the key it was retiring; entries already in the list were copied through verbatim. The list is read through phpdotenv (quotes stripped, `${VAR}` resolved) and written back unquoted, so an entry holding `#`, `$` or whitespace came back as a different key on the next boot — `#` opens a comment and truncates it. Every entry is now made env-safe (re-emitted as `base64:`, decoding to the identical bytes) when its raw form cannot survive an `.env` line.
+- **`encryption:key` now verifies its temporary `.env` was written in full, and `fsync`s it, before renaming it into place.** A full disk makes `Filesystem::put()` return a short byte count instead of throwing, so a truncated body could replace a complete `.env` — on the first of the command's two writes, that body holds the only copy of the key being retired.
+- **`encryption:key` now carries the `.env` owner and group onto the file it writes.** `sudo php artisan encryption:key` over a `www-data:www-data` `.env` used to leave a root-owned file the web user could not read. Ownership is restored best-effort with a warning naming the repairing `chown`; the mode restore is verified and a widened mode aborts before anything is replaced.
+
 ## 2026-08-31 — v13.7.0
 
 ### Added

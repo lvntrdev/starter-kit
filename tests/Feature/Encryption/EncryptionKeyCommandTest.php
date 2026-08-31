@@ -32,6 +32,7 @@
 |
 */
 
+use Dotenv\Dotenv;
 use Illuminate\Filesystem\Filesystem;
 use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
 
@@ -336,4 +337,107 @@ it('preserves the .env permission bits across a rotation', function (): void {
 
     expect($result['status'])->toBe(0)
         ->and(fileperms(ekcEnvPath()) & 0777)->toBe(0600);
+});
+
+/*
+|--------------------------------------------------------------------------
+| 9. A retired key must MEAN the same thing on the next boot
+|--------------------------------------------------------------------------
+|
+| The previous-key list is read through phpdotenv (quotes stripped, `${VAR}`
+| resolved) and written back UNQUOTED. An entry carrying `#`, `$` or whitespace
+| therefore comes back as a DIFFERENT key on the next boot — `#` opens a
+| comment and truncates it — and the rows encrypted with it are unreadable with
+| no copy of the key anywhere. Only the current primary used to be normalised;
+| the entries already in the list rode through verbatim.
+|
+| The write itself is the other half: put() reports a full disk by RETURNING a
+| short byte count, and renaming that temp file into place replaces a complete
+| .env with a truncated one — on step (3) that is the only copy of the key being
+| retired.
+|
+*/
+
+/**
+ * A Filesystem that lands only part of the body and says so, the way a full
+ * disk does. Extends the recorder so the payloads stay observable.
+ */
+final class EkcShortWriteFilesystem extends EkcRecordingFilesystem
+{
+    public function put($path, $contents, $lock = false)
+    {
+        $this->writes[] = (string) $contents;
+
+        // Deliberately NOT parent::put(): the point is a partial body on disk
+        // paired with a return value that admits it.
+        return file_put_contents($path, substr((string) $contents, 0, 10));
+    }
+}
+
+it('re-encodes an existing previous key that .env parsing would mangle', function (): void {
+    // 32 raw bytes carrying the three characters an unquoted .env line changes
+    // the meaning of: a comment opener, an interpolation sigil, whitespace.
+    $raw = 'ab #$ '.substr(str_repeat('abcdefghij', 4), 0, 26);
+
+    expect(strlen($raw))->toBe(32);
+
+    // Single-quoted in the fixture, so phpdotenv hands the command the literal
+    // bytes — the state an operator who quoted their key is actually in.
+    ekcFixture(
+        'APP_KEY='.ekcKey('app')."\n"
+        .'DATA_ENCRYPTION_KEY='.ekcKey('primary')."\n"
+        ."DATA_ENCRYPTION_PREVIOUS_KEYS='".$raw."'\n"
+    );
+
+    $result = ekcRun();
+
+    expect($result['status'])->toBe(0);
+
+    // Re-read the written file the way the APPLICATION will: if the entry no
+    // longer survives this parse, the key is gone.
+    $parsed = Dotenv::parse(ekcEnvContents());
+
+    $entries = explode(',', (string) ($parsed[DataEncrypterFactory::PREVIOUS_ENV_KEY] ?? ''));
+
+    expect($entries)->toHaveCount(2)
+        ->and($entries[0])->toBe(ekcKey('primary'))
+        ->and($entries[1])->toStartWith('base64:')
+        ->and(base64_decode(substr($entries[1], 7), true))->toBe($raw);
+});
+
+it('leaves an already env-safe previous key exactly as it found it', function (): void {
+    ekcFixture(
+        'APP_KEY='.ekcKey('app')."\n"
+        .'DATA_ENCRYPTION_KEY='.ekcKey('primary')."\n"
+        .'DATA_ENCRYPTION_PREVIOUS_KEYS='.ekcKey('retired')."\n"
+    );
+
+    $result = ekcRun();
+
+    $parsed = Dotenv::parse(ekcEnvContents());
+
+    expect($result['status'])->toBe(0)
+        ->and(explode(',', (string) $parsed[DataEncrypterFactory::PREVIOUS_ENV_KEY]))
+        ->toBe([ekcKey('primary'), ekcKey('retired')]);
+});
+
+it('refuses to replace .env when the temporary file was written short', function (): void {
+    $before = 'APP_KEY='.ekcKey('app')."\n"
+        .'DATA_ENCRYPTION_KEY='.ekcKey('primary')."\n";
+
+    ekcFixture($before);
+
+    $result = ekcRun([], new EkcShortWriteFilesystem);
+
+    // The temp file is deleted on the way out, so the directory holds the
+    // untouched .env and nothing else.
+    $leftovers = array_values(array_filter(
+        (array) scandir($this->ekcBasePath),
+        static fn (string $entry): bool => str_starts_with($entry, '.env.') || str_starts_with($entry, '.env.tmp'),
+    ));
+
+    expect($result['status'])->toBe(1)
+        ->and(ekcEnvContents())->toBe($before)
+        ->and($result['output'])->toContain('written short')
+        ->and($leftovers)->toBe([]);
 });
