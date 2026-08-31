@@ -6,6 +6,12 @@ This file is the cross-major-version migration guide. Every release gets its own
 
 ## Unreleased
 
+### `DATA_ENCRYPTION_CIPHER` must match `app.cipher` — enforced
+
+The whole read chain (`DATA_ENCRYPTION_KEY`, `DATA_ENCRYPTION_PREVIOUS_KEYS[n]`, `APP_PREVIOUS_KEYS[n]`, `APP_KEY`) is used under **one** cipher, so a `DATA_ENCRYPTION_CIPHER` that differs from `app.cipher` would leave rows written under the other cipher unreadable even though their key is still listed. `DataEncrypterFactory::cipher()` now throws a `RuntimeException` naming both values instead of failing later with an opaque `DecryptException`. Unset the variable, or set it to the same value as `app.cipher`.
+
+Changing `app.cipher` itself on a database that already holds encrypted settings or 2FA data is a **one-way boundary**: the previous-key chain does not carry a per-key cipher, so old payloads become unreadable and neither `encryption:health` nor `encryption:rekey` can recover them. If you must change it, rekey **under the old cipher** first, verify with `encryption:health`, take a backup, and only then switch — treating the switch as a migration, not a config edit.
+
 ### Activity-log credential redaction — back up before migrating
 
 New activity rows no longer record sensitive attributes, but existing `activity_log` rows may still contain password hashes, tokens, or secrets. The new data-only migration recursively removes those keys from both the `attribute_changes` and `properties` JSON columns.

@@ -7,6 +7,7 @@ namespace Lvntr\StarterKit\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Filesystem\Filesystem;
+use Lvntr\StarterKit\Console\Concerns\HoldsEncryptionRotationLock;
 use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
 use RuntimeException;
 use SensitiveParameter;
@@ -65,6 +66,8 @@ use Throwable;
  */
 final class EncryptionKeyCommand extends Command
 {
+    use HoldsEncryptionRotationLock;
+
     /**
      * Characters an `.env` value may carry verbatim.
      *
@@ -166,15 +169,17 @@ final class EncryptionKeyCommand extends Command
             return Command::FAILURE;
         }
 
-        try {
-            $this->rotate($envPath, $cipher);
-        } catch (Throwable $e) {
-            $this->components->error($e->getMessage());
+        return $this->withRotationLock(function () use ($envPath, $cipher): int {
+            try {
+                $this->rotate($envPath, $cipher);
+            } catch (Throwable $e) {
+                $this->components->error($e->getMessage());
 
-            return Command::FAILURE;
-        }
+                return Command::FAILURE;
+            }
 
-        return Command::SUCCESS;
+            return Command::SUCCESS;
+        });
     }
 
     /**
@@ -275,7 +280,7 @@ final class EncryptionKeyCommand extends Command
                 throw new RuntimeException("Could not create a temporary file next to [{$target}].");
             }
 
-            @chmod($temp, 0600);
+            $this->narrowOrFail($temp);
 
             $this->files->put($temp, $contents);
 
@@ -290,6 +295,34 @@ final class EncryptionKeyCommand extends Command
             }
 
             throw $e;
+        }
+    }
+
+    /**
+     * Narrow a file to owner-only and PROVE it before a key is written into it.
+     *
+     * chmod() returning true is not the same as the mode being applied: a FAT or
+     * SMB mount, or a restrictive `open_basedir`, silently keeps the permissive
+     * mode. An unverified chmod therefore reports success while the very next
+     * line writes key material into a world-readable file. Fail here instead —
+     * the temp file is still empty, so refusing costs nothing.
+     *
+     * @throws RuntimeException
+     */
+    private function narrowOrFail(string $temp): void
+    {
+        @chmod($temp, 0600);
+
+        clearstatcache(true, $temp);
+
+        $mode = @fileperms($temp);
+
+        if ($mode === false || ($mode & 0077) !== 0) {
+            throw new RuntimeException(
+                "Refusing to write the key: [{$temp}] could not be restricted to owner-only access. "
+                .'The filesystem may not support permissions (FAT, some network mounts). '
+                .'Nothing was written.'
+            );
         }
     }
 

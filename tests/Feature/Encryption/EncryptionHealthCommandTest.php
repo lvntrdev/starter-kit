@@ -34,6 +34,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Lvntr\StarterKit\Console\Commands\EncryptionHealthCommand;
 use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
+use Lvntr\StarterKit\Support\Encryption\EncrypterCoverage;
 
 function ehcBytes(string $seed): string
 {
@@ -374,7 +375,7 @@ it('--json emits the documented shape and never any key material', function (): 
 
     expect(array_keys($decoded))->toBe([
         'version', 'generated_at', 'verdict', 'safe_to_clear', 'exit_code',
-        'message', 'keys', 'summary', 'surfaces',
+        'message', 'keys', 'config_block', 'coverage', 'summary', 'surfaces',
     ]);
 
     expect($decoded['version'])->toBe(1)
@@ -403,7 +404,21 @@ it('--json emits the documented shape and never any key material', function (): 
         ->and($decoded['keys']['app_key_in_chain'])->toBeTrue();
 
     expect(array_keys($decoded['summary']))
-        ->toBe(['scanned', 'primary', 'previous', 'unreadable', 'incomplete']);
+        ->toBe(['scanned', 'primary', 'previous', 'unreadable', 'incomplete', 'unvouched', 'config_block_missing']);
+
+    // Coverage: WHO serves each surface, reported beside the row attribution.
+    expect(array_keys($decoded['config_block']))
+        ->toBe(['present', 'configuration_cached', 'primary_key_in_environment'])
+        ->and($decoded['config_block']['present'])->toBeTrue();
+
+    expect($decoded['coverage'])->toHaveCount(2)
+        ->and(array_keys($decoded['coverage'][0]))
+        ->toBe(['surface', 'status', 'encrypter', 'kit_built', 'detail'])
+        ->and($decoded['coverage'][0]['surface'])->toBe('settings')
+        ->and($decoded['coverage'][0]['status'])->toBe(EncrypterCoverage::STATUS_COVERED)
+        ->and($decoded['coverage'][0]['kit_built'])->toBeTrue()
+        ->and($decoded['summary']['unvouched'])->toBe(0)
+        ->and($decoded['summary']['config_block_missing'])->toBeFalse();
 
     expect($decoded['surfaces'])->toHaveCount(2)
         ->and(array_keys($decoded['surfaces'][0]))->toBe([

@@ -6,6 +6,12 @@ Bu dosya büyük sürümler arası geçiş rehberidir. Her sürüm kendi bölüm
 
 ## Unreleased
 
+### `DATA_ENCRYPTION_CIPHER` ile `app.cipher` eşleşmek zorunda — zorunlu kılındı
+
+Okuma zincirinin tamamı (`DATA_ENCRYPTION_KEY`, `DATA_ENCRYPTION_PREVIOUS_KEYS[n]`, `APP_PREVIOUS_KEYS[n]`, `APP_KEY`) **tek** bir cipher ile kullanılır; dolayısıyla `app.cipher` değerinden farklı bir `DATA_ENCRYPTION_CIPHER`, anahtarı listede olsa bile diğer cipher ile yazılmış satırları okunamaz bırakır. `DataEncrypterFactory::cipher()` artık geç gelen kapalı bir `DecryptException` yerine her iki değeri de adlandıran bir `RuntimeException` fırlatıyor. Değişkeni kaldırın ya da `app.cipher` ile aynı değere ayarlayın.
+
+Şifreli ayar veya 2FA verisi barındıran bir veritabanında `app.cipher` değerini değiştirmek **tek yönlü bir sınırdır**: önceki-anahtar zinciri anahtar başına cipher taşımadığı için eski payload'lar okunamaz hale gelir ve ne `encryption:health` ne de `encryption:rekey` onları kurtarabilir. Değiştirmek zorundaysanız önce **eski cipher altında** rekey yapın, `encryption:health` ile doğrulayın, yedek alın ve ancak sonra geçin — bunu bir config düzenlemesi değil, migration olarak ele alın.
+
 ### Aktivite kaydı kimlik bilgisi redaksiyonu — migration öncesi yedek alın
 
 Yeni aktivite satırları artık hassas alanları kaydetmiyor; ancak mevcut `activity_log` satırları hâlâ parola hash'leri, token'lar veya secret'lar içerebilir. Yeni data-only migration bu anahtarları hem `attribute_changes` hem `properties` JSON kolonundan recursive olarak kaldırır.

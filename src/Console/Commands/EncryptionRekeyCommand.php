@@ -13,9 +13,12 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Lvntr\StarterKit\Console\Concerns\HoldsEncryptionRotationLock;
 use Lvntr\StarterKit\Domain\Setting\SettingService;
+use Lvntr\StarterKit\StarterKitServiceProvider;
 use Lvntr\StarterKit\Support\Encryption\DataCrypt;
 use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
+use Lvntr\StarterKit\Support\Encryption\EncrypterCoverage;
 use Throwable;
 
 /**
@@ -96,6 +99,8 @@ use Throwable;
  */
 final class EncryptionRekeyCommand extends Command
 {
+    use HoldsEncryptionRotationLock;
+
     public const SURFACE_SETTINGS = 'settings';
 
     public const SURFACE_TWO_FACTOR = 'two-factor';
@@ -167,6 +172,17 @@ final class EncryptionRekeyCommand extends Command
 
     public function handle(): int
     {
+        // A dry run reads and reports; it writes nothing, so it neither needs
+        // the rotation lock nor should it block a real rotation waiting on one.
+        if ((bool) $this->option('dry-run')) {
+            return $this->rekey();
+        }
+
+        return $this->withRotationLock(fn (): int => $this->rekey());
+    }
+
+    private function rekey(): int
+    {
         $chunkSize = $this->resolveChunkSize();
 
         if ($chunkSize === null) {
@@ -231,6 +247,10 @@ final class EncryptionRekeyCommand extends Command
             $this->line('Only one key is configured, so no value can move between keys; this run reports which values that key can read.');
         }
 
+        if (! $this->coverageAllows($chain, $selected)) {
+            return self::FAILURE;
+        }
+
         if ($dryRun) {
             $this->warn('DRY RUN — every decrypt is attempted, nothing is written.');
         }
@@ -261,6 +281,85 @@ final class EncryptionRekeyCommand extends Command
         }
 
         return $this->report($reports, $dryRun);
+    }
+
+    /**
+     * Refuse a run whose selected surfaces the kit cannot re-encrypt.
+     *
+     * A rekey rewrites every value onto the PRIMARY key. That is only safe if
+     * the code that will read those values afterwards uses the same key — and
+     * for the two-factor surface it may not: Fortify reads through
+     * `Fortify::$encrypter ?? Model::$encrypter ?? Crypt`, and the kit
+     * deliberately does not overwrite a consumer that set either one
+     * ({@see StarterKitServiceProvider::configureDataEncryption()}).
+     * Rewriting those columns onto a key that encrypter does not hold turns
+     * every 2FA login into a failed challenge — the exact loss this command
+     * exists to prevent, caused by the command itself.
+     *
+     * So it stops BEFORE reading a single row and names the surface. The run is
+     * refused rather than silently narrowed: an operator who asked for a full
+     * rekey and got a partial one, reported as success, is worse off than one
+     * who got an error naming the surface and the flag that excludes it.
+     *
+     * A run whose selected surfaces are all covered is never affected.
+     *
+     * @param  list<array{source: string, key: string}>  $chain
+     * @param  list<string>  $selected
+     */
+    private function coverageAllows(array $chain, array $selected): bool
+    {
+        $probe = new EncrypterCoverage;
+
+        if (! $probe->configBlockPresent()) {
+            // Not a refusal: rekeying onto the APP_KEY fallback is a legitimate,
+            // reversible operation (APP_KEY stays in the chain). It IS a warning,
+            // because the operator almost certainly meant to rekey onto the
+            // dedicated key they configured and which this install cannot see.
+            $this->warn(sprintf(
+                'The `starter-kit.encryption` config block is ABSENT, so %s reads null and the primary key is the '
+                .'%s fallback%s. Re-publish config/starter-kit.php (vendor:publish --tag=starter-kit-config '
+                .'--force) before rekeying if you meant to move onto a dedicated key.',
+                DataEncrypterFactory::PRIMARY_ENV_KEY,
+                DataEncrypterFactory::APP_ENV_KEY,
+                $probe->primaryKeyPresentInEnvironment()
+                    ? sprintf(' even though %s IS set in this environment', DataEncrypterFactory::PRIMARY_ENV_KEY)
+                    : '',
+            ));
+        }
+
+        $blocked = [];
+
+        foreach ($probe->report($chain) as $entry) {
+            if (! in_array($entry['surface'], $selected, true)) {
+                continue;
+            }
+
+            if (EncrypterCoverage::isNotVouched($entry['status'])) {
+                $blocked[] = $entry;
+            }
+        }
+
+        if ($blocked === []) {
+            return true;
+        }
+
+        $this->error('Refusing to rekey: a selected surface is served by an encrypter this kit cannot re-encrypt for.');
+
+        foreach ($blocked as $entry) {
+            $this->error(sprintf('  %-11s %s', $entry['surface'], $entry['detail']));
+            $this->warn(sprintf('  %-11s serving encrypter: %s (kit-built: %s)', '', $entry['encrypter'], $entry['kit_built'] ? 'yes' : 'no'));
+        }
+
+        $remaining = array_values(array_diff($selected, array_column($blocked, 'surface')));
+
+        $this->warn($remaining === []
+            ? 'Nothing was read and nothing was written. Point that surface at the kit\'s data encrypter, or rekey it with your own tooling.'
+            : sprintf(
+                'Nothing was read and nothing was written. Re-run with `--only=%s` to rekey the surface(s) this kit does cover.',
+                implode(',', $remaining),
+            ));
+
+        return false;
     }
 
     /**

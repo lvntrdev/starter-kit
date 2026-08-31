@@ -110,6 +110,8 @@ use Lvntr\StarterKit\Http\Middleware\ValidateTurnstile;
 use Lvntr\StarterKit\Http\Responses\ApiResponse;
 use Lvntr\StarterKit\Support\DeferredDeleteMediaFilesystem;
 use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
+use Lvntr\StarterKit\Support\Encryption\EncrypterCoverage;
+use Lvntr\StarterKit\Support\Encryption\KitOwnedEncrypter;
 use Lvntr\StarterKit\Support\HtmlSanitizer;
 use Lvntr\StarterKit\Support\MediaPathGenerator;
 use Lvntr\StarterKit\Support\Scramble\ApiResponseExtension;
@@ -954,10 +956,17 @@ class StarterKitServiceProvider extends ServiceProvider
      *     failure, long after the change. Resolving per call cannot drift.
      *
      * It holds no key material, so it is also safe to serialize.
+     *
+     * It carries {@see KitOwnedEncrypter} so `encryption:health` and
+     * `encryption:rekey` can tell this shim from an encrypter the APPLICATION
+     * installed on Fortify. The two are behaviourally indistinguishable, and
+     * the difference decides whether those commands may vouch for the 2FA
+     * surface at all — see {@see EncrypterCoverage}. The marker is declarative:
+     * it adds no method and changes nothing at runtime.
      */
     private function dataEncrypterProxy(): EncrypterContract
     {
-        return new class implements EncrypterContract, StringEncrypter
+        return new class implements EncrypterContract, KitOwnedEncrypter, StringEncrypter
         {
             public function encrypt(#[\SensitiveParameter] $value, $serialize = true)
             {

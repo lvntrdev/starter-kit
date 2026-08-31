@@ -116,7 +116,11 @@ final class DataEncrypterFactory
     {
         $chain = $this->resolve();
 
-        $encrypter = new Encrypter($chain[0]['key'], $this->cipher());
+        // KitEncrypter, not Encrypter: behaviourally identical, but it carries
+        // the KitOwnedEncrypter marker so EncrypterCoverage can tell an
+        // encrypter the KIT built from one an app rebound over it. Nothing else
+        // depends on the concrete class.
+        $encrypter = new KitEncrypter($chain[0]['key'], $this->cipher());
 
         return $encrypter->previousKeys(array_map(
             static fn (array $entry): string => $entry['key'],

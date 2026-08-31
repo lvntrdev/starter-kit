@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Lvntr\StarterKit\Domain\Setting\SettingService;
 use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
+use Lvntr\StarterKit\Support\Encryption\EncrypterCoverage;
 use Throwable;
 
 /**
@@ -50,6 +51,11 @@ use Throwable;
  *       WOULD lose it. Run `encryption:rekey`.
  *   1 — {@see self::VERDICT_INCOMPLETE}: a surface could not be fully scanned,
  *       so "safe" cannot be asserted about it.
+ *   1 — {@see self::VERDICT_NOT_COVERED}: a surface is served by an encrypter
+ *       the kit did not build and cannot vouch for, or the
+ *       `starter-kit.encryption` config block is absent so DATA_ENCRYPTION_KEY
+ *       is inert. The attribution below is a true statement about the stored
+ *       bytes and a misleading one about this install.
  *   2 — {@see self::VERDICT_UNREADABLE}: a value NO configured key can read.
  *       The key that wrote it is missing from `.env`; it must be ADDED, never
  *       cleared.
@@ -80,6 +86,15 @@ final class EncryptionHealthCommand extends Command
     public const VERDICT_REKEY_REQUIRED = 'rekey-required';
 
     public const VERDICT_INCOMPLETE = 'incomplete';
+
+    /**
+     * A surface is served by an encrypter this run could not vouch for, or the
+     * `starter-kit.encryption` config block is absent so the configured key is
+     * inert. Nothing is lost, but the attribution below does not describe the
+     * install's actual read/write path, so "safe to clear" cannot be asserted
+     * from it.
+     */
+    public const VERDICT_NOT_COVERED = 'not-covered';
 
     public const VERDICT_UNREADABLE = 'unreadable';
 
@@ -187,18 +202,29 @@ final class EncryptionHealthCommand extends Command
 
         $keys = $this->describeKeys($cipher, $usingDedicatedKey);
 
+        // WHO serves each surface, as opposed to which key opened its stored
+        // bytes. Read-only and cheap (no row is touched); it is what turns an
+        // attribution report into a statement about this install.
+        $coverageProbe = new EncrypterCoverage;
+        $coverage = $coverageProbe->report($chain);
+        $configBlock = [
+            'present' => $coverageProbe->configBlockPresent(),
+            'configuration_cached' => $coverageProbe->configurationIsCached(),
+            'primary_key_in_environment' => $coverageProbe->primaryKeyPresentInEnvironment(),
+        ];
+
         $surfaces = [];
 
         foreach ($this->surfaces() as $surface) {
             $surfaces[] = $this->scanSurface($surface);
         }
 
-        $summary = $this->summarize($surfaces);
+        $summary = $this->summarize($surfaces, $coverage, $configBlock);
         $verdict = $this->decideVerdict($summary);
 
         return $json
-            ? $this->outputJson($keys, $surfaces, $summary, $verdict)
-            : $this->outputText($keys, $surfaces, $summary, $verdict);
+            ? $this->outputJson($keys, $surfaces, $summary, $verdict, $coverage, $configBlock)
+            : $this->outputText($keys, $surfaces, $summary, $verdict, $coverage, $configBlock);
     }
 
     /**
@@ -539,12 +565,33 @@ final class EncryptionHealthCommand extends Command
     /**
      * Roll the per-surface reports up.
      *
+     * `unvouched` and `config_block_missing` come from the COVERAGE probe, not
+     * from any row: a surface whose serving encrypter is not the kit's, and a
+     * config block that hides DATA_ENCRYPTION_KEY entirely, both make the
+     * row-level attribution below a true statement about the wrong thing.
+     *
      * @param  list<array<string, mixed>>  $surfaces
-     * @return array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int}
+     * @param  list<array{surface: string, status: string, encrypter: string, kit_built: bool, detail: string}>  $coverage
+     * @param  array{present: bool, configuration_cached: bool, primary_key_in_environment: bool}  $configBlock
+     * @return array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int, unvouched: int, config_block_missing: bool}
      */
-    private function summarize(array $surfaces): array
+    private function summarize(array $surfaces, array $coverage, array $configBlock): array
     {
-        $summary = ['scanned' => 0, 'primary' => 0, 'previous' => 0, 'unreadable' => 0, 'incomplete' => 0];
+        $summary = [
+            'scanned' => 0,
+            'primary' => 0,
+            'previous' => 0,
+            'unreadable' => 0,
+            'incomplete' => 0,
+            'unvouched' => 0,
+            'config_block_missing' => ! $configBlock['present'],
+        ];
+
+        foreach ($coverage as $entry) {
+            if (EncrypterCoverage::isNotVouched($entry['status'])) {
+                $summary['unvouched']++;
+            }
+        }
 
         foreach ($surfaces as $surface) {
             $summary['scanned'] += $surface['scanned'];
@@ -564,17 +611,26 @@ final class EncryptionHealthCommand extends Command
      * The verdict, in strict precedence order.
      *
      * Unreadable first because it is the only state where data is ALREADY out
-     * of reach; then rows on an old key, which clearing the list would put out
-     * of reach; then an incomplete scan, which cannot prove either way. "Safe"
-     * is reachable only when every surface was scanned and every value it held
-     * read with the primary key.
+     * of reach. Then coverage: a surface served by an encrypter that is not the
+     * kit's, or a config block that makes the configured key inert, means the
+     * attribution below describes something other than this install's real
+     * read/write path — reporting "rekey required" from it would send the
+     * operator to a command that is about to refuse. Then rows on an old key,
+     * which clearing the list would put out of reach; then an incomplete scan,
+     * which cannot prove either way. "Safe" is reachable only when every
+     * surface was scanned, vouched for, and every value it held read with the
+     * primary key.
      *
-     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int}  $summary
+     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int, unvouched: int, config_block_missing: bool}  $summary
      */
     private function decideVerdict(array $summary): string
     {
         if ($summary['unreadable'] > 0) {
             return self::VERDICT_UNREADABLE;
+        }
+
+        if ($summary['unvouched'] > 0 || $summary['config_block_missing']) {
+            return self::VERDICT_NOT_COVERED;
         }
 
         if ($summary['previous'] > 0) {
@@ -601,7 +657,7 @@ final class EncryptionHealthCommand extends Command
      * One-line summary of the verdict, shared by both output modes so the JSON
      * consumer and the operator read the same sentence.
      *
-     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int}  $summary
+     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int, unvouched: int, config_block_missing: bool}  $summary
      */
     private function verdictMessage(string $verdict, array $summary): string
     {
@@ -624,6 +680,21 @@ final class EncryptionHealthCommand extends Command
                 $summary['unreadable'],
                 DataEncrypterFactory::PREVIOUS_ENV_KEY,
             ),
+            self::VERDICT_NOT_COVERED => $summary['config_block_missing']
+                ? sprintf(
+                    'The `starter-kit.encryption` config block is absent, so %s cannot take effect no matter what '
+                    .'.env says and the primary key silently falls back to %s. Fix the configuration before '
+                    .'reading anything below as a verdict.',
+                    DataEncrypterFactory::PRIMARY_ENV_KEY,
+                    DataEncrypterFactory::APP_ENV_KEY,
+                )
+                : sprintf(
+                    '%d surface(s) are served by an encrypter this kit did not build or could not inspect, so this '
+                    .'report does not describe how they are actually read and written. Do NOT clear %s on the '
+                    .'strength of it.',
+                    $summary['unvouched'],
+                    DataEncrypterFactory::PREVIOUS_ENV_KEY,
+                ),
             self::VERDICT_INCOMPLETE => sprintf(
                 '%d surface(s) could not be fully scanned, so this run cannot vouch for them. Every value it DID '
                 .'read is on the primary key. Do NOT clear %s on the strength of this report.',
@@ -637,9 +708,11 @@ final class EncryptionHealthCommand extends Command
     /**
      * @param  array<string, mixed>  $keys
      * @param  list<array<string, mixed>>  $surfaces
-     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int}  $summary
+     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int, unvouched: int, config_block_missing: bool}  $summary
+     * @param  list<array{surface: string, status: string, encrypter: string, kit_built: bool, detail: string}>  $coverage
+     * @param  array{present: bool, configuration_cached: bool, primary_key_in_environment: bool}  $configBlock
      */
-    private function outputText(array $keys, array $surfaces, array $summary, string $verdict): int
+    private function outputText(array $keys, array $surfaces, array $summary, string $verdict, array $coverage, array $configBlock): int
     {
         $this->newLine();
         $this->line('  <fg=blue;options=bold>Starter Kit — Data Encryption Health</>');
@@ -678,7 +751,17 @@ final class EncryptionHealthCommand extends Command
             ));
         }
 
+        $this->reportConfigBlock($configBlock);
+
         $this->newLine();
+        $this->line('  <options=bold>Who serves each surface</>');
+
+        foreach ($coverage as $entry) {
+            $this->reportCoverageEntry($entry);
+        }
+
+        $this->newLine();
+        $this->line('  <options=bold>What each surface stores</>');
 
         foreach ($surfaces as $surface) {
             if ($surface['status'] !== 'ok') {
@@ -730,9 +813,11 @@ final class EncryptionHealthCommand extends Command
      *
      * @param  array<string, mixed>  $keys
      * @param  list<array<string, mixed>>  $surfaces
-     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int}  $summary
+     * @param  array{scanned: int, primary: int, previous: int, unreadable: int, incomplete: int, unvouched: int, config_block_missing: bool}  $summary
+     * @param  list<array{surface: string, status: string, encrypter: string, kit_built: bool, detail: string}>  $coverage
+     * @param  array{present: bool, configuration_cached: bool, primary_key_in_environment: bool}  $configBlock
      */
-    private function outputJson(array $keys, array $surfaces, array $summary, string $verdict): int
+    private function outputJson(array $keys, array $surfaces, array $summary, string $verdict, array $coverage, array $configBlock): int
     {
         $exitCode = $this->exitCodeFor($verdict);
 
@@ -744,6 +829,8 @@ final class EncryptionHealthCommand extends Command
             'exit_code' => $exitCode,
             'message' => $this->verdictMessage($verdict, $summary),
             'keys' => $keys,
+            'config_block' => $configBlock,
+            'coverage' => $coverage,
             'summary' => $summary,
             'surfaces' => array_map(static fn (array $surface): array => [
                 'name' => $surface['name'],
@@ -773,7 +860,15 @@ final class EncryptionHealthCommand extends Command
     private function reportKeyError(string $message, bool $json): int
     {
         $verdict = self::VERDICT_KEY_ERROR;
-        $summary = ['scanned' => 0, 'primary' => 0, 'previous' => 0, 'unreadable' => 0, 'incomplete' => 0];
+        $summary = [
+            'scanned' => 0,
+            'primary' => 0,
+            'previous' => 0,
+            'unreadable' => 0,
+            'incomplete' => 0,
+            'unvouched' => 0,
+            'config_block_missing' => false,
+        ];
 
         if ($json) {
             $this->line((string) json_encode([
@@ -784,6 +879,8 @@ final class EncryptionHealthCommand extends Command
                 'exit_code' => self::EXIT_BROKEN,
                 'message' => $message,
                 'keys' => null,
+                'config_block' => null,
+                'coverage' => [],
                 'summary' => $summary,
                 'surfaces' => [],
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
@@ -800,6 +897,78 @@ final class EncryptionHealthCommand extends Command
         ));
 
         return self::EXIT_BROKEN;
+    }
+
+    /**
+     * Warn when the `starter-kit.encryption` config block is not there at all.
+     *
+     * This is the one failure mode the row scan below cannot see. With the
+     * block absent every key under it reads null, so the factory takes the
+     * APP_KEY path and every row legitimately attributes to APP_KEY — a clean
+     * report, produced by a broken configuration, on an install whose operator
+     * set DATA_ENCRYPTION_KEY and believes their data survives `key:generate`.
+     *
+     * @param  array{present: bool, configuration_cached: bool, primary_key_in_environment: bool}  $configBlock
+     */
+    private function reportConfigBlock(array $configBlock): void
+    {
+        if ($configBlock['present']) {
+            return;
+        }
+
+        $this->newLine();
+        $this->error(sprintf(
+            '  The `starter-kit.encryption` config block is ABSENT, so %s, %s and %s all read null and the primary '
+            .'key falls back to %s%s.',
+            DataEncrypterFactory::PRIMARY_ENV_KEY,
+            DataEncrypterFactory::PREVIOUS_ENV_KEY,
+            DataEncrypterFactory::CIPHER_ENV_KEY,
+            DataEncrypterFactory::APP_ENV_KEY,
+            $configBlock['primary_key_in_environment']
+                ? sprintf(' — and %s IS set in this environment, so it is currently inert', DataEncrypterFactory::PRIMARY_ENV_KEY)
+                : '',
+        ));
+        $this->warn(sprintf(
+            '  Cause: a published config/starter-kit.php that predates the encryption release%s. '
+            .'Fix: re-publish it with `php artisan vendor:publish --tag=starter-kit-config --force`%s, then run this command '
+            .'again. Everything below describes the %s fallback, not %s.',
+            $configBlock['configuration_cached']
+                ? ', combined with a cached config (config:cache makes the package default merge a no-op)'
+                : '',
+            $configBlock['configuration_cached'] ? ' and `php artisan config:cache` again' : '',
+            DataEncrypterFactory::APP_ENV_KEY,
+            DataEncrypterFactory::PRIMARY_ENV_KEY,
+        ));
+    }
+
+    /**
+     * One line per surface naming the encrypter that actually serves it.
+     *
+     * Printed BEFORE the row attribution on purpose: an operator who reads
+     * "42 rows on the primary key" first, and only then learns the surface is
+     * served by someone else's encrypter, has already formed the wrong
+     * conclusion.
+     *
+     * @param  array{surface: string, status: string, encrypter: string, kit_built: bool, detail: string}  $entry
+     */
+    private function reportCoverageEntry(array $entry): void
+    {
+        $line = sprintf('  %-11s %s', $entry['surface'], $entry['detail']);
+
+        match ($entry['status']) {
+            EncrypterCoverage::STATUS_COVERED => $this->line($line),
+            EncrypterCoverage::STATUS_NO_WRITER => $this->line($line),
+            EncrypterCoverage::STATUS_FOREIGN => $this->error($line),
+            default => $this->warn($line),
+        };
+
+        if (! $entry['kit_built'] && EncrypterCoverage::isNotVouched($entry['status'])) {
+            $this->warn(sprintf(
+                '    The kit did not build this encrypter [%s] and will not rebind it. Nothing below is a claim '
+                .'about this surface.',
+                $entry['encrypter'],
+            ));
+        }
     }
 
     /**
