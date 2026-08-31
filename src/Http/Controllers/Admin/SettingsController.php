@@ -5,6 +5,7 @@ namespace Lvntr\StarterKit\Http\Controllers\Admin;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -25,6 +26,7 @@ use Lvntr\StarterKit\Domain\Setting\DTOs\StorageSettingsDTO;
 use Lvntr\StarterKit\Domain\Setting\DTOs\TurnstileSettingsDTO;
 use Lvntr\StarterKit\Domain\Setting\Queries\SettingsDefaultsQuery;
 use Lvntr\StarterKit\Domain\Setting\SettingService;
+use Lvntr\StarterKit\Exceptions\ApiException;
 use Lvntr\StarterKit\Http\Requests\Admin\Settings\SendTestMailRequest;
 use Lvntr\StarterKit\Http\Requests\Admin\Settings\UpdateApidogSettingsRequest;
 use Lvntr\StarterKit\Http\Requests\Admin\Settings\UpdateAppearanceSettingsRequest;
@@ -197,14 +199,8 @@ class SettingsController extends Controller
      */
     public function uploadLogo(UploadLogoRequest $request): ApiResponse|JsonResponse
     {
-        // Delete old logo if exists
-        $oldLogo = $this->settings->getValue('general.logo');
-        if ($oldLogo && Storage::disk('public')->exists($oldLogo)) {
-            Storage::disk('public')->delete($oldLogo);
-        }
-
-        $path = $request->file('logo')->store('logo', 'public');
-        $this->settings->setValue('general.logo', $path);
+        $path = $this->storeUploadedFile($request->file('logo'), 'logo');
+        $this->replaceStoredFile('general.logo', $path);
 
         return to_api(['logo_url' => $this->publicUrl($path)], __('sk-setting.flash.logo_uploaded'));
     }
@@ -235,10 +231,8 @@ class SettingsController extends Controller
     {
         $key = $this->appearanceLogoKey($variant);
 
-        $this->deleteStoredFile($key);
-
-        $path = $request->file('logo')->store('appearance', 'public');
-        $this->settings->setValue($key, $path);
+        $path = $this->storeUploadedFile($request->file('logo'), 'appearance');
+        $this->replaceStoredFile($key, $path);
 
         return to_api(['logo_url' => $this->publicUrl($path)], __('sk-setting.flash.logo_uploaded'));
     }
@@ -265,10 +259,8 @@ class SettingsController extends Controller
      */
     public function uploadFavicon(UploadFaviconRequest $request): ApiResponse|JsonResponse
     {
-        $this->deleteStoredFile('appearance.favicon');
-
-        $path = $request->file('favicon')->store('appearance', 'public');
-        $this->settings->setValue('appearance.favicon', $path);
+        $path = $this->storeUploadedFile($request->file('favicon'), 'appearance');
+        $this->replaceStoredFile('appearance.favicon', $path);
 
         return to_api(['favicon_url' => $this->publicUrl($path)], __('sk-setting.flash.favicon_uploaded'));
     }
@@ -296,6 +288,44 @@ class SettingsController extends Controller
             'dark' => 'appearance.logo_dark',
             default => abort(404),
         };
+    }
+
+    /**
+     * Store an uploaded file on the public disk, failing loudly when the write
+     * does not produce a path.
+     */
+    private function storeUploadedFile(mixed $file, string $directory): string
+    {
+        $path = $file instanceof UploadedFile ? $file->store($directory, 'public') : false;
+
+        // store() returns false when the disk write fails. Bailing out HERE is
+        // what keeps the currently-referenced asset intact: the caller only
+        // swaps the setting (and drops the old file) once a new path exists.
+        if (! is_string($path) || $path === '') {
+            throw ApiException::serverError(__('sk-setting.flash.upload_failed'));
+        }
+
+        return $path;
+    }
+
+    /**
+     * Point a setting at a freshly stored file, then drop the one it replaced.
+     *
+     * The order matters. Deleting first — which is what these endpoints used to
+     * do — loses the existing asset outright when the new store() fails, leaving
+     * the setting pointing at a path that no longer exists. Writing the setting
+     * first means a failed delete only leaves an orphan behind, which is
+     * recoverable; a deleted-then-failed upload is not.
+     */
+    private function replaceStoredFile(string $key, string $newPath): void
+    {
+        $previous = $this->settings->getValue($key);
+
+        $this->settings->setValue($key, $newPath);
+
+        if (is_string($previous) && $previous !== '' && $previous !== $newPath && Storage::disk('public')->exists($previous)) {
+            Storage::disk('public')->delete($previous);
+        }
     }
 
     /**

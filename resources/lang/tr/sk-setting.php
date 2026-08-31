@@ -23,6 +23,7 @@ return [
         'favicon_deleted' => 'Favicon kaldırıldı.',
         'test_mail_sent' => 'Test e-postası başarıyla gönderildi.',
         'test_mail_failed' => 'Test e-postası gönderilemedi. Ayrıntılar için sunucu günlüklerini kontrol edin.',
+        'upload_failed' => 'Dosya kaydedilemedi. Önceki dosya korundu.',
     ],
 
     'tabs' => [

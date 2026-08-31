@@ -23,6 +23,7 @@ return [
         'favicon_deleted' => 'Favicon removed.',
         'test_mail_sent' => 'Test email sent successfully.',
         'test_mail_failed' => 'Failed to send test email. Check the server logs for details.',
+        'upload_failed' => 'The file could not be stored. The previous one was kept.',
     ],
 
     'tabs' => [

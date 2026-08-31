@@ -3,8 +3,10 @@
 namespace Lvntr\StarterKit\Domain\Setting;
 
 use App\Models\Setting;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Lvntr\StarterKit\Support\Encryption\DataCrypt;
 use Lvntr\StarterKit\Support\HtmlSanitizer;
 
@@ -88,7 +90,7 @@ class SettingService
             ],
         );
 
-        Cache::forget('settings');
+        $this->forgetCacheAfterCommit();
 
         $this->logSettingsChange([$path]);
     }
@@ -161,12 +163,29 @@ class SettingService
             }
         });
 
-        Cache::forget('settings');
+        $this->forgetCacheAfterCommit();
 
         $this->logSettingsChange(array_map(
             static fn (int|string $key): string => "{$group}.{$key}",
             array_keys($values),
         ));
+    }
+
+    /**
+     * Drop the cached snapshot once the surrounding transaction commits.
+     *
+     * setGroup() opens its own transaction, but callers wrap it in an OUTER one
+     * (UpdateAuthSettingsAction, for instance, needs the group write and the 2FA
+     * revoke to land together). Forgetting the key inline would clear the cache
+     * while the outer transaction is still open, so a concurrent reader could
+     * miss, re-read the PRE-write rows, and cache them for another hour.
+     * DB::afterCommit() defers to the outermost commit and — when no transaction
+     * is active at all — runs the callback immediately, so the single-write path
+     * behaves exactly as before.
+     */
+    private function forgetCacheAfterCommit(): void
+    {
+        DB::afterCommit(static fn () => Cache::forget('settings'));
     }
 
     /**
@@ -231,7 +250,19 @@ class SettingService
         if ($encrypted && $value !== null) {
             try {
                 return DataCrypt::decryptString((string) $value);
-            } catch (\Exception) {
+            } catch (DecryptException $e) {
+                // An unreadable row is a real operational event (wrong/rotated
+                // key, corrupted ciphertext) and the null we return here can be
+                // cached for an hour, so it must not stay silent. The CIPHERTEXT
+                // and the plaintext are both withheld — only the failure is
+                // logged. Everything else (a misconfigured cipher, a driver or
+                // programming error) is NOT swallowed: it propagates so the
+                // fault surfaces where it happens instead of degrading every
+                // encrypted setting to its env/default fallback.
+                Log::warning('starter-kit: an encrypted setting could not be decrypted; falling back to null.', [
+                    'reason' => $e->getMessage(),
+                ]);
+
                 return null;
             }
         }
