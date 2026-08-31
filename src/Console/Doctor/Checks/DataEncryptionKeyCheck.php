@@ -7,6 +7,7 @@ namespace Lvntr\StarterKit\Console\Doctor\Checks;
 use Lvntr\StarterKit\Console\Commands\EncryptionHealthCommand;
 use Lvntr\StarterKit\Console\Doctor\DoctorCheck;
 use Lvntr\StarterKit\Console\Doctor\DoctorReport;
+use Lvntr\StarterKit\Support\DocsLink;
 use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
 use Throwable;
 
@@ -73,7 +74,7 @@ class DataEncryptionKeyCheck implements DoctorCheck
                 .'migration will make them unreadable, and the failure is silent.',
                 'Adopt a dedicated key with `php artisan encryption:key` (it keeps '
                 .DataEncrypterFactory::APP_ENV_KEY.' in the read chain, so nothing breaks), then follow '
-                .'docs/server-migration-runbook.md.'
+                .DocsLink::to('server-migration-runbook.md').'.'
             );
         }
 

@@ -157,7 +157,15 @@ php artisan sk:publish --tag=form --destination=/tmp/sk-compare
 diff -ru resources/js/components/Lvntr-Starter-Kit/FormBuilder /tmp/sk-compare/resources/js/components/Lvntr-Starter-Kit/FormBuilder
 ```
 
-`--force` öncesi commit'le — eski versiyona Git üzerinden erişebilirsin. Proje genelinde kurtarma için (config inject sorunları vb.) `php artisan sk:install` tekrar çalıştırılabilir — idempotent'tir ve AST inject'leri yalnızca anahtar eksikse yeniden uygular.
+`--force` öncesi commit'le — eski versiyona Git üzerinden erişebilirsin.
+
+> **Kurulu bir projede `php artisan sk:install` komutunu tekrar çalıştırmayın.** Bu rehberin önceki bir revizyonu komutu proje geneli kurtarma yolu olarak öneriyordu. Bu tavsiye yanlıştı ve geri çekildi — `sk:install` bir ilk-kurulum komutudur, onarım aracı değildir.
+>
+> - Yalnızca `lang/` korunabilir. Yayınlanan diğer her yol **`--force` olmadan da** üzerine yazılır; düzenlediğiniz bir controller, provider, route dosyası, Vue sayfası veya config paket sürümüyle değiştirilir.
+> - Hash kaydı **sildiğiniz** bir dosyayı korur, **değiştirdiğiniz** dosyayı değil.
+> - Bu kayıt `storage/starter-kit/hashes.json` yolunda durur ve git tarafından yok sayılır. Stateless bir deploy onu kaybederse `sk:install` uygulamayı **ilk kurulum** sayar: mevcut `.env` dosyanızın üzerine `.env.example` kopyalanır — veritabanı, cache, mail ve depolama kimlik bilgileri kaybolur — ardından boş kalan `APP_KEY` yeniden üretilebilir; bu da mevcut oturum çerezlerini ve `APP_KEY` ile şifrelenmiş her değeri okunamaz hale getirir.
+>
+> Kurulu bir projeyi onarmak için `sk:update` (hash farkındalıklı, düzenlemelerinizi korur) kullanın ya da tek bir alanı `sk:publish --tag=<alan> --force` ile sıfırlayın — öncesinde farkı `sk:publish --tag=<alan> --destination=/tmp/sk-compare` ile inceleyin. `sk:update`, `config/filesystems.php` ve `config/permission-resources.php` enjeksiyonlarını yeniden uygular; kalan kurulum-anı enjeksiyonlarının (`config/app.php`, `bootstrap/app.php`, provider kaydı, `media-library.php`, `services.php`) henüz otomatik bir onarım yolu yok — bunları `vendor/lvntr/laravel-starter-kit/stubs/` altındaki aynı göreli yola sahip stub'a karşı elle uygulayın.
 
 ## Hangi Durumda `sk:upgrade` Kullanılmalı
 

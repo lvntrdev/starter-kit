@@ -4,9 +4,12 @@ namespace Lvntr\StarterKit\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
+use Lvntr\StarterKit\Console\Commands\Concerns\ChecksStepResults;
+use Lvntr\StarterKit\Console\Commands\Concerns\ComparesPublishedStubs;
 use Lvntr\StarterKit\Console\Commands\Concerns\MirrorsAiSkills;
 use Lvntr\StarterKit\Console\Commands\Concerns\WritesFilesAtomically;
 use Lvntr\StarterKit\StarterKitServiceProvider;
+use Lvntr\StarterKit\Support\DocsLink;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\multiselect;
@@ -14,6 +17,8 @@ use function Laravel\Prompts\spin;
 
 class UpdateCommand extends Command
 {
+    use ChecksStepResults;
+    use ComparesPublishedStubs;
     use MirrorsAiSkills;
     use WritesFilesAtomically;
 
@@ -582,12 +587,25 @@ class UpdateCommand extends Command
         }
 
         // 5. Run new migrations
+        //
+        // spin() hands back the callback's value and it used to be dropped on the
+        // floor: a `migrate` that died still printed "Migrations completed." and
+        // the command still exited 0. The result is now the command's result.
+        $failedSteps = [];
+
         if (! $dryRun && ! empty($this->added) && $this->hasNewMigrations()) {
             if (confirm('New migrations found. Run them now?', default: true)) {
-                spin(function () {
-                    return $this->callSilently('migrate', ['--force' => true]) === 0;
+                $migrated = spin(function () {
+                    return $this->runArtisan('migrate', ['--force' => true]);
                 }, 'Running new migrations...');
-                $this->components->info('Migrations completed.');
+
+                if ($migrated) {
+                    $this->components->info('Migrations completed.');
+                } else {
+                    $failedSteps[] = 'Running new migrations';
+                    $this->components->error($this->stepFailureDetail ?? 'Migrations failed.');
+                    $this->stepFailureDetail = null;
+                }
             }
         }
 
@@ -595,13 +613,21 @@ class UpdateCommand extends Command
         // migration) and a seeder run are needed for the colors to appear.
         if (! $dryRun && in_array('config/permission-resources.php (injected role_colors)', $this->updated, true)) {
             if (confirm('Role colors added. Run migrate + sk:seed-permissions to apply them now?', default: true)) {
-                spin(function () {
-                    return $this->callSilently('migrate', ['--force' => true]) === 0;
+                $applied = spin(function () {
+                    return $this->runArtisan('migrate', ['--force' => true]);
                 }, 'Running migrations...');
-                spin(function () {
-                    return $this->callSilently('sk:seed-permissions') === 0;
+
+                $applied = $applied && spin(function () {
+                    return $this->runArtisan('sk:seed-permissions');
                 }, 'Seeding role colors...');
-                $this->components->info('Role colors applied.');
+
+                if ($applied) {
+                    $this->components->info('Role colors applied.');
+                } else {
+                    $failedSteps[] = 'Applying role colors (migrate + sk:seed-permissions)';
+                    $this->components->error($this->stepFailureDetail ?? 'Role colors could not be applied.');
+                    $this->stepFailureDetail = null;
+                }
             }
         }
 
@@ -638,6 +664,22 @@ class UpdateCommand extends Command
         // Summary
         $this->newLine();
         $this->printSummary($dryRun);
+
+        // A failed database step does not roll back the file work above, and the
+        // hash registry deliberately still records it: the stub copies really are
+        // on disk, and a registry that pretended otherwise would make the NEXT
+        // update treat every one of them as untracked. What changes is the exit
+        // code — the run reports the failure it actually had.
+        if ($failedSteps !== []) {
+            $this->newLine();
+            $this->line(
+                '  <fg=red;options=bold>Update failed at step "'.implode('", "', $failedSteps)
+                .'" — fix the issue, then re-run `php artisan sk:update`.</>'
+            );
+            $this->newLine();
+
+            return self::FAILURE;
+        }
 
         return self::SUCCESS;
     }
@@ -712,40 +754,52 @@ class UpdateCommand extends Command
      * the guard is worth nothing if only one of the two paths through the loop
      * consults it.
      *
+     * The rule itself lives in {@see ComparesPublishedStubs} — sk:install runs
+     * the same one over its publish loop, and a second copy of it here would be
+     * a second copy of a data-loss guard.
+     *
+     * STUB_UP_TO_DATE is folded into the conflict report rather than passing
+     * silently: this command's whole purpose is to tell the operator that a
+     * package-owned file is out of sync, and a preserved copy is out of sync
+     * whether or not the stub itself moved in this release.
+     *
      * @param  array<string, string>  $hashes  registry, path => stub hash at install/update time
      */
     private function updateSafePath(string $relativePath, string $stubSource, array $hashes, bool $force, bool $dryRun): void
     {
         $target = base_path($relativePath);
+        $targetExists = $this->files->exists($target);
 
-        if ($this->filesAreIdentical($stubSource, $target)) {
-            return;
-        }
+        // md5_file() is false for an unreadable path; '' / null keep that case
+        // on the conservative side of the rule instead of raising a TypeError.
+        $decision = $this->decidePublishedStub(
+            md5_file($stubSource) ?: '',
+            $targetExists ? (md5_file($target) ?: null) : null,
+            $hashes[$relativePath] ?? null,
+            $force,
+        );
 
-        if ($this->files->exists($target) && ! $force) {
-            $recordedHash = $hashes[$relativePath] ?? null;
-
-            // Opted out at install time (e.g. --without-ai-skill). The file on
-            // disk is the consumer's business, not ours.
-            if ($recordedHash === '__skipped__') {
+        switch ($decision) {
+            // Already current, or opted out at install time (e.g.
+            // --without-ai-skill) — the file on disk is the consumer's business.
+            case self::STUB_IDENTICAL:
+            case self::STUB_OPTED_OUT:
                 return;
-            }
 
-            // No usable record: the copy predates hash tracking, or it was
-            // re-created after a recorded deletion. Either way we cannot tell a
-            // stale stock file from an edited one — so we ask.
-            if ($recordedHash === null || $recordedHash === '__deleted__') {
+                // No usable record: the copy predates hash tracking, or it was
+                // re-created after a recorded deletion. Either way we cannot tell
+                // a stale stock file from an edited one — so we ask.
+            case self::STUB_UNTRACKED:
                 $this->untracked[] = $relativePath;
 
                 return;
-            }
 
-            if ($recordedHash !== md5_file($target)) {
+            case self::STUB_UP_TO_DATE:
+            case self::STUB_MODIFIED:
                 $this->skipped[] = $relativePath;
                 $this->safePathConflicts[] = $relativePath;
 
                 return;
-            }
         }
 
         if (! $dryRun) {
@@ -1969,7 +2023,7 @@ PHP;
             $this->line('  <fg=gray>reverts that string to the vendor default.</>');
         }
 
-        $this->line('  <fg=gray>See: docs/migrate-existing-project-to-vendor.md</>');
+        $this->line('  <fg=gray>See: '.DocsLink::to('migrate-existing-project-to-vendor.md').'</>');
         $this->newLine();
     }
 

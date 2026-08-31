@@ -11,8 +11,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Lvntr\StarterKit\Console\Commands\Concerns\ChecksStepResults;
+use Lvntr\StarterKit\Console\Commands\Concerns\ComparesPublishedStubs;
 use Lvntr\StarterKit\Console\Commands\Concerns\MirrorsAiSkills;
+use Lvntr\StarterKit\Console\Commands\Concerns\WritesFilesAtomically;
 use Lvntr\StarterKit\StarterKitServiceProvider;
+use Lvntr\StarterKit\Support\DocsLink;
 use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
 use PhpParser\Error;
 use PhpParser\Node;
@@ -30,10 +34,15 @@ use function Laravel\Prompts\text;
 
 class InstallCommand extends Command
 {
+    use ChecksStepResults;
+    use ComparesPublishedStubs;
     use MirrorsAiSkills;
+    use WritesFilesAtomically;
 
     protected $signature = 'sk:install
-        {--force : Overwrite existing files}
+        {--force : Overwrite existing files, and bypass the already-installed safety stop}
+        {--adopt : Rebuild storage/starter-kit/hashes.json from the shipped stubs for an app that is already installed — copies no file, runs no migration, touches no .env}
+        {--dry-run : Print what would be written and exit without writing anything}
         {--without-ai-skill : Skip .claude/skills/ and .codex/skills/ AI skill files}
         {--without-eject : Keep User/Role runtime in vendor (skip default domain eject)}
         {--resume : Resume a previously interrupted install, skipping already-completed steps}';
@@ -51,13 +60,86 @@ class InstallCommand extends Command
      */
     private const DEFAULT_EJECT_DOMAINS = ['User', 'Role'];
 
+    /**
+     * Composer package name, matched against the consumer's composer.lock as one
+     * half of an already-installed marker. See detectComposerLockMarkers().
+     */
+    private const PACKAGE_NAME = 'lvntr/laravel-starter-kit';
+
+    /**
+     * Files that ONLY this kit publishes. A stock Laravel application — the
+     * shape `laravel new` and `composer create-project` produce — has none of
+     * them, so finding one means sk:install has already run here.
+     *
+     * Deliberately narrow: never app/Models/User.php, never a framework config
+     * file. A marker that a fresh project could legitimately own would block
+     * the install it exists to protect.
+     *
+     * @var list<string>
+     */
+    private const EXISTING_APP_FILE_MARKERS = [
+        'app/Providers/DomainServiceProvider.php',
+        'config/permission-resources.php',
+    ];
+
+    /**
+     * Directories only this kit publishes. Same rule as the file markers, plus
+     * one more: the directory must actually CONTAIN something. An empty
+     * leftover directory carries no work worth protecting and would be a pure
+     * false positive.
+     *
+     * @var list<string>
+     */
+    private const EXISTING_APP_DIRECTORY_MARKERS = [
+        'app/Http/Controllers/Admin',
+        'resources/js/Pages/Admin',
+    ];
+
+    /**
+     * Tables the kit's own migrations create. Their presence in a reachable
+     * schema is evidence the kit has been installed and migrated here, which
+     * survives a wiped storage/ directory and a fresh clone alike.
+     *
+     * `permissions` is Spatie's rather than the kit's own, so it can in
+     * principle belong to a non-kit application that is installing the kit for
+     * the first time. It stays in the list because the stop is recoverable and
+     * names the exact table it tripped on — an operator reads one line and
+     * decides. Silently ignoring it would trade a recoverable stop for an
+     * unrecoverable overwrite.
+     *
+     * @var list<string>
+     */
+    private const KIT_SCHEMA_TABLES = [
+        'settings',
+        'file_manager_folders',
+        'permissions',
+    ];
+
     private Filesystem $files;
+
+    /**
+     * --dry-run. Every write this command performs is behind a guard on this
+     * flag: the publish loop copies nothing, the checkpoint is not persisted,
+     * and the run returns before .env / migrations / seeders / npm are reached.
+     * A dry run that mutated anything would be worse than no dry run at all.
+     */
+    private bool $dryRun = false;
 
     /** @var list<string> */
     private array $published = [];
 
     /** @var list<string> */
     private array $skipped = [];
+
+    /**
+     * Files whose on-disk copy differs from what the kit recorded shipping, so
+     * the publish loop left the consumer's version alone. Reported as its own
+     * group at the end of the run: an operator who is not told which files were
+     * withheld has no way to notice that their re-install did nothing for them.
+     *
+     * @var list<string>
+     */
+    private array $preserved = [];
 
     /**
      * Default domains successfully ejected during this install run. Drives the
@@ -99,6 +181,15 @@ class InstallCommand extends Command
      * NOT take the pristine first-install force-overwrite path.
      */
     private bool $progressExisted = false;
+
+    /**
+     * Labels of best-effort steps that failed. These never fail the command (a
+     * machine without Node must still be able to install), but they are listed
+     * again in the closing summary so the operator knows what to run by hand.
+     *
+     * @var list<string>
+     */
+    private array $bestEffortFailures = [];
 
     /**
      * Default Laravel files that conflict with Starter Kit stubs.
@@ -205,9 +296,31 @@ class InstallCommand extends Command
         ],
     ];
 
+    /**
+     * The filesystem helper is bound here rather than only in handle() so the
+     * detection helpers below are callable — and therefore unit-testable — on a
+     * freshly constructed command, the way the existing InstallCommand unit
+     * tests instantiate it.
+     */
+    public function __construct()
+    {
+        parent::__construct();
+
+        $this->files = new Filesystem;
+    }
+
     public function handle(): int
     {
         $this->files = new Filesystem;
+        $this->dryRun = (bool) $this->option('dry-run');
+
+        // --adopt is a registry-repair command wearing the installer's name. It
+        // shares nothing with the install path except the stub-hash semantics,
+        // so it short-circuits ahead of the banner, the preflight and the
+        // checkpoint — none of which apply to it.
+        if ($this->option('adopt')) {
+            return $this->adoptExistingInstall();
+        }
 
         $this->newLine();
         $this->line('  <fg=cyan;options=bold>Lvntr Starter Kit Installer (v13.6.x)</>');
@@ -235,6 +348,33 @@ class InstallCommand extends Command
             $this->newLine();
         }
 
+        // Fail-closed. The hash registry was the ONLY thing separating a first
+        // install from a re-run, and it lives under the git-ignored storage/
+        // tree: a stateless deploy, a wiped storage/, or a fresh clone loses it.
+        // The command then classified a fully installed application as a brand
+        // new project — force-publishing over every path and taking the
+        // first-install-only branches. So when the registry is missing we ask
+        // the application itself whether it has been installed, and stop before
+        // the first byte is written if the answer is yes.
+        //
+        // A resume never reaches the check: the markers it would find are this
+        // command's OWN half-finished publish, and stopping there would strand
+        // the operator in the middle of an install with no way forward.
+        $noHashRegistry = $this->isFirstInstall();
+        $existingAppMarkers = $noHashRegistry && ! $this->progressExisted
+            ? $this->detectExistingApp()
+            : [];
+
+        if ($existingAppMarkers !== []) {
+            if (! $this->option('force')) {
+                $this->renderExistingAppStop($existingAppMarkers);
+
+                return self::FAILURE;
+            }
+
+            $this->renderForcedOverExistingApp($existingAppMarkers);
+        }
+
         // 1. Publish stubs first so the kit's .env.example, package.json, and
         // scaffolding are in place before any .env / database wiring runs.
         // On a pristine first install (no hash registry AND no partial progress)
@@ -244,7 +384,8 @@ class InstallCommand extends Command
         $isFirstInstall = $this->computeFirstInstall(
             $this->progressExisted,
             $this->progressMeta,
-            $this->isFirstInstall(),
+            $noHashRegistry,
+            $existingAppMarkers !== [],
         );
         $this->progressMeta['first_install'] = $isFirstInstall;
         $this->persistProgress();
@@ -259,6 +400,14 @@ class InstallCommand extends Command
                 );
             });
 
+            // --dry-run stops here, before the first byte is written. Everything
+            // past this point (.env, database config, migrations, seeders, npm,
+            // the hash registry) mutates the application, so a dry run that kept
+            // going would not be dry.
+            if ($this->dryRun) {
+                return $this->renderDryRunPlan();
+            }
+
             // 1b. Merge package.json (stub wins for shared deps, user extras preserved)
             $this->step('Merging package.json', function () {
                 $this->mergePackageJson();
@@ -269,7 +418,9 @@ class InstallCommand extends Command
             // when it is blank. Runs before the database step so DB_* values are
             // written into an already-seeded .env.
             $this->step('Ensuring .env file', function () use ($isFirstInstall) {
-                $this->ensureEnvFile($isFirstInstall);
+                if (! $this->ensureEnvFile($isFirstInstall)) {
+                    return false;
+                }
 
                 // The dedicated data key is generated HERE, not at the end of
                 // the install: step 8 runs the seeders, and _03_SettingSeeder
@@ -280,6 +431,8 @@ class InstallCommand extends Command
                 // destroys exactly the values this feature exists to keep.
                 // Guarded and first-install-only, so a re-run is a no-op.
                 $this->ensureDataEncryptionKey(base_path('.env'), $isFirstInstall);
+
+                return true;
             });
 
             // 2. Database configuration (writes DB_* into the now-seeded .env)
@@ -304,15 +457,17 @@ class InstallCommand extends Command
             // 4. Publish config
             $this->step('Publishing configuration', function () {
                 // Core starter-kit config
-                $this->callSilently('vendor:publish', [
+                if (! $this->runArtisan('vendor:publish', [
                     '--tag' => 'starter-kit-config',
                     '--force' => $this->option('force'),
-                ]);
+                ])) {
+                    return false;
+                }
 
                 // FileManager config — vendor runtime reads its defaults from here.
                 // Published separately so users can override file-manager.php settings
                 // (allowed mime types, max size, model bindings) without touching vendor code.
-                $this->callSilently('vendor:publish', [
+                return $this->runArtisan('vendor:publish', [
                     '--tag' => 'starter-kit-file-manager-config',
                     '--force' => $this->option('force'),
                 ]);
@@ -380,15 +535,27 @@ class InstallCommand extends Command
             }
 
             // 6. Regenerate autoload so published classes are available for migrations/seeders
+            //
+            // Best-effort on purpose: composer is not guaranteed to be on PATH of
+            // the machine running the install (deploy images routinely drop it),
+            // and today's installs survive that. If the dump really was needed,
+            // the seeder step right after fails loudly on the missing class.
             $this->step('Regenerating autoload', function () {
                 $composer = $this->findComposerBinary();
-                $process = new Process([...$composer, 'dump-autoload', '-q'], base_path(), null, null, 120);
-                $process->run();
+                $succeeded = $this->runProcessStep([...$composer, 'dump-autoload', '-q'], timeout: 120);
 
                 // Reload the in-process autoloader so newly published classes (e.g. App\Enums\RoleEnum)
                 // are discoverable during the seeder step that runs in the same PHP process.
                 $this->refreshAutoloader();
-            });
+
+                if (! $succeeded) {
+                    $this->stepFailureDetail .= PHP_EOL.'  Run `composer dump-autoload` by hand before the seeders.';
+
+                    return false;
+                }
+
+                return true;
+            }, mandatory: false);
 
             // 7-9. Database-dependent steps (migrations, seeders, permissions).
             // A soft reachability probe replaces a hard crash when the DB is down:
@@ -408,7 +575,7 @@ class InstallCommand extends Command
                 // 9. Seed permissions (config-driven, vendor runtime reads from permission-resources.php)
                 if ($this->confirmStep('Seed permissions from config/permission-resources.php?')) {
                     $this->step('Seeding permissions', function () {
-                        $this->callSilently('sk:seed-permissions', ['--fresh' => true]);
+                        return $this->runArtisan('sk:seed-permissions', ['--fresh' => true]);
                     });
                 }
             } else {
@@ -421,10 +588,10 @@ class InstallCommand extends Command
             // 10. Passport keys + personal access client
             if ($this->confirmStep('Generate Passport encryption keys?')) {
                 $this->step('Generating Passport keys', function () {
-                    $this->callSilently('passport:keys', ['--force' => true]);
+                    return $this->runArtisan('passport:keys', ['--force' => true]);
                 });
                 $this->step('Creating Passport personal access client', function () {
-                    $this->callSilently('passport:client', ['--personal' => true, '--name' => config('app.name').' Personal Access Client', '--provider' => 'users', '--no-interaction' => true]);
+                    return $this->runArtisan('passport:client', ['--personal' => true, '--name' => config('app.name').' Personal Access Client', '--provider' => 'users', '--no-interaction' => true]);
                 });
 
                 // ROOT CAUSE FIX: passport:client is invoked with --no-interaction,
@@ -462,8 +629,13 @@ class InstallCommand extends Command
             // it (unsupported cipher at that moment, an APP_KEY guard abort); it
             // is a no-op whenever the key is already there.
             $this->step('Finalizing encryption keys', function () use ($isFirstInstall) {
-                $this->ensureAppKey(base_path('.env'));
+                if (! $this->ensureAppKey(base_path('.env'))) {
+                    return false;
+                }
+
                 $this->ensureDataEncryptionKey(base_path('.env'), $isFirstInstall);
+
+                return true;
             });
 
             // 13. Save stub hashes for update tracking
@@ -502,6 +674,8 @@ class InstallCommand extends Command
             $this->components->twoColumnDetail('<fg=yellow>Skipped</>', count($this->skipped).' files (already exist, use --force to overwrite)');
         }
 
+        $this->printPreservedFiles();
+
         if ($this->ejectedDomains !== []) {
             $this->newLine();
             $this->components->twoColumnDetail(
@@ -512,6 +686,16 @@ class InstallCommand extends Command
             $this->line('  <fg=gray>To revert: delete the directories, remove the injected Event::listen lines</>');
             $this->line('  <fg=gray>from app/Providers/DomainServiceProvider.php, then run `composer dump-autoload`.</>');
             $this->line('  <fg=gray>To keep them in vendor next time: `php artisan sk:install --without-eject`.</>');
+        }
+
+        // Non-fatal failures did not stop the install, so they are repeated here
+        // — the closing screen is the only place the operator still reads.
+        if ($this->bestEffortFailures !== []) {
+            $this->newLine();
+            $this->components->warn('These optional steps failed and were skipped:');
+            foreach ($this->bestEffortFailures as $failed) {
+                $this->line("  <fg=yellow>- {$failed}</>");
+            }
         }
 
         $this->newLine();
@@ -528,22 +712,62 @@ class InstallCommand extends Command
 
     /**
      * Run a step with simple before/after output (no spinner).
+     *
+     * The callback's return value is the step's verdict: `false` means the step
+     * failed. Anything else (including the `null` of a callback that only throws
+     * on error) is success — that is what keeps every legacy step working.
+     *
+     * A failed MANDATORY step aborts the run: it throws, which the handle()
+     * catch turns into `renderStepFailure()` + `self::FAILURE`. Because it never
+     * reaches markStepComplete(), the checkpoint keeps the step pending and the
+     * hash registry / clearProgress() at the end of handle() never run — a
+     * failed install stays resumable instead of being recorded as done.
+     *
+     * A failed BEST-EFFORT step (frontend work) warns, is remembered for the
+     * closing summary, and lets the install continue with its exit code intact.
+     *
+     * @return bool Whether the step succeeded.
      */
-    private function step(string $label, callable $callback): void
+    private function step(string $label, callable $callback, bool $mandatory = true): bool
     {
         if ($this->stepAlreadyCompleted($label, (bool) $this->option('resume'), $this->completedSteps)) {
             $this->components->twoColumnDetail($label, '<fg=gray>SKIPPED (resume)</>');
 
-            return;
+            return true;
         }
 
         $this->currentStep = $label;
+        $this->stepFailureDetail = null;
         $this->line("  <fg=gray>→</> {$label}...");
-        $callback();
+
+        $result = $callback();
+
+        if ($result === false) {
+            $detail = $this->stepFailureDetail ?? 'The step reported a failure.';
+            $this->stepFailureDetail = null;
+
+            if ($mandatory) {
+                $this->components->twoColumnDetail($label, '<fg=red>FAILED</>');
+
+                // Caught by handle()'s try/catch: renders the failed step + the
+                // resume command and returns self::FAILURE.
+                throw new \RuntimeException($detail);
+            }
+
+            $this->components->twoColumnDetail($label, '<fg=yellow>FAILED (non-fatal)</>');
+            $this->line('  <fg=yellow>'.$detail.'</>');
+            $this->bestEffortFailures[] = $label;
+            $this->currentStep = null;
+
+            return false;
+        }
+
         $this->components->twoColumnDetail($label, '<fg=green>DONE</>');
 
         $this->markStepComplete($label);
         $this->currentStep = null;
+
+        return true;
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -675,16 +899,20 @@ class InstallCommand extends Command
     /**
      * Write the current checkpoint (completed steps + metadata) to disk,
      * creating the storage/starter-kit directory on demand.
+     *
+     * Atomic for the same reason the registry is: this file is written between
+     * steps precisely so an interruption is survivable, and the interruption
+     * most likely to truncate it is one that lands DURING the write. A
+     * half-written checkpoint parses as `null`, loadProgress() reads it as a
+     * clean start, and the resume then redoes steps that already ran.
      */
     private function persistProgress(): void
     {
-        $dir = dirname($this->progressFilePath());
-
-        if (! $this->files->isDirectory($dir)) {
-            $this->files->makeDirectory($dir, 0755, true);
+        if ($this->dryRun) {
+            return;
         }
 
-        $this->files->put($this->progressFilePath(), json_encode([
+        $this->atomicPut($this->progressFilePath(), json_encode([
             'completed' => $this->completedSteps,
             'meta' => $this->progressMeta,
             'updated_at' => date('c'),
@@ -697,6 +925,10 @@ class InstallCommand extends Command
      */
     private function clearProgress(): void
     {
+        if ($this->dryRun) {
+            return;
+        }
+
         $path = $this->progressFilePath();
 
         if ($this->files->exists($path)) {
@@ -718,18 +950,346 @@ class InstallCommand extends Command
     /**
      * Pure decision: is this a first install? A resumed/re-run install (progress
      * checkpoint present) inherits the ORIGINAL decision from the checkpoint so
-     * it keeps ejecting the default domains it started with; a clean run falls
-     * back to the absence of the hash registry.
+     * it keeps ejecting the default domains it started with.
+     *
+     * On a clean run the absence of the hash registry is no longer enough on its
+     * own: the registry is git-ignored and routinely lost, so it is now the
+     * absence of the registry AND the absence of any evidence that the kit has
+     * already been installed here. That pairing is what keeps a --force run over
+     * a detected installation out of the first-install-only branches — the eject,
+     * the FIRST_INSTALL_ONLY env seeding and the dedicated-key generation all
+     * hang off this flag, and every one of them is wrong on an app that already
+     * has data.
      *
      * @param  array<string, mixed>  $meta
      */
-    private function computeFirstInstall(bool $progressExisted, array $meta, bool $noHashRegistry): bool
-    {
+    private function computeFirstInstall(
+        bool $progressExisted,
+        array $meta,
+        bool $noHashRegistry,
+        bool $existingAppDetected = false,
+    ): bool {
         if ($progressExisted) {
             return (bool) ($meta['first_install'] ?? false);
         }
 
-        return $noHashRegistry;
+        return $noHashRegistry && ! $existingAppDetected;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // EXISTING-APPLICATION DETECTION (fail-closed)
+    // ══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Observable evidence that the kit has ALREADY been installed into this
+     * application, independent of the git-ignored hash registry.
+     *
+     * Each returned string is a complete, operator-readable sentence naming the
+     * exact path or table it tripped on, because the whole value of the stop is
+     * that it can be judged in one read: either the operator recognises the file
+     * as their own installed app, or they see a coincidence and re-run with
+     * --force.
+     *
+     * Any single marker is sufficient. They are cheap and ordered cheapest
+     * first, but all of them are collected rather than short-circuited — a stop
+     * that names one file when four exist reads like a false positive.
+     *
+     * @return list<string>
+     */
+    private function detectExistingApp(): array
+    {
+        return array_merge(
+            $this->detectPublishedTargetMarkers(base_path()),
+            $this->detectComposerLockMarkers(base_path()),
+            $this->detectKitSchemaMarkers(),
+        );
+    }
+
+    /**
+     * Published files/directories that only this kit creates. Takes the base
+     * path as an argument rather than calling base_path() so it is testable
+     * against a temporary directory.
+     *
+     * @return list<string>
+     */
+    private function detectPublishedTargetMarkers(string $basePath): array
+    {
+        $base = rtrim(str_replace('\\', '/', $basePath), '/');
+        $markers = [];
+
+        foreach (self::EXISTING_APP_FILE_MARKERS as $relative) {
+            if ($this->files->isFile($base.'/'.$relative)) {
+                $markers[] = $relative.' — published by sk:install; a stock Laravel app has no such file';
+            }
+        }
+
+        foreach (self::EXISTING_APP_DIRECTORY_MARKERS as $relative) {
+            $path = $base.'/'.$relative;
+
+            if (! $this->files->isDirectory($path)) {
+                continue;
+            }
+
+            $count = $this->countFilesUnder($path);
+
+            if ($count === 0) {
+                continue;
+            }
+
+            $markers[] = $count === null
+                ? $relative.'/ — published by sk:install; present but not readable for inspection'
+                : sprintf(
+                    '%s/ — published by sk:install; %d file(s) present, a stock Laravel app has no such directory',
+                    $relative,
+                    $count,
+                );
+        }
+
+        return $markers;
+    }
+
+    /**
+     * Number of files under $path, or null when the directory exists but cannot
+     * be read.
+     *
+     * Null is deliberately not folded into 0. A directory the installer cannot
+     * inspect is not evidence of absence, and an unhandled iterator exception
+     * here would surface as a stack trace ahead of the install's own error
+     * handling. Callers treat null as "present" — the fail-closed reading.
+     */
+    private function countFilesUnder(string $path): ?int
+    {
+        try {
+            return count($this->files->allFiles($path, true));
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * The kit's own DDD tree under app/Domain/ alongside a composer.lock entry
+     * for the package.
+     *
+     * The composer.lock entry alone proves nothing — a FIRST install is by
+     * definition run right after `composer require`, so the entry is always
+     * there. app/Domain/ is what makes the pair specific: a stock Laravel
+     * application has no such directory, and this kit is what puts one there
+     * (published stubs plus the User/Role eject). Requiring both keeps the
+     * marker off a project that merely required the package and has not
+     * installed it yet.
+     *
+     * @return list<string>
+     */
+    private function detectComposerLockMarkers(string $basePath): array
+    {
+        $base = rtrim(str_replace('\\', '/', $basePath), '/');
+        $lockPath = $base.'/composer.lock';
+        $domainPath = $base.'/app/Domain';
+
+        if (! $this->files->isFile($lockPath) || ! $this->files->isDirectory($domainPath)) {
+            return [];
+        }
+
+        $domainFiles = $this->countFilesUnder($domainPath);
+
+        if ($domainFiles === 0) {
+            return [];
+        }
+
+        try {
+            $lock = $this->files->get($lockPath);
+        } catch (\Throwable) {
+            // An unreadable composer.lock leaves this marker unprovable. The
+            // published-target and schema markers are unaffected, so the guard
+            // still has evidence to work from.
+            return [];
+        }
+
+        if (! str_contains($lock, '"'.self::PACKAGE_NAME.'"')) {
+            return [];
+        }
+
+        return [sprintf(
+            'app/Domain/ — %s of kit domain code, with composer.lock listing %s',
+            $domainFiles === null ? 'present but not readable for inspection' : $domainFiles.' file(s)',
+            self::PACKAGE_NAME,
+        )];
+    }
+
+    /**
+     * Kit tables in a reachable schema.
+     *
+     * An UNREACHABLE database is never an error and never a marker: the install
+     * is frequently run before DB_* is configured at all, and turning that into
+     * a hard stop would break the ordinary first install this guard exists to
+     * protect. Every driver failure — no credentials, no server, no driver
+     * extension, a database that does not exist yet — lands in the same catch
+     * and yields "no evidence".
+     *
+     * @return list<string>
+     */
+    private function detectKitSchemaMarkers(): array
+    {
+        try {
+            $connection = DB::connection();
+            $connection->getPdo();
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $markers = [];
+
+        foreach (self::KIT_SCHEMA_TABLES as $table) {
+            try {
+                if (Schema::hasTable($table)) {
+                    $markers[] = sprintf(
+                        'database table `%s` on connection `%s` — created by the kit\'s migrations',
+                        $table,
+                        $connection->getName(),
+                    );
+                }
+            } catch (\Throwable) {
+                // The connection opened but the schema is not introspectable
+                // (permissions, a dropped database mid-check). Report what was
+                // found so far rather than inventing evidence either way.
+                return $markers;
+            }
+        }
+
+        return $markers;
+    }
+
+    /**
+     * Refuse the install and tell the operator exactly what was found and which
+     * command they actually want. Nothing has been written at this point.
+     *
+     * @param  list<string>  $markers
+     */
+    private function renderExistingAppStop(array $markers): void
+    {
+        $this->newLine();
+        $this->components->error('This application already looks installed — nothing was written.');
+        $this->newLine();
+
+        $this->line('  <fg=yellow>Evidence found:</>');
+        foreach ($markers as $marker) {
+            $this->line('    <fg=red>•</> <fg=white>'.$marker.'</>');
+        }
+
+        $this->newLine();
+        $this->line('  <fg=gray>The tracking registry is missing:</>');
+        $this->line('  <fg=gray>  '.$this->hashRegistryPath().'</>');
+        $this->line('  <fg=gray>That file is how sk:install tells a first install from a re-run, and it is</>');
+        $this->line('  <fg=gray>git-ignored — a stateless deploy or a cleared storage/ directory loses it.</>');
+        $this->line('  <fg=gray>Continuing would publish over the paths above and take the first-install-only</>');
+        $this->line('  <fg=gray>branches (default-domain eject, first-install .env seeding) on an app that</>');
+        $this->line('  <fg=gray>already has data.</>');
+
+        $this->newLine();
+        $this->line('  <fg=yellow>What you probably want:</>');
+        $this->components->twoColumnDetail(
+            '<fg=cyan>php artisan sk:update</>',
+            '<fg=gray>update an app that is already installed</>',
+        );
+        $this->components->twoColumnDetail(
+            '<fg=cyan>php artisan sk:install --adopt</>',
+            '<fg=gray>rebuild the registry only — copies no file, runs no migration, touches no .env</>',
+        );
+        $this->components->twoColumnDetail(
+            '<fg=cyan>php artisan sk:install --adopt --dry-run</>',
+            '<fg=gray>show what --adopt would record, write nothing</>',
+        );
+
+        $this->newLine();
+        $this->line('  <fg=yellow>If this really is a fresh project and the evidence is a coincidence:</>');
+        $this->line('  <fg=gray>remove or rename the exact path(s)/table(s) named above, then re-run</>');
+        $this->line('  <fg=gray>sk:install normally — that keeps the full first-install behaviour.</>');
+        $this->line('  <fg=gray>--force also proceeds, but read it as "overwrite the paths listed above", and</>');
+        $this->line('  <fg=gray>note that a forced run is NOT treated as a first install.</>');
+        $this->newLine();
+    }
+
+    /**
+     * --force over a detected installation. The operator asked for it, so the
+     * run continues — but the paths that are about to be overwritten are named
+     * first, and loudly.
+     *
+     * @param  list<string>  $markers
+     */
+    private function renderForcedOverExistingApp(array $markers): void
+    {
+        $this->newLine();
+        $this->components->warn('--force: publishing over an application that already looks installed.');
+        $this->newLine();
+
+        $this->line('  <fg=yellow>These will be overwritten:</>');
+        foreach ($markers as $marker) {
+            $this->line('    <fg=red>•</> <fg=white>'.$marker.'</>');
+        }
+
+        $this->newLine();
+        $this->line('  <fg=gray>Every published path except lang/ is replaced with the shipped stub.</>');
+        $this->line('  <fg=gray>Your .env is still never overwritten, and because the kit was detected here</>');
+        $this->line('  <fg=gray>this run is NOT treated as a first install: no default-domain eject and no</>');
+        $this->line('  <fg=gray>first-install-only .env seeding.</>');
+        $this->newLine();
+    }
+
+    /**
+     * Report the files the publish loop refused to overwrite, as one group.
+     *
+     * The count alone is useless here — the operator needs the paths, because
+     * the whole point of preserving a file is that they now have to decide
+     * whether the version they kept is missing something the release shipped.
+     * One line of instruction, not a paragraph: diff against the stub, or
+     * re-run with --force and lose the edits knowingly.
+     */
+    private function printPreservedFiles(bool $dryRun = false): void
+    {
+        if ($this->preserved === []) {
+            return;
+        }
+
+        $verb = $dryRun ? 'Would preserve' : 'Preserved';
+
+        $this->newLine();
+        $this->components->twoColumnDetail(
+            "<fg=yellow>{$verb}</>",
+            count($this->preserved).' locally modified files (the shipped version was NOT written)',
+        );
+
+        foreach ($this->preserved as $path) {
+            $this->line("  <fg=yellow>~</> {$path}");
+        }
+
+        $this->newLine();
+        $this->line('  <fg=gray>Diff each against the same relative path under vendor/lvntr/laravel-starter-kit/stubs/</>');
+        $this->line('  <fg=gray>and merge by hand, or re-run with `php artisan sk:install --force` to take the package</>');
+        $this->line('  <fg=gray>version and DISCARD these edits.</>');
+    }
+
+    /**
+     * Report what a --dry-run install WOULD have published, having written
+     * nothing.
+     */
+    private function renderDryRunPlan(): int
+    {
+        $this->newLine();
+        $this->components->info('Dry run — nothing was written.');
+        $this->newLine();
+
+        $this->components->twoColumnDetail('<fg=green>Would publish</>', count($this->published).' files');
+        $this->components->twoColumnDetail('<fg=yellow>Would skip</>', count($this->skipped).' files (preserved or intentionally deleted)');
+
+        $this->printPreservedFiles(dryRun: true);
+
+        $this->newLine();
+        $this->line('  <fg=gray>No .env change, no database configuration, no migration, no seeder,</>');
+        $this->line('  <fg=gray>no npm install, and no hash-registry write were performed.</>');
+        $this->line('  <fg=gray>Re-run without --dry-run to install.</>');
+        $this->newLine();
+
+        return self::SUCCESS;
     }
 
     /**
@@ -759,6 +1319,11 @@ class InstallCommand extends Command
         $this->line('  <fg=yellow>Fix the issue above, then resume the install with:</>');
         $this->line('  <fg=cyan>php artisan sk:install --resume</>');
         $this->line('  <fg=gray>Completed steps are checkpointed and will be skipped on resume.</>');
+        $this->newLine();
+
+        // Single closing line: whatever scrolled past, the last thing on screen
+        // names the failed step and the exact command that continues the run.
+        $this->line("  <fg=red;options=bold>Install failed at step \"{$step}\" — resume with `php artisan sk:install --resume`.</>");
         $this->newLine();
     }
 
@@ -828,6 +1393,11 @@ class InstallCommand extends Command
     /**
      * Update values in the .env file.
      *
+     * Rewrites one line per key and leaves every other byte of the file alone;
+     * the whole body is only ever handed to the atomic writer, never truncated
+     * in place. The seed branch is reachable only when .env does not exist —
+     * this method must not be able to replace an existing file either.
+     *
      * @param  array<string, string>  $values
      */
     private function updateEnvFile(array $values): void
@@ -836,11 +1406,10 @@ class InstallCommand extends Command
 
         if (! $this->files->exists($envPath)) {
             $examplePath = base_path('.env.example');
-            if ($this->files->exists($examplePath)) {
-                $this->files->copy($examplePath, $envPath);
-            } else {
-                $this->files->put($envPath, '');
-            }
+            $this->putEnvAtomically(
+                $envPath,
+                $this->files->exists($examplePath) ? $this->files->get($examplePath) : '',
+            );
         }
 
         $content = $this->files->get($envPath);
@@ -853,28 +1422,50 @@ class InstallCommand extends Command
             }
 
             if (preg_match("/^{$key}=.*/m", $content)) {
-                // Replace existing key
-                $content = preg_replace("/^{$key}=.*/m", "{$key}={$escapedValue}", $content);
+                // Replaced through a callback, never as a replacement STRING: a
+                // password containing $1 or \1 would otherwise be read as a
+                // backreference and silently written to disk mangled (or empty),
+                // locking the operator out of their own database. Same reasoning
+                // as replaceOrAppendEnvLine() below.
+                $content = preg_replace_callback(
+                    "/^{$key}=.*/m",
+                    static fn (): string => "{$key}={$escapedValue}",
+                    $content,
+                ) ?? $content;
             } else {
                 // Add new key
                 $content .= "\n{$key}={$escapedValue}";
             }
         }
 
-        $this->files->put($envPath, $content);
+        $this->putEnvAtomically($envPath, $content);
     }
 
     /**
      * Ensure the consumer's .env exists and carries every key the kit ships in
      * .env.example.
      *
-     * On a fresh install the kit's .env.example becomes the base — any values
-     * the user already set (APP_URL, APP_KEY, DB_*) are re-applied on top so
-     * nothing critical is lost. On a re-install only keys missing from the
-     * existing .env are appended — existing lines and values are never touched.
+     * AN EXISTING .env IS NEVER OVERWRITTEN — not on a re-install, and not on a
+     * first install either. It used to be: a first install copied .env.example
+     * over whatever was there, which on the ordinary `composer create-project`
+     * shape (a Laravel app that already has a .env) destroyed the operator's
+     * DB_PASSWORD and, far worse, their APP_KEY — and APP_KEY is what every
+     * already-encrypted row and every live session is readable through. There
+     * is no undo for that and no copy of the value anywhere else, so the copy
+     * branch is now reachable only when the file genuinely does not exist.
+     *
+     * The first-install intent survives without the overwrite: $isFirstInstall
+     * is handed to the merge, which seeds the FIRST_INSTALL_ONLY_ENV_KEYS a
+     * brand-new project is supposed to start with — but only where the key is
+     * absent. No existing key's value is ever rewritten on either path.
+     *
      * Finally APP_KEY is generated when blank so the app boots.
+     *
+     * @return bool False only when APP_KEY generation itself failed — an app
+     *              without an APP_KEY cannot boot, let alone encrypt anything,
+     *              so the caller treats it as a failed step.
      */
-    private function ensureEnvFile(bool $isFirstInstall = false): void
+    private function ensureEnvFile(bool $isFirstInstall = false): bool
     {
         $envPath = base_path('.env');
         $examplePath = base_path('.env.example');
@@ -882,17 +1473,116 @@ class InstallCommand extends Command
         // Nothing to seed from. The publish step is expected to have placed the
         // kit's .env.example, so reaching here means a malformed install.
         if (! $this->files->exists($examplePath)) {
-            return;
+            return true;
         }
 
-        if (! $this->files->exists($envPath) || $isFirstInstall) {
-            $this->files->copy($examplePath, $envPath);
+        if ($this->files->exists($envPath)) {
+            $this->mergeMissingEnvKeys($envPath, $examplePath, $isFirstInstall);
         } else {
-            $this->mergeMissingEnvKeys($envPath, $examplePath);
+            // Seeded atomically as well: a half-written .env left behind by an
+            // interrupted run would count as "present" on the next attempt and
+            // never be re-seeded, which is the same dead end from the other
+            // direction.
+            $this->putEnvAtomically($envPath, $this->files->get($examplePath));
         }
 
-        $this->ensureAppKey($envPath);
+        if (! $this->ensureAppKey($envPath)) {
+            return false;
+        }
+
         $this->ensureCachePrefix($envPath);
+
+        return true;
+    }
+
+    /**
+     * Write $content to $path through a temp file in the SAME directory, then
+     * rename() it over the target.
+     *
+     * Every .env writer in this command goes through here. A plain put() opens
+     * the real file with O_TRUNC: an install interrupted between the truncate
+     * and the write (Ctrl-C, OOM kill, a full disk) leaves a truncated or empty
+     * .env, and the credentials that were in it are gone. rename() within one
+     * filesystem is atomic, so the file on disk is only ever the old body or
+     * the complete new one.
+     *
+     * The mode of the existing file is carried over; a file being created gets
+     * 0600, and the temp file is chmod-ed before the body is written so the
+     * credentials are never briefly readable under a permissive umask.
+     *
+     * A SYMLINKED .env is followed, not replaced. Zero-downtime deployers
+     * (Envoyer, Deployer, Capistrano) symlink the release's .env at one shared
+     * file; rename() would swap out the LINK, leaving the shared credentials
+     * orphaned and this release reading a private copy that the next deploy
+     * never sees. realpath() resolves to the file the operator actually
+     * maintains and the swap happens there — same directory, so still one
+     * filesystem and still atomic.
+     */
+    private function putEnvAtomically(string $path, string $content): void
+    {
+        // false for a path that does not exist yet (and for a dangling link,
+        // where there is no target to write through anyway).
+        $target = realpath($path) ?: $path;
+
+        $temp = dirname($target).'/.env.sk-tmp-'.bin2hex(random_bytes(8));
+
+        $targetExists = $this->files->exists($target);
+
+        $perms = $targetExists ? @fileperms($target) : false;
+        $mode = $perms === false ? 0600 : ($perms & 0777);
+
+        // Ownership has to be carried too, not just the mode. A `sudo php
+        // artisan sk:install` over an app whose .env is www-data:www-data would
+        // otherwise rename a root-owned file into place and the web user could
+        // no longer read it — the in-place put() this writer replaced preserved
+        // the owner implicitly, because it never created a new inode.
+        $owner = $targetExists ? @fileowner($target) : false;
+        $group = $targetExists ? @filegroup($target) : false;
+
+        try {
+            // 'x' fails rather than clobbering, so a colliding name can never
+            // cost us a file we did not create.
+            $handle = @fopen($temp, 'x');
+
+            if ($handle === false) {
+                throw new \RuntimeException('Could not create a temporary .env file at ['.$temp.'].');
+            }
+
+            try {
+                @chmod($temp, $mode);
+
+                // Best-effort: only root can hand a file to another user, and a
+                // non-root run already owns the file it is replacing.
+                if ($group !== false) {
+                    @chgrp($temp, $group);
+                }
+
+                if ($owner !== false) {
+                    @chown($temp, $owner);
+                }
+
+                if (fwrite($handle, $content) !== strlen($content)) {
+                    throw new \RuntimeException('Could not write the temporary .env file at ['.$temp.'].');
+                }
+
+                // Flush userland + kernel buffers before the rename, so a crash
+                // right after it cannot leave a correctly named but empty file.
+                fflush($handle);
+                @fsync($handle);
+            } finally {
+                fclose($handle);
+            }
+
+            if (! @rename($temp, $target)) {
+                throw new \RuntimeException('Could not move the temporary .env file into place at ['.$target.'].');
+            }
+        } finally {
+            // Only reachable when the rename did not happen; a successful
+            // rename leaves nothing behind.
+            if ($this->files->exists($temp)) {
+                $this->files->delete($temp);
+            }
+        }
     }
 
     /**
@@ -927,7 +1617,7 @@ class InstallCommand extends Command
             $content = rtrim($content, "\n")."\nCACHE_PREFIX={$prefix}\n";
         }
 
-        $this->files->put($envPath, $content);
+        $this->putEnvAtomically($envPath, $content);
     }
 
     /**
@@ -935,19 +1625,42 @@ class InstallCommand extends Command
      * user's existing lines and values. Comment/blank lines are ignored when
      * detecting keys; the missing lines are copied verbatim so their inline
      * comments and defaults survive.
+     *
+     * $isFirstInstall lifts the FIRST_INSTALL_ONLY_ENV_KEYS skip — see that
+     * constant. It only ever adds an absent key; nothing existing is rewritten
+     * on either path.
      */
-    private function mergeMissingEnvKeys(string $envPath, string $examplePath): void
+    private function mergeMissingEnvKeys(string $envPath, string $examplePath, bool $isFirstInstall = false): void
     {
+        $current = $this->files->get($envPath);
+
         $merged = $this->buildMergedEnvContent(
-            $this->files->get($envPath),
+            $current,
             $this->files->get($examplePath),
+            $isFirstInstall,
         );
 
         if ($merged === null) {
             return;
         }
 
-        $this->files->put($envPath, $merged);
+        $this->putEnvAtomically($envPath, $merged);
+
+        // Key NAMES only. The added lines come from .env.example, so their
+        // values are the shipped defaults rather than anything sensitive, but
+        // printing a name is the whole point here and printing a value never is.
+        $added = array_keys(array_diff_key(
+            $this->parseEnvKeys($merged),
+            $this->parseEnvKeys($current),
+        ));
+
+        if ($added !== []) {
+            $this->components->info(sprintf(
+                'Added %d missing key(s) to .env (existing values untouched): %s',
+                count($added),
+                implode(', ', $added),
+            ));
+        }
     }
 
     /**
@@ -960,9 +1673,12 @@ class InstallCommand extends Command
      * gate from a command it ran for an unrelated reason, which is exactly the
      * "an upgrade must not change who gets a 403" guarantee the kit sells.
      *
-     * A key listed here therefore reaches a fresh install (which copies
-     * .env.example wholesale) and no one else. An existing app opts in by
-     * writing the line itself — see docs/UPGRADE.md.
+     * A key listed here therefore reaches a fresh install and no one else. It
+     * used to get there because a first install copied .env.example over the
+     * file; now that an existing .env is never overwritten, the same keys are
+     * seeded by the merge under the $isFirstInstall flag, and only where the
+     * key is absent — an operator who already set one keeps their value. An
+     * existing app opts in by writing the line itself — see docs/UPGRADE.md.
      *
      * The two DATA_ENCRYPTION_* keys are here for the same reason in a harsher
      * currency. Merging a BLANK DATA_ENCRYPTION_KEY line would be inert, but
@@ -988,15 +1704,17 @@ class InstallCommand extends Command
      * current .env under a kit header. Returns null when nothing is missing so
      * the caller can skip the write (making the operation idempotent).
      *
-     * Keys in self::FIRST_INSTALL_ONLY_ENV_KEYS are skipped: this method runs
-     * only on the re-install path (ensureEnvFile copies the example outright on
-     * a first install), so skipping here is precisely "new installs get it,
-     * existing ones do not".
+     * Keys in self::FIRST_INSTALL_ONLY_ENV_KEYS are skipped unless
+     * $isFirstInstall says this is a brand-new project. That flag is the whole
+     * mechanism behind "new installs get it, existing ones do not", now that an
+     * existing .env is never overwritten and every install reaches this merge.
+     * Even on a first install the key is only ADDED when absent, so an operator
+     * who pre-set one keeps their value.
      *
      * Pure string-in / string-out — no filesystem access — so it can be unit
      * tested in isolation.
      */
-    private function buildMergedEnvContent(string $envContent, string $exampleContent): ?string
+    private function buildMergedEnvContent(string $envContent, string $exampleContent, bool $isFirstInstall = false): ?string
     {
         $existing = $this->parseEnvKeys($envContent);
         $exampleLines = preg_split('/\r\n|\r|\n/', $exampleContent) ?: [];
@@ -1011,7 +1729,7 @@ class InstallCommand extends Command
 
             $key = trim(explode('=', $trimmed, 2)[0]);
 
-            if (in_array($key, self::FIRST_INSTALL_ONLY_ENV_KEYS, strict: true)) {
+            if (! $isFirstInstall && in_array($key, self::FIRST_INSTALL_ONLY_ENV_KEYS, strict: true)) {
                 continue;
             }
 
@@ -1055,17 +1773,19 @@ class InstallCommand extends Command
     /**
      * Generate APP_KEY via artisan when the .env value is blank, so a freshly
      * seeded environment boots without a manual `key:generate`.
+     *
+     * @return bool Whether an APP_KEY is now present (true when one already was).
      */
-    private function ensureAppKey(string $envPath): void
+    private function ensureAppKey(string $envPath): bool
     {
         $content = $this->files->get($envPath);
 
         // A non-empty APP_KEY is already set — leave it untouched.
         if (preg_match('/^APP_KEY=.+$/m', $content)) {
-            return;
+            return true;
         }
 
-        $this->callSilently('key:generate', ['--force' => true]);
+        return $this->runArtisan('key:generate', ['--force' => true]);
     }
 
     /**
@@ -1082,10 +1802,11 @@ class InstallCommand extends Command
      * describe the split. Adoption on an existing app is an explicit
      * `php artisan encryption:key`, which preserves the current key first.
      *
-     * On a first install the reasoning inverts: ensureEnvFile() has just copied
-     * .env.example wholesale, so there is no prior key and no encrypted row,
-     * and a key generated here is the one every value will ever have been
-     * written with. Nothing is added to DATA_ENCRYPTION_PREVIOUS_KEYS on
+     * On a first install the reasoning inverts: there is no prior key and no
+     * encrypted row (ensureEnvFile() has just seeded the kit's keys, and the
+     * blank check below still holds if a value was somehow already there), and
+     * a key generated here is the one every value will ever have been written
+     * with. Nothing is added to DATA_ENCRYPTION_PREVIOUS_KEYS on
      * purpose — a fresh install has no retired key, and copying APP_KEY in
      * there would duplicate that secret into a second env var and keep it a
      * valid data key forever, including after APP_KEY is rotated.
@@ -1154,7 +1875,7 @@ class InstallCommand extends Command
             return;
         }
 
-        $this->files->put($envPath, $updated);
+        $this->putEnvAtomically($envPath, $updated);
 
         // The install process has ALREADY booted with this key absent, so the
         // seeders that run later in this same run would otherwise encrypt every
@@ -1238,6 +1959,16 @@ class InstallCommand extends Command
 
     /**
      * Recursively publish a directory.
+     *
+     * Not a plain copy loop. Everything outside $preservablePaths used to be
+     * overwritten unconditionally, which made a second `sk:install` a silent
+     * data-loss event: a consumer who edited a published controller got the
+     * stub back with nothing in the summary saying their work was gone. The
+     * hash registry already records what the kit SHIPPED for each path, so the
+     * same three-way comparison `sk:update` uses ({@see ComparesPublishedStubs})
+     * now guards this loop too — a file that differs from what we shipped is
+     * the consumer's, and it is preserved and reported instead of clobbered.
+     * `--force` still takes the package version, as documented.
      */
     private function publishDirectory(string $source, string $destination, bool $force): void
     {
@@ -1245,9 +1976,13 @@ class InstallCommand extends Command
             return;
         }
 
-        if (! $this->files->isDirectory($destination)) {
+        if (! $this->dryRun && ! $this->files->isDirectory($destination)) {
             $this->files->makeDirectory($destination, 0755, true);
         }
+
+        // Read once. The old re-install guard re-read and re-decoded the whole
+        // registry inside the loop, once per stub file.
+        $registry = $this->loadHashRegistry();
 
         foreach ($this->files->allFiles($source, true) as $file) {
             $relativePath = $file->getRelativePathname();
@@ -1275,11 +2010,13 @@ class InstallCommand extends Command
             $targetPath = $destination.DIRECTORY_SEPARATOR.$relativePath;
             $targetDir = dirname($targetPath);
 
-            if (! $this->files->isDirectory($targetDir)) {
+            if (! $this->dryRun && ! $this->files->isDirectory($targetDir)) {
                 $this->files->makeDirectory($targetDir, 0755, true);
             }
 
-            if (! $force && $this->isPreservable($relativePath) && $this->files->exists($targetPath)) {
+            $targetExists = $this->files->exists($targetPath);
+
+            if (! $force && $this->isPreservable($relativePath) && $targetExists) {
                 $this->skipped[] = $relativePath;
 
                 continue;
@@ -1287,19 +2024,54 @@ class InstallCommand extends Command
 
             // Re-install guard: if hash registry exists and has a record for this file
             // but the target is missing, the user intentionally deleted it — don't restore.
-            if (! $force && ! $this->files->exists($targetPath)) {
-                $hashFile = config('starter-kit.published_hashes', storage_path('starter-kit/hashes.json'));
-                if ($this->files->exists($hashFile)) {
-                    $hashes = json_decode($this->files->get($hashFile), true) ?: [];
-                    if (isset($hashes[$normalizedPath])) {
-                        $this->skipped[] = $relativePath;
+            if (! $force && ! $targetExists && $this->registryRecordFor($registry, $normalizedPath) !== null) {
+                $this->skipped[] = $relativePath;
 
-                        continue;
-                    }
+                continue;
+            }
+
+            // Hash-aware overwrite guard. Only the outcomes that mean "do not
+            // write" stop the copy:
+            //   - OPTED_OUT   the consumer excluded this path at install time
+            //   - UP_TO_DATE  we have shipped nothing new, so the difference on
+            //                 disk is theirs
+            //   - MODIFIED    a new version exists AND they edited their copy
+            // IDENTICAL and WRITE fall through (an identical copy is a harmless
+            // no-op write that keeps the published count honest), and UNTRACKED
+            // keeps the documented install behaviour of writing the scaffold:
+            // with no record there is nothing to compare against, and the
+            // already-installed stop guards the case that actually matters.
+            // md5_file() returns false for an unreadable path (and for a
+            // directory sitting where a file should be). Falling back to null
+            // keeps the pre-guard behaviour — publish — instead of raising a
+            // TypeError on a tree we cannot read anyway.
+            if ($targetExists) {
+                $decision = $this->decidePublishedStub(
+                    md5_file($file->getPathname()) ?: '',
+                    md5_file($targetPath) ?: null,
+                    $this->registryRecordFor($registry, $normalizedPath),
+                    $force,
+                );
+
+                if ($decision === self::STUB_OPTED_OUT) {
+                    $this->skipped[] = $relativePath;
+
+                    continue;
+                }
+
+                if ($decision === self::STUB_UP_TO_DATE || $decision === self::STUB_MODIFIED) {
+                    $this->preserved[] = $normalizedPath;
+
+                    continue;
                 }
             }
 
-            $this->files->copy($file->getPathname(), $targetPath);
+            // --dry-run records the decision and copies nothing; the plan the
+            // operator reads is therefore the exact set this loop would write.
+            if (! $this->dryRun) {
+                $this->files->copy($file->getPathname(), $targetPath);
+            }
+
             $this->published[] = $relativePath;
         }
     }
@@ -1310,9 +2082,7 @@ class InstallCommand extends Command
      */
     private function isFirstInstall(): bool
     {
-        $hashFile = config('starter-kit.published_hashes', storage_path('starter-kit/hashes.json'));
-
-        return ! $this->files->exists($hashFile);
+        return ! $this->files->exists($this->hashRegistryPath());
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -1815,7 +2585,7 @@ class InstallCommand extends Command
                 }
 
                 $this->step('Running migrate:fresh', function () {
-                    $this->callSilently('migrate:fresh', ['--force' => true]);
+                    return $this->runArtisan('migrate:fresh', ['--force' => true]);
                 });
 
                 return;
@@ -1823,7 +2593,7 @@ class InstallCommand extends Command
         }
 
         $this->step('Running migrations', function () {
-            $this->callSilently('migrate', ['--force' => true]);
+            return $this->runArtisan('migrate', ['--force' => true]);
         });
     }
 
@@ -1881,7 +2651,7 @@ class InstallCommand extends Command
             }
 
             $this->step("Seeding: {$displayName}", function () use ($fqcn) {
-                $this->callSilently('db:seed', [
+                return $this->runArtisan('db:seed', [
                     '--class' => $fqcn,
                     '--force' => true,
                 ]);
@@ -2031,6 +2801,12 @@ class InstallCommand extends Command
 
     /**
      * Install frontend dependencies and build.
+     *
+     * EVERY step here is best-effort by design: the kit must stay installable on
+     * a machine with no Node toolchain (CI images, PHP-only deploy hosts). A
+     * failure warns, prints the command to run by hand, and leaves the install's
+     * exit code alone — promoting these to mandatory would start failing
+     * installs that work today.
      */
     private function installFrontend(): void
     {
@@ -2058,7 +2834,7 @@ class InstallCommand extends Command
         if ($this->files->isDirectory($nodeModules)) {
             $this->step('Removing old node_modules', function () use ($nodeModules) {
                 $this->files->deleteDirectory($nodeModules);
-            });
+            }, mandatory: false);
         }
 
         if ($this->files->exists($lockFile)) {
@@ -2066,64 +2842,60 @@ class InstallCommand extends Command
         }
 
         // 1. npm install
-        $this->line('  <fg=gray>→</> Installing npm dependencies...');
-
-        $npmInstall = new Process(['npm', 'install'], base_path(), null, null, 300);
-        $npmInstall->run();
-
-        if (! $npmInstall->isSuccessful()) {
-            $this->components->twoColumnDetail('Installing npm dependencies', '<fg=red>FAILED</>');
-            $this->line('  <fg=red>'.$npmInstall->getErrorOutput().'</>');
+        if (! $this->step('Installing npm dependencies', function () {
+            return $this->runProcessStep(['npm', 'install'], timeout: 300);
+        }, mandatory: false)) {
+            $this->renderFrontendGuidance('npm install && npm run build');
 
             return;
         }
-
-        $this->components->twoColumnDetail('Installing npm dependencies', '<fg=green>DONE</>');
 
         // 2. Clear config/route cache so wayfinder sees fresh routes
         $this->runProcess(['php', 'artisan', 'config:clear'], 'Clearing config cache');
         $this->runProcess(['php', 'artisan', 'route:clear'], 'Clearing route cache');
 
         // 3. Generate Wayfinder route/action TypeScript files (required for build)
-        $this->line('  <fg=gray>→</> Generating Wayfinder types...');
-
-        $wayfinderProcess = new Process(['php', 'artisan', 'wayfinder:generate'], base_path(), null, null, 60);
-        $wayfinderProcess->run();
-
-        if (! $wayfinderProcess->isSuccessful()) {
-            $this->components->twoColumnDetail('Generating Wayfinder types', '<fg=red>FAILED</>');
-            $this->line('  <fg=red>'.$wayfinderProcess->getErrorOutput().'</>');
-            $this->newLine();
+        if (! $this->step('Generating Wayfinder types', function () {
+            return $this->runProcessStep(['php', 'artisan', 'wayfinder:generate'], timeout: 60);
+        }, mandatory: false)) {
             $this->components->warn('Wayfinder types could not be generated. Build will fail.');
-            $this->line('  Fix the issue, then run:');
-            $this->line('  <fg=cyan>php artisan wayfinder:generate && npm run build</>');
+            $this->renderFrontendGuidance('php artisan wayfinder:generate && npm run build');
 
             return;
         }
 
-        $this->components->twoColumnDetail('Generating Wayfinder types', '<fg=green>DONE</>');
-
         // 4. Build frontend
-        $this->line('  <fg=gray>→</> Building frontend assets...');
-
-        $npmBuild = new Process(['npm', 'run', 'build'], base_path(), null, null, 300);
-        $npmBuild->run();
-
-        if ($npmBuild->isSuccessful()) {
-            $this->components->twoColumnDetail('Building frontend assets', '<fg=green>DONE</>');
-        } else {
-            $this->components->twoColumnDetail('Building frontend assets', '<fg=red>FAILED</>');
-            $this->line('  <fg=red>'.$npmBuild->getErrorOutput().'</>');
+        if (! $this->step('Building frontend assets', function () {
+            return $this->runProcessStep(['npm', 'run', 'build'], timeout: 300);
+        }, mandatory: false)) {
+            $this->renderFrontendGuidance('npm run build');
         }
     }
 
     /**
+     * The "run it by hand" guidance shipped with every non-fatal frontend
+     * failure — the install continues, so the operator needs the exact command.
+     */
+    private function renderFrontendGuidance(string $command): void
+    {
+        $this->line('  <fg=yellow>Frontend assets were not built. Fix the issue above, then run:</>');
+        $this->line("  <fg=cyan>{$command}</>");
+        $this->newLine();
+    }
+
+    /**
      * Run a process silently, only for cache/clear type operations.
+     *
+     * Best-effort: a cache clear that fails is not worth stopping an install
+     * over, but it is no longer swallowed — the next step (wayfinder) would
+     * otherwise fail with a stale-route error and no hint of the cause.
      */
     private function runProcess(array $command, string $label): void
     {
-        $process = new Process($command, base_path(), null, null, 30);
-        $process->run();
+        if (! $this->runProcessStep($command, timeout: 30)) {
+            $this->components->warn($label.' failed: '.$this->stepFailureDetail);
+            $this->stepFailureDetail = null;
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -2207,7 +2979,7 @@ class InstallCommand extends Command
         if ($this->databaseHoldsOffsetTimestamps()) {
             $this->components->warn('This database already holds data on a non-UTC session — database timezone pin skipped.');
             $this->line('    Pinning it here would shift how existing timestamps render.');
-            $this->line('    Run <fg=cyan>php artisan sk:upgrade</> and follow the one-time conversion guide in <fg=cyan>docs/timezone.md</>.');
+            $this->line('    Run <fg=cyan>php artisan sk:upgrade</> and follow the one-time conversion guide in <fg=cyan>'.DocsLink::to('timezone.md').'</>.');
 
             return;
         }
@@ -2819,8 +3591,84 @@ class InstallCommand extends Command
      */
     private function saveStubHashes(): void
     {
-        $hashFile = config('starter-kit.published_hashes', storage_path('starter-kit/hashes.json'));
+        $this->writeHashRegistry($this->buildStubHashRegistry()['hashes']);
+    }
+
+    /**
+     * Configured location of the published-file hash registry. Single accessor
+     * so the install path, the re-install guard and --adopt can never drift onto
+     * different files.
+     */
+    private function hashRegistryPath(): string
+    {
+        return config('starter-kit.published_hashes', storage_path('starter-kit/hashes.json'));
+    }
+
+    /**
+     * Read the registry once. A malformed or absent file reads as "no records",
+     * which makes every path untracked — the publish loop then behaves exactly
+     * as it did before hash tracking existed rather than failing the install.
+     *
+     * @return array<string, mixed>
+     */
+    private function loadHashRegistry(): array
+    {
+        $path = $this->hashRegistryPath();
+
+        if (! $this->files->exists($path)) {
+            return [];
+        }
+
+        $data = json_decode($this->files->get($path), true);
+
+        return is_array($data) ? $data : [];
+    }
+
+    /**
+     * Look a path up in the registry, tolerating the separator form it was
+     * written with.
+     *
+     * The registry is keyed by SplFileInfo::getRelativePathname(), which uses
+     * DIRECTORY_SEPARATOR — identical to the normalised form on POSIX, but
+     * backslashed on Windows, where a registry written by an older run would
+     * then read as "no record" for every single file and the overwrite guard
+     * would never fire. Checking both forms costs one array lookup and removes
+     * the whole class of silent mis-keying.
+     *
+     * @param  array<string, mixed>  $registry
+     */
+    private function registryRecordFor(array $registry, string $normalizedPath): ?string
+    {
+        $record = $registry[$normalizedPath] ?? null;
+
+        if ($record === null && DIRECTORY_SEPARATOR !== '/') {
+            $record = $registry[str_replace('/', DIRECTORY_SEPARATOR, $normalizedPath)] ?? null;
+        }
+
+        return is_string($record) ? $record : null;
+    }
+
+    /**
+     * Build the registry contents from the shipped stubs against what is
+     * currently on disk, plus the counts that describe the result.
+     *
+     * This is the ONE definition of the registry's semantics — a stub whose
+     * target exists is recorded under the hash of the STUB (what we shipped, so
+     * sk:update can later tell a consumer edit from an untouched file), a stub
+     * excluded by a flag gets the '__skipped__' sentinel, and a stub whose
+     * target is absent is left out entirely so sk:update treats it as new.
+     * Both saveStubHashes() and --adopt go through here, which is what makes
+     * "--adopt writes the same registry a successful install would" true by
+     * construction rather than by a second implementation agreeing.
+     *
+     * @return array{hashes: array<string, string>, adopted: int, missing: int, skipped: int}
+     */
+    private function buildStubHashRegistry(): array
+    {
         $hashes = [];
+        $adopted = 0;
+        $missing = 0;
+        $skippedCount = 0;
 
         $stubsPath = StarterKitServiceProvider::stubsPath();
         $skipPaths = $this->getSkipPaths();
@@ -2848,6 +3696,7 @@ class InstallCommand extends Command
 
             if ($skipped) {
                 $hashes[$relativePath] = '__skipped__';
+                $skippedCount++;
 
                 continue;
             }
@@ -2855,17 +3704,199 @@ class InstallCommand extends Command
             if ($this->files->exists($targetPath)) {
                 // Store STUB hash — this is what we shipped, used to detect user modifications
                 $hashes[$relativePath] = md5_file($file->getPathname());
+                $adopted++;
+
+                continue;
             }
+
+            $missing++;
         }
 
         $hashes['_format'] = 'v2';
 
-        $dir = dirname($hashFile);
-        if (! $this->files->isDirectory($dir)) {
-            $this->files->makeDirectory($dir, 0755, true);
+        return [
+            'hashes' => $hashes,
+            'adopted' => $adopted,
+            'missing' => $missing,
+            'skipped' => $skippedCount,
+        ];
+    }
+
+    /**
+     * Persist the registry, creating storage/starter-kit on demand.
+     *
+     * Atomic (temp file in the same directory, flushed, then renamed) because a
+     * truncated registry is the most expensive failure this command can leave
+     * behind: sk:update reads it to tell consumer-owned files from removable
+     * ones, so half a registry reads as "these paths were never published" and
+     * the next update decides accordingly. A crash mid-write must leave the old
+     * registry or the new one, never something in between. A write that cannot
+     * complete throws, so it fails the install instead of vanishing.
+     *
+     * @param  array<string, string>  $hashes
+     */
+    private function writeHashRegistry(array $hashes): void
+    {
+        $this->atomicPut(
+            $this->hashRegistryPath(),
+            json_encode($hashes, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+        );
+    }
+
+    /**
+     * Copy an existing registry aside before it is replaced, returning the
+     * backup path (null when there was nothing to back up).
+     *
+     * The registry is the only record of which files the kit published and what
+     * it shipped for each. Replacing it with a rebuild is a judgement call about
+     * files the operator may have edited, so the previous state stays on disk —
+     * a rebuild that guessed wrong is then one `mv` away from being undone.
+     * The counter defends the same-second re-run: silently overwriting the first
+     * backup would destroy exactly the copy the operator would restore from.
+     */
+    private function backupHashRegistry(string $path): ?string
+    {
+        if (! $this->files->exists($path)) {
+            return null;
         }
 
-        $this->files->put($hashFile, json_encode($hashes, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $stamp = date('Ymd-His');
+        $backup = $path.'.bak-'.$stamp;
+
+        $suffix = 1;
+        while ($this->files->exists($backup)) {
+            $backup = $path.'.bak-'.$stamp.'-'.$suffix;
+            $suffix++;
+        }
+
+        $this->files->copy($path, $backup);
+
+        return $backup;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ADOPT (--adopt): registry repair, no publish
+    // ══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Rebuild the hash registry for an application the kit is already installed
+     * into, WITHOUT copying a single file.
+     *
+     * This is the recovery path out of the fail-closed stop. The registry is
+     * git-ignored, so losing it is routine — a stateless deploy, a fresh clone,
+     * a cleared storage/ tree — and before this command the only ways forward
+     * were to hand-write the file or to let sk:install publish over a live
+     * application. It writes exactly one path (the registry, after backing up
+     * whatever was there): no stub is copied, no migration runs, no .env is
+     * read or written, no seeder and no npm step is reached.
+     */
+    private function adoptExistingInstall(): int
+    {
+        $this->newLine();
+        $this->line('  <fg=cyan;options=bold>Lvntr Starter Kit — adopt an existing installation</>');
+        $this->newLine();
+        $this->line('  <fg=gray>Rebuilds the published-file registry from the shipped stubs for every</>');
+        $this->line('  <fg=gray>target that already exists on disk.</>');
+        $this->line('  <fg=gray>No file is copied, no migration runs, no .env is touched.</>');
+        $this->newLine();
+
+        // The zero-count guard below cannot carry this decision on its own. The
+        // kit ships `app/Models/User.php` and `app/Providers/AppServiceProvider.php`,
+        // and a stock Laravel application already has both, so a never-installed
+        // app adopts two files and sails past a count check. The evidence that
+        // this app was really installed is the same marker set the fail-closed
+        // stop reads, so --adopt reads it too.
+        $markers = $this->detectExistingApp();
+
+        if ($markers === []) {
+            $this->components->error('Nothing to adopt — this application does not look like it has the kit installed.');
+            $this->newLine();
+            $this->line('  <fg=gray>--adopt rebuilds the registry for an app that WAS installed and lost it.</>');
+            $this->line('  <fg=gray>Writing one here would mark this app as installed and permanently skip the</>');
+            $this->line('  <fg=gray>first-install steps it has never had.</>');
+            $this->components->twoColumnDetail(
+                '<fg=cyan>php artisan sk:install</>',
+                '<fg=gray>this application is not installed yet</>',
+            );
+            $this->newLine();
+
+            return self::FAILURE;
+        }
+
+        $this->line('  <fg=yellow>Evidence this application was installed:</>');
+        foreach ($markers as $marker) {
+            $this->line('    <fg=green>•</> <fg=white>'.$marker.'</>');
+        }
+        $this->newLine();
+
+        $registry = $this->buildStubHashRegistry();
+        $path = $this->hashRegistryPath();
+
+        $this->components->twoColumnDetail(
+            '<fg=green>Adopted</>',
+            $registry['adopted'].' published file(s) found on disk',
+        );
+        $this->components->twoColumnDetail(
+            '<fg=yellow>Missing</>',
+            $registry['missing'].' stub target(s) absent (sk:update will treat them as new)',
+        );
+        $this->components->twoColumnDetail(
+            '<fg=gray>Skipped</>',
+            $registry['skipped'].' stub path(s) excluded by flags',
+        );
+
+        // Adopting nothing is not a harmless no-op: a registry listing zero
+        // published files still EXISTS, and its existence is what makes
+        // isFirstInstall() false. Writing one onto an app that was never
+        // installed would permanently deny it the first-install path (env
+        // seeding, User/Role eject) with no error to explain why.
+        if ($registry['adopted'] === 0) {
+            $this->newLine();
+            $this->components->error('Nothing to adopt — no published kit file was found in this application.');
+            $this->newLine();
+            $this->line('  <fg=gray>Writing an empty registry would mark this app as installed and permanently</>');
+            $this->line('  <fg=gray>skip the first-install steps it has never had.</>');
+            $this->components->twoColumnDetail(
+                '<fg=cyan>php artisan sk:install</>',
+                '<fg=gray>this application is not installed yet</>',
+            );
+            $this->newLine();
+
+            return self::FAILURE;
+        }
+
+        if ($this->dryRun) {
+            $this->newLine();
+            $this->components->info('Dry run — nothing was written.');
+            $this->newLine();
+            $this->line('  <fg=gray>Would write:  '.$path.'</>');
+
+            if ($this->files->exists($path)) {
+                $this->line('  <fg=gray>Would back up the current registry alongside it first.</>');
+            }
+
+            $this->newLine();
+
+            return self::SUCCESS;
+        }
+
+        $backup = $this->backupHashRegistry($path);
+
+        $this->writeHashRegistry($registry['hashes']);
+
+        $this->newLine();
+
+        if ($backup !== null) {
+            $this->components->twoColumnDetail('<fg=gray>Backed up</>', $backup);
+        }
+
+        $this->components->info('Registry rebuilt: '.$path);
+        $this->newLine();
+        $this->line('  <fg=gray>Nothing else on disk was touched.</>');
+        $this->line('  <fg=gray>From here use <fg=cyan>php artisan sk:update</> to take new kit versions.</>');
+        $this->newLine();
+
+        return self::SUCCESS;
     }
 
     /**

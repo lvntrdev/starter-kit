@@ -157,7 +157,15 @@ php artisan sk:publish --tag=form --destination=/tmp/sk-compare
 diff -ru resources/js/components/Lvntr-Starter-Kit/FormBuilder /tmp/sk-compare/resources/js/components/Lvntr-Starter-Kit/FormBuilder
 ```
 
-Commit before `--force` so Git keeps the old version reachable. For whole-project recovery (infrastructure config inject mistakes etc.), re-run `php artisan sk:install` — it is idempotent and re-applies AST injections only when keys are missing.
+Commit before `--force` so Git keeps the old version reachable.
+
+> **Do not re-run `php artisan sk:install` on a project that is already installed.** An earlier revision of this guide offered it as a whole-project recovery path. That advice was wrong and is withdrawn — `sk:install` is a first-install command, not a repair tool.
+>
+> - Only `lang/` is preservable. Every other published path is overwritten **even without `--force`**, so a controller, provider, route file, Vue page or config you edited is replaced by the packaged stub.
+> - The hash registry protects a file you **deleted**, not one you **changed**.
+> - That registry lives at `storage/starter-kit/hashes.json`, which is git-ignored. If a stateless deploy loses it, `sk:install` classifies the app as a **first install**: it copies `.env.example` over your existing `.env` — dropping the database, cache, mail and storage credentials — and can then regenerate a blank `APP_KEY`, which makes existing session cookies and every `APP_KEY`-encrypted value unreadable.
+>
+> To repair an installed project, use `sk:update` (hash-aware, keeps your edits) or reset one area with `sk:publish --tag=<area> --force` after inspecting the diff via `sk:publish --tag=<area> --destination=/tmp/sk-compare`. `sk:update` re-applies the `config/filesystems.php` and `config/permission-resources.php` injections; the remaining install-time injections (`config/app.php`, `bootstrap/app.php`, provider registration, `media-library.php`, `services.php`) have no automated repair path yet — re-apply them by hand against the stub at the same relative path under `vendor/lvntr/laravel-starter-kit/stubs/`.
 
 ## When To Use `sk:upgrade` Instead
 

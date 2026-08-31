@@ -6,6 +6,8 @@ use Composer\InstalledVersions;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
+use Lvntr\StarterKit\Console\Commands\Concerns\ChecksStepResults;
+use Lvntr\StarterKit\Support\DocsLink;
 use PhpParser\Error;
 use PhpParser\Node;
 use PhpParser\Node\Stmt;
@@ -13,12 +15,13 @@ use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\CloningVisitor;
 use PhpParser\ParserFactory;
 use PhpParser\PrettyPrinter;
-use Symfony\Component\Process\Process;
 
 use function Laravel\Prompts\confirm;
 
 class UpgradeCommand extends Command
 {
+    use ChecksStepResults;
+
     protected $signature = 'sk:upgrade
         {--force : Skip confirmation prompts}
         {--skip-build : Do not run npm install / npm run build}';
@@ -66,9 +69,11 @@ class UpgradeCommand extends Command
 
         // 4. Sync stubs via sk:update (hash-aware, preserves user edits).
         if ($this->confirmStep('Sync Starter Kit stubs (sk:update)?')) {
-            $this->step('Synchronising stubs', function () {
-                $this->call('sk:update', ['--no-interaction' => true]);
-            });
+            if (! $this->step('Synchronising stubs', function () {
+                return $this->runArtisan('sk:update', ['--no-interaction' => true], echo: true);
+            })) {
+                return $this->failUpgrade('Synchronising stubs');
+            }
         }
 
         // 5. Repair the legacy display-timezone env binding in existing apps.
@@ -84,11 +89,14 @@ class UpgradeCommand extends Command
         });
 
         // 7. Clear cached bootstrap artefacts so new service bindings pick up.
+        // Best-effort: a cache store that is momentarily unreachable (Redis down)
+        // must not abort an upgrade whose file work already landed.
         $this->step('Clearing framework caches', function () {
-            $this->callSilently('config:clear');
-            $this->callSilently('route:clear');
-            $this->callSilently('view:clear');
-            $this->callSilently('cache:clear');
+            $cleared = true;
+
+            foreach (['config:clear', 'route:clear', 'view:clear', 'cache:clear'] as $command) {
+                $cleared = $this->runArtisan($command) && $cleared;
+            }
 
             foreach (['packages.php', 'services.php'] as $file) {
                 $path = base_path('bootstrap/cache/'.$file);
@@ -96,41 +104,50 @@ class UpgradeCommand extends Command
                     $this->files->delete($path);
                 }
             }
-        });
+
+            return $cleared;
+        }, mandatory: false);
 
         // 8. Regenerate composer autoload so any new classes resolve.
+        // Best-effort: composer is not guaranteed to be on the PATH of the machine
+        // running the upgrade, and that has never blocked an upgrade before.
         $this->step('Regenerating autoload', function () {
-            $process = new Process(['composer', 'dump-autoload', '-q'], base_path(), null, null, 120);
-            $process->run();
-        });
+            return $this->runProcessStep(['composer', 'dump-autoload', '-q'], timeout: 120);
+        }, mandatory: false);
 
         // 9. Run any new migrations shipped with the v13 package line.
         if ($this->confirmStep('Run database migrations?')) {
-            $this->step('Running migrations', function () {
-                $this->call('migrate', ['--force' => true]);
-            });
+            if (! $this->step('Running migrations', function () {
+                return $this->runArtisan('migrate', ['--force' => true], echo: true);
+            })) {
+                return $this->failUpgrade('Running migrations');
+            }
         }
 
         // 10. Re-seed permissions in case the package added new abilities.
         if ($this->confirmStep('Re-seed roles and permissions from config?')) {
-            $this->step('Seeding permissions', function () {
-                $this->call('sk:seed-permissions');
-            });
+            if (! $this->step('Seeding permissions', function () {
+                return $this->runArtisan('sk:seed-permissions', echo: true);
+            })) {
+                return $this->failUpgrade('Seeding permissions');
+            }
         }
 
         // 11. Rebuild frontend assets.
         if (! $this->option('skip-build') && $this->confirmStep('Reinstall npm dependencies and rebuild assets?')) {
-            $this->step('Installing npm dependencies', function () {
-                $process = new Process(['npm', 'install'], base_path(), null, null, 600);
-                $process->setTty(Process::isTtySupported());
-                $process->run();
-            });
+            // Frontend work stays non-fatal on purpose: a machine without a Node
+            // toolchain must still be able to complete the upgrade.
+            $npmInstalled = $this->step('Installing npm dependencies', function () {
+                return $this->runProcessStep(['npm', 'install'], timeout: 600, tty: true);
+            }, mandatory: false);
 
-            $this->step('Building frontend assets', function () {
-                $process = new Process(['npm', 'run', 'build'], base_path(), null, null, 600);
-                $process->setTty(Process::isTtySupported());
-                $process->run();
-            });
+            $built = $npmInstalled && $this->step('Building frontend assets', function () {
+                return $this->runProcessStep(['npm', 'run', 'build'], timeout: 600, tty: true);
+            }, mandatory: false);
+
+            if (! $built) {
+                $this->components->warn('Frontend assets were not rebuilt. Run `npm install && npm run build` by hand.');
+            }
         }
 
         $this->newLine();
@@ -317,7 +334,7 @@ class UpgradeCommand extends Command
             $message = match ($result) {
                 'changed' => $apply
                     ? "{$connection}: timezone pinned to +00:00."
-                    : "{$connection}: timezone pin skipped; apply it after following docs/timezone.md.",
+                    : "{$connection}: timezone pin skipped; apply it after following ".DocsLink::to('timezone.md').'.',
                 'existing' => "{$connection}: existing timezone left unchanged.",
                 'unreadable' => "{$connection}: connections array is not a literal; add 'timezone' => '+00:00' manually.",
                 default => "{$connection}: connection not found; skipped.",
@@ -327,7 +344,7 @@ class UpgradeCommand extends Command
         }
 
         if ($needsChange && ! $apply) {
-            $this->line('    <fg=yellow>Apply later by following docs/timezone.md, then add \'timezone\' => \'+00:00\' to the mysql/mariadb connection arrays that need it.</>');
+            $this->line('    <fg=yellow>Apply later by following '.DocsLink::to('timezone.md').', then add \'timezone\' => \'+00:00\' to the mysql/mariadb connection arrays that need it.</>');
         }
     }
 
@@ -410,7 +427,7 @@ class UpgradeCommand extends Command
         }
 
         $this->line('    DEFAULT CURRENT_TIMESTAMP values move in the opposite direction and self-heal.');
-        $this->line('    Follow the one-time conversion guide before or with this change: <fg=cyan>docs/timezone.md</>.');
+        $this->line('    Follow the one-time conversion guide before or with this change: <fg=cyan>'.DocsLink::to('timezone.md').'</>.');
 
         // A non-TTY shell is just as unattended as an explicit --no-interaction: the prompt would
         // fall back to its "yes" default there, applying the pin without consent. Symfony's
@@ -598,12 +615,56 @@ class UpgradeCommand extends Command
 
     /**
      * Run a labelled step with before/after output.
+     *
+     * The callback's return value is the verdict: `false` means the step failed.
+     * Anything else (including the `null` of a callback that only throws on
+     * error) counts as success.
+     *
+     * A MANDATORY failure is reported and returns false so handle() can stop and
+     * exit non-zero — an upgrade whose migrations died must not report success.
+     * A BEST-EFFORT failure (caches, autoload, frontend) only warns: those are
+     * repeatable by hand and a machine without composer/Node must still be able
+     * to finish the upgrade.
+     *
+     * @return bool Whether the step succeeded.
      */
-    private function step(string $label, callable $callback): void
+    private function step(string $label, callable $callback, bool $mandatory = true): bool
     {
+        $this->stepFailureDetail = null;
         $this->line("  <fg=gray>→</> {$label}...");
-        $callback();
+
+        $result = $callback();
+
+        if ($result === false) {
+            $detail = $this->stepFailureDetail ?? 'The step reported a failure.';
+            $this->stepFailureDetail = null;
+
+            $this->components->twoColumnDetail(
+                $label,
+                $mandatory ? '<fg=red>FAILED</>' : '<fg=yellow>FAILED (non-fatal)</>',
+            );
+            $this->line('  <fg='.($mandatory ? 'red' : 'yellow').'>'.$detail.'</>');
+
+            return false;
+        }
+
         $this->components->twoColumnDetail($label, '<fg=green>DONE</>');
+
+        return true;
+    }
+
+    /**
+     * Close a failed upgrade with a single line naming the step that failed and
+     * the command that resumes it. sk:upgrade is idempotent (every step is
+     * guarded or hash-aware), so re-running it after the fix is the resume path.
+     */
+    private function failUpgrade(string $label): int
+    {
+        $this->newLine();
+        $this->line("  <fg=red;options=bold>Upgrade failed at step \"{$label}\" — fix the issue, then re-run `php artisan sk:upgrade`.</>");
+        $this->newLine();
+
+        return self::FAILURE;
     }
 
     /**

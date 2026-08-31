@@ -6,11 +6,43 @@ This file is the cross-major-version migration guide. Every release gets its own
 
 ## Unreleased
 
+### `sk:install` now refuses to run on an app it did not install
+
+`sk:install` used to trust its own hash registry (`storage/starter-kit/hashes.json`) as the only signal that a project was already installed — and that registry is git-ignored, so a stateless deploy or a cleared `storage/` directory made a live application look brand new. The command now runs a fail-closed detection pass ahead of the banner: it looks for the kit's schema tables and a handful of paths that only an install creates. If any of that evidence is present but the registry is missing, the command stops before writing anything and prints exactly what it found.
+
+The stop names two ways out: `sk:update` for changing an installed app, and `php artisan sk:install --adopt` (add `--dry-run` to preview) to rebuild the registry from the files already on disk — it copies no file, runs no migration, and never touches `.env`. `--force` still proceeds past the stop for a genuine edge case, but read it as "overwrite the paths listed above," and note that a forced run is **not** treated as a first install (no default-domain eject, no first-install `.env` seeding).
+
+### `.env` is never overwritten — a first install onto an app that already has one now merges
+
+A first install used to copy `.env.example` over an existing `.env` outright — destroying `DB_PASSWORD`, `APP_KEY`, and everything else already configured whenever `sk:install` ran on the ordinary `composer create-project` shape (a Laravel app that already ships a `.env`). `.env` is no longer overwritten on either path. If the file already exists, the installer merges: every key present in `.env.example` but missing from `.env` is appended, and the first-install-only keys are seeded **only where absent**. No existing key's value is ever rewritten. `.env` is created from `.env.example` only when it does not exist at all. `APP_KEY` is still generated when the merged file leaves it blank, so the app can boot.
+
+### A consumer-modified published file is skipped by default — `--force` is the opt-out
+
+Both `sk:install` and `sk:update` now decide whether to overwrite a published path through the same three-way comparison (shipped stub hash vs. on-disk hash vs. the hash recorded in the registry at the last install/update). When the on-disk copy no longer matches what was recorded, the difference is treated as a consumer edit and the file is **skipped and reported**, instead of being silently overwritten — this now also covers `sk:install`'s re-publish path, not only `sk:update`'s. Pass `--force` to overwrite anyway; commit first so Git keeps the previous version reachable.
+
+### Installer commands now exit non-zero on a failed mandatory step
+
+`sk:install`, `sk:update`, `sk:upgrade`, and the published `site:install` stub used to invoke `migrate`, `db:seed`, `vendor:publish`, `sk:seed-permissions`, `passport:keys`, `key:generate` and other sub-commands without reading their result, so a failed migration still printed `DONE`, recorded the step as complete in the resume checkpoint, and the command exited `0` — a CI job could go green over a half-installed application. Every sub-command result is now checked; a failed **mandatory** step (publish, migrations, seeders, permission seeding, Passport keys, encryption keys) now aborts the run with a non-zero exit code, leaves the checkpoint pending so `sk:install --resume` picks up where it stopped, and skips the stub-hash registry write.
+
+If a CI pipeline currently passes despite a silently failing installer step, it will start failing after this upgrade — that is the intended signal, not a regression to work around. Frontend and tooling steps (`npm install`, Wayfinder generation, `npm run build`, `composer dump-autoload`, cache clears) deliberately stay non-fatal: they warn, print the command to run by hand, and are listed again in the closing summary, so a machine without Node or Composer still installs exactly as it does today. The `site:install` change ships through `stubs/`, so it reaches new installs and `sk:update`-refreshed apps only — an existing, untouched consumer copy of `site:install` is not changed.
+
+### `sk:install` is no longer documented as a recovery path
+
+`docs/install.md` and `docs/update.md` previously described re-running `php artisan sk:install` on an existing project as an idempotent whole-project recovery step. It is not, and that advice is withdrawn. `sk:install` publishes over every path except `lang/` regardless of `--force`, its hash registry only protects a file you deleted (not one you edited), and the registry is stored under the git-ignored `storage/starter-kit/hashes.json` — losing it makes the command classify an installed app as a **first install**, at which point it copies `.env.example` over the existing `.env` and can regenerate `APP_KEY`.
+
+No code changed in this release; the command behaves as it always has. Use `sk:update` or a scoped `sk:publish --tag=<area>` to change an installed app, and treat `storage/starter-kit/` as persistent operational state in your deploy strategy — it must survive a release the same way `storage/app/` does.
+
 ### `DATA_ENCRYPTION_CIPHER` must match `app.cipher` — enforced
 
 The whole read chain (`DATA_ENCRYPTION_KEY`, `DATA_ENCRYPTION_PREVIOUS_KEYS[n]`, `APP_PREVIOUS_KEYS[n]`, `APP_KEY`) is used under **one** cipher, so a `DATA_ENCRYPTION_CIPHER` that differs from `app.cipher` would leave rows written under the other cipher unreadable even though their key is still listed. `DataEncrypterFactory::cipher()` now throws a `RuntimeException` naming both values instead of failing later with an opaque `DecryptException`. Unset the variable, or set it to the same value as `app.cipher`.
 
 Changing `app.cipher` itself on a database that already holds encrypted settings or 2FA data is a **one-way boundary**: the previous-key chain does not carry a per-key cipher, so old payloads become unreadable and neither `encryption:health` nor `encryption:rekey` can recover them. If you must change it, rekey **under the old cipher** first, verify with `encryption:health`, take a backup, and only then switch — treating the switch as a migration, not a config edit.
+
+### Activity-log morph widening migration — forward-fix only
+
+`2026_06_20_000000_widen_activity_log_morphs_to_string` widens `activity_log.subject_id` / `causer_id` to `char(36)` so UUID users and bigint Role/Permission ids can share the table. Its `down()` reverts both columns to `uuid`. On MariaDB 10.7+ that is a **native UUID type**, so rolling back a table that holds numeric subject/causer ids fails or truncates data; on MySQL the two types coincide, which is why the risk is easy to miss in testing.
+
+Do not roll this migration back on a populated `activity_log`. Fix forward with a new migration, or restore from the backup taken before the upgrade.
 
 ### Activity-log credential redaction — back up before migrating
 

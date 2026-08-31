@@ -6,11 +6,43 @@ Bu dosya büyük sürümler arası geçiş rehberidir. Her sürüm kendi bölüm
 
 ## Unreleased
 
+### `sk:install` artık kendisinin kurmadığı bir uygulamada çalışmayı reddediyor
+
+`sk:install` daha önce bir projenin zaten kurulu olduğunu anlamak için yalnızca kendi hash kaydına (`storage/starter-kit/hashes.json`) güveniyordu — bu kayıt git tarafından yok sayılır, yani stateless bir deploy ya da temizlenen bir `storage/` dizini canlı bir uygulamayı yepyeni gösterebiliyordu. Komut artık banner'dan önce fail-closed bir tespit adımı çalıştırıyor: kit'in şema tablolarını ve yalnızca bir kurulumun oluşturabileceği birkaç yolu arıyor. Bu kanıtlardan biri varsa ama kayıt yoksa komut hiçbir şey yazmadan durur ve tam olarak ne bulduğunu yazdırır.
+
+Durma mesajı iki çıkış yolu adlandırır: kurulu bir uygulamayı değiştirmek için `sk:update`, kaydı diskteki dosyalardan yeniden inşa etmek için `php artisan sk:install --adopt` (önizlemek için `--dry-run` ekleyin) — bu hiçbir dosya kopyalamaz, hiçbir migration çalıştırmaz, `.env`'e hiç dokunmaz. `--force` gerçek bir uç durum için durmayı yine aşar; ama bunu "yukarıda listelenen yolların üzerine yaz" olarak okuyun ve zorlanmış bir koşunun ilk kurulum sayılMADIĞINI (varsayılan-domain eject yok, ilk-kurulum `.env` tohumlaması yok) unutmayın.
+
+### `.env` artık asla üzerine yazılmıyor — mevcut bir `.env`'e sahip bir uygulamaya ilk kurulum artık merge ediyor
+
+İlk kurulum, mevcut bir `.env`'in üzerine `.env.example`'ı olduğu gibi kopyalardı — bu, `sk:install`'in zaten bir `.env` taşıyan sıradan `composer create-project` şeklinde çalıştığı her durumda `DB_PASSWORD`, `APP_KEY` ve yapılandırılmış her şeyi yok ediyordu. `.env` artık her iki yolda da üzerine yazılmıyor. Dosya zaten varsa installer merge ediyor: `.env.example`'da olup `.env`'de eksik olan her anahtar ekleniyor, ilk-kuruluma-özel anahtarlar ise **yalnızca yoksa** tohumlanıyor. Mevcut hiçbir anahtarın değeri asla yeniden yazılmıyor. `.env`, yalnızca hiç yoksa `.env.example`'dan oluşturuluyor. Merge edilmiş dosya boş bırakırsa `APP_KEY` hâlâ üretiliyor, böylece uygulama boot edebiliyor.
+
+### Consumer tarafından değiştirilmiş bir published dosya varsayılan olarak atlanıyor — opt-out `--force`
+
+Hem `sk:install` hem `sk:update` artık bir published yolun üzerine yazılıp yazılmayacağına aynı üç-yönlü karşılaştırmayla (shipped stub hash'i vs. diskteki hash vs. son install/update'te kayda geçen hash) karar veriyor. Diskteki kopya kayda geçenle artık eşleşmiyorsa fark bir consumer düzenlemesi sayılıyor ve dosya sessizce üzerine yazılmak yerine **atlanıp raporlanıyor** — bu artık yalnızca `sk:update`'in değil, `sk:install`'in yeniden-publish yolunun da kapsamında. Yine de üzerine yazmak için `--force` verin; önce commit alın ki Git önceki sürümü erişilebilir tutsun.
+
+### Kurulum komutları artık zorunlu bir adım başarısız olduğunda sıfırdan farklı bir çıkış kodu döndürüyor
+
+`sk:install`, `sk:update`, `sk:upgrade` ve yayınlanan `site:install` stub'ı `migrate`, `db:seed`, `vendor:publish`, `sk:seed-permissions`, `passport:keys`, `key:generate` gibi alt komutların sonucunu hiç okumadan çağırıyordu; bu yüzden başarısız bir migration yine `DONE` yazıyor, resume checkpoint'inde adımı tamamlanmış olarak kaydediyor ve komut `0` ile çıkıyordu — bir CI job'ı yarım kurulmuş bir uygulamanın üzerinden yeşil geçebiliyordu. Artık her alt komut sonucu denetleniyor; başarısız bir **zorunlu** adım (publish, migration, seeder, izin tohumlama, Passport anahtarları, şifreleme anahtarları) artık koşuyu sıfırdan farklı bir çıkış koduyla durduruyor, checkpoint'i beklemede bırakıyor (`sk:install --resume` kaldığı yerden devam ediyor) ve stub-hash registry yazımını atlıyor.
+
+Sessizce başarısız olan bir installer adımına rağmen şu an geçen bir CI hattı bu yükseltmeden sonra başarısız olmaya başlayacaktır — bu, etrafından dolaşılacak bir regresyon değil, amaçlanan sinyaldir. Frontend ve tooling adımları (`npm install`, Wayfinder üretimi, `npm run build`, `composer dump-autoload`, cache temizlikleri) bilerek ölümcül değil: yalnızca uyarıyor, elle çalıştırılacak komutu yazdırıyor ve kapanış özetinde tekrar listeleniyor; böylece Node ya da Composer'ı olmayan bir makine bugünkü gibi kurulmaya devam ediyor. `site:install` değişikliği `stubs/` üzerinden geliyor, dolayısıyla yalnızca yeni kurulumlara ve `sk:update` ile tazelenen uygulamalara ulaşıyor — mevcut, dokunulmamış bir consumer `site:install` kopyası değişmiyor.
+
+### `sk:install` artık kurtarma yolu olarak belgelenmiyor
+
+`docs/install.tr.md` ve `docs/update.tr.md`, mevcut bir projede `php artisan sk:install` komutunu yeniden çalıştırmayı idempotent bir proje-geneli kurtarma adımı olarak tarif ediyordu. Öyle değil ve bu tavsiye geri çekildi. `sk:install`, `--force` verilmese de `lang/` dışındaki her yolun üzerine yayın yapar; hash kaydı yalnızca sildiğiniz bir dosyayı korur (düzenlediğinizi değil) ve bu kayıt git tarafından yok sayılan `storage/starter-kit/hashes.json` altında durur — kaybı, komutun kurulu bir uygulamayı **ilk kurulum** saymasına yol açar; o noktada mevcut `.env` dosyasının üzerine `.env.example` kopyalanır ve `APP_KEY` yeniden üretilebilir.
+
+Bu sürümde kod değişmedi; komut her zamanki gibi davranıyor. Kurulu bir uygulamayı değiştirmek için `sk:update` ya da kapsamı daraltılmış `sk:publish --tag=<alan>` kullanın ve deploy stratejinizde `storage/starter-kit/` dizinini kalıcı operasyon durumu olarak ele alın — tıpkı `storage/app/` gibi sürümler arasında yaşamalıdır.
+
 ### `DATA_ENCRYPTION_CIPHER` ile `app.cipher` eşleşmek zorunda — zorunlu kılındı
 
 Okuma zincirinin tamamı (`DATA_ENCRYPTION_KEY`, `DATA_ENCRYPTION_PREVIOUS_KEYS[n]`, `APP_PREVIOUS_KEYS[n]`, `APP_KEY`) **tek** bir cipher ile kullanılır; dolayısıyla `app.cipher` değerinden farklı bir `DATA_ENCRYPTION_CIPHER`, anahtarı listede olsa bile diğer cipher ile yazılmış satırları okunamaz bırakır. `DataEncrypterFactory::cipher()` artık geç gelen kapalı bir `DecryptException` yerine her iki değeri de adlandıran bir `RuntimeException` fırlatıyor. Değişkeni kaldırın ya da `app.cipher` ile aynı değere ayarlayın.
 
 Şifreli ayar veya 2FA verisi barındıran bir veritabanında `app.cipher` değerini değiştirmek **tek yönlü bir sınırdır**: önceki-anahtar zinciri anahtar başına cipher taşımadığı için eski payload'lar okunamaz hale gelir ve ne `encryption:health` ne de `encryption:rekey` onları kurtarabilir. Değiştirmek zorundaysanız önce **eski cipher altında** rekey yapın, `encryption:health` ile doğrulayın, yedek alın ve ancak sonra geçin — bunu bir config düzenlemesi değil, migration olarak ele alın.
+
+### Aktivite kaydı morph genişletme migration'ı — yalnız ileri düzeltme
+
+`2026_06_20_000000_widen_activity_log_morphs_to_string`, UUID kullanıcılar ile bigint Role/Permission id'lerinin aynı tabloyu paylaşabilmesi için `activity_log.subject_id` / `causer_id` kolonlarını `char(36)` genişliğine çeker. `down()` metodu her iki kolonu `uuid` tipine geri döndürür. MariaDB 10.7+ üzerinde bu **native UUID tipidir**; sayısal subject/causer id barındıran bir tabloyu geri almak hata verir ya da veriyi budar. MySQL'de iki tip çakıştığı için risk testte kolayca gözden kaçar.
+
+Dolu bir `activity_log` üzerinde bu migration'ı geri almayın. Yeni bir migration ile ileri düzeltin ya da yükseltme öncesi alınan yedekten dönün.
 
 ### Aktivite kaydı kimlik bilgisi redaksiyonu — migration öncesi yedek alın
 

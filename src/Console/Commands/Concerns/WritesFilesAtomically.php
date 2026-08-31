@@ -38,13 +38,28 @@ trait WritesFilesAtomically
             $this->files->makeDirectory($dir, 0755, true);
         }
 
+        // A directory we could not create is not a reason to skip the write
+        // silently — the caller believes the file is on disk after this returns.
+        if (! $this->files->isDirectory($dir)) {
+            throw new RuntimeException("Atomic write failed: could not create the directory [{$dir}].");
+        }
+
         // Temp file lives next to the target so the final rename stays within a
         // single filesystem (see class docblock). The leading dot + random
         // suffix keep concurrent writes and directory scanners from colliding.
         $temp = $dir.DIRECTORY_SEPARATOR.'.'.basename($path).'.tmp'.bin2hex(random_bytes(6));
 
         try {
-            $this->files->put($temp, $contents);
+            // put() returns false (or a short byte count on a full disk) instead
+            // of throwing, so an unchecked call renames a truncated temp file
+            // over a good target — the exact corruption this trait prevents.
+            $written = $this->files->put($temp, $contents);
+
+            if ($written === false || $written !== strlen($contents)) {
+                throw new RuntimeException("Atomic write failed: could not write the temp file for [{$path}].");
+            }
+
+            $this->flushToDisk($temp);
 
             if (! @rename($temp, $path)) {
                 throw new RuntimeException("Atomic write failed: could not move temp file into place for [{$path}].");
@@ -55,6 +70,37 @@ trait WritesFilesAtomically
             }
 
             throw $e;
+        }
+    }
+
+    /**
+     * Push the temp file's bytes out of the kernel page cache before it is
+     * renamed into place.
+     *
+     * rename() makes the SWAP atomic, not the CONTENT durable: on a crash or
+     * power loss the metadata change can reach the disk while the data behind
+     * it has not, leaving a correctly named registry full of zeroes. fsync
+     * closes that window. The write itself still goes through $this->files->put
+     * so an injected Filesystem stays able to observe it (the encryption
+     * commands' write-order tests depend on that), which is why the flush opens
+     * its own handle instead of writing through one.
+     *
+     * Best-effort by design: a filesystem that cannot fsync (some network and
+     * container mounts) must not fail an otherwise complete write.
+     */
+    private function flushToDisk(string $temp): void
+    {
+        $handle = @fopen($temp, 'r+');
+
+        if ($handle === false) {
+            return;
+        }
+
+        try {
+            @fflush($handle);
+            @fsync($handle);
+        } finally {
+            fclose($handle);
         }
     }
 }

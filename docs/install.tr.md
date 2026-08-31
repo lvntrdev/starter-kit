@@ -117,6 +117,8 @@ composer require lvntr/laravel-starter-kit:^13.6
 php artisan sk:install
 ```
 
+> **`sk:install` bir ilk-kurulum komutudur, onarım aracı değildir.** Kit'in henüz kurulmadığı bir projede bir kez çalıştırın. Kurulu bir uygulamada tekrar çalıştırmak güvenli **değildir**: yalnızca `lang/` korunabilir, yayınlanan diğer her yol `--force` olmadan da üzerine yazılır ve hash kaydı yalnızca sildiğiniz bir dosyayı korur — düzenlediğinizi değil. Kayıt, git tarafından yok sayılan `storage/starter-kit/hashes.json` altında durur; stateless bir deploy onu kaybederse komut uygulamayı ilk kurulum sayar ve mevcut `.env` dosyanızın üzerine `.env.example` kopyalar. Kurulu bir uygulamayı değiştirmek için [`sk:update`](update.tr.md) ya da `sk:publish --tag=<alan>` kullanın.
+
 Herhangi bir dosyaya dokunmadan önce installer bir **preflight** kontrolü çalıştırır (Node.js sürümü — Node eksikse ya da Vite 7 motor tabanı olan 20.19'dan eskiyse uyarı verir ve npm adımının kendi kendine düşmesine izin verir; asla hard-fail olmaz) ve önceki yarıda kalmış bir çalışmadan **checkpoint** varsa yükler (`storage/starter-kit/install-progress.json`). Bir adım hata fırlatırsa installer ham stack trace yerine somut bir mesajla durur ("Step failed: `<adım>` — sorunu düzelt, sonra `sk:install --resume` çalıştır"); tamamlanmış adımlar checkpoint'e yazıldığından `--resume` onları atlayıp kaldığı yerden devam eder. Kurulum başarıyla bitince progress dosyası otomatik silinir.
 
 Sihirbaz ardından her adımda sizinle interaktif olarak ilerler:
@@ -142,7 +144,7 @@ Sihirbaz ardından her adımda sizinle interaktif olarak ilerler:
 
 Config adımında `sk:install`, `config/database.php` içindeki mevcut `mysql` ve `mariadb` dizilerine literal `'timezone' => '+00:00'` sözleşmesini ekler. Consumer'ın tanımladığı bir `timezone` değerinin üzerine yazmaz, eksik bir bağlantı oluşturmaz; `sqlite`, `pgsql` veya `sqlsrv` bağlantılarına dokunmaz.
 
-Sıfır kurulumlarda veri dönüşümü gerekmez. `sk:install` mevcut bir projede kurtarma yolu olarak da belgelendiği için, önce varsayılan MySQL/MariaDB bağlantısının UTC dışı bir oturumda veri taşıyıp taşımadığını kontrol eder — taşıyorsa pin adımını **atlar** ve bu durumu onay kapısıyla ele alan `sk:upgrade` komutunu, [tek seferlik dönüşüm rehberini](timezone.tr.md#mevcut-veriler-için-tek-seferlik-dönüşüm) okuduktan sonra çalıştırmanızı söyler. Ulaşılamayan bir veritabanı sıfır kurulum gibi değerlendirilir ve adımı bloke etmez.
+Sıfır kurulumlarda veri dönüşümü gerekmez. Consumer `sk:install` komutunu zaten veri barındıran bir veritabanına yöneltebileceği için, önce varsayılan MySQL/MariaDB bağlantısının UTC dışı bir oturumda veri taşıyıp taşımadığını kontrol eder — taşıyorsa pin adımını **atlar** ve bu durumu onay kapısıyla ele alan `sk:upgrade` komutunu, [tek seferlik dönüşüm rehberini](timezone.tr.md#mevcut-veriler-için-tek-seferlik-dönüşüm) okuduktan sonra çalıştırmanızı söyler. Ulaşılamayan bir veritabanı sıfır kurulum gibi değerlendirilir ve adımı bloke etmez.
 
 ### Varsayılan domain eject'i (User + Role)
 

@@ -80,21 +80,39 @@ class SiteInstallCommand extends Command
         $this->newLine();
 
         // 3. Fresh migrations
-        spin(function () {
+        //
+        // Every step below is checked: spin() returns the callback's value, and
+        // dropping it meant a failed migrate:fresh still ended with "Site
+        // installation completed successfully!" and exit code 0.
+        $migrated = spin(function () {
             return $this->callSilently('migrate:fresh', ['--force' => true]) === 0;
         }, 'Running migrate:fresh...');
 
+        if (! $migrated) {
+            return $this->failStep('Running migrate:fresh');
+        }
+
         // 4. Seeders (roles, permissions, definitions, default settings)
-        $this->runSeeders();
+        if (! $this->runSeeders()) {
+            return $this->failStep('Running seeders');
+        }
 
         // 5. Passport keys + personal access client
-        spin(function () {
+        $keysInstalled = spin(function () {
             return $this->callSilently('passport:keys', ['--force' => true]) === 0;
         }, 'Installing Passport keys...');
 
-        spin(function () {
+        if (! $keysInstalled) {
+            return $this->failStep('Installing Passport keys');
+        }
+
+        $clientCreated = spin(function () {
             return $this->callSilently('passport:client', ['--personal' => true, '--name' => config('app.name').' Personal Access Client', '--provider' => 'users', '--no-interaction' => true]) === 0;
         }, 'Creating Passport personal access client...');
+
+        if (! $clientCreated) {
+            return $this->failStep('Creating Passport personal access client');
+        }
 
         // 6. Default admin user
         $email = 'admin@demo.com';
@@ -126,6 +144,20 @@ class SiteInstallCommand extends Command
         $this->newLine();
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Close a failed run with a single line naming the failed step and the
+     * command that re-runs it, and hand back a non-zero exit code so a wrapping
+     * script or CI job sees the failure.
+     */
+    private function failStep(string $label): int
+    {
+        $this->newLine();
+        $this->components->error("Site install failed at step \"{$label}\" — fix the issue, then re-run `php artisan site:install`.");
+        $this->newLine();
+
+        return self::FAILURE;
     }
 
     /**
@@ -179,8 +211,12 @@ class SiteInstallCommand extends Command
     /**
      * Discover and run seeders from the seeders directory in alphabetical order.
      * Files starting with "_" are auto-discovered and executed.
+     *
+     * @return bool False as soon as a seeder fails — the ones after it depend on
+     *              the rows it was supposed to write, so continuing only buries
+     *              the original error.
      */
-    private function runSeeders(): void
+    private function runSeeders(): bool
     {
         $seederPath = database_path('seeders');
         $files = glob($seederPath.'/_*.php');
@@ -197,12 +233,20 @@ class SiteInstallCommand extends Command
                 continue;
             }
 
-            spin(function () use ($fqcn) {
+            $seeded = spin(function () use ($fqcn) {
                 return $this->callSilently('db:seed', [
                     '--class' => $fqcn,
                     '--force' => true,
                 ]) === 0;
             }, "Seeding: {$displayName}...");
+
+            if (! $seeded) {
+                $this->components->error("Seeder [{$fqcn}] failed.");
+
+                return false;
+            }
         }
+
+        return true;
     }
 }

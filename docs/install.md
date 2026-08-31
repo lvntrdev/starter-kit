@@ -117,6 +117,8 @@ composer require lvntr/laravel-starter-kit:^13.6
 php artisan sk:install
 ```
 
+> **`sk:install` is a first-install command, not a repair tool.** Run it once, on a project that the kit has not been installed into yet. It is **not** safe to re-run on an installed app: only `lang/` is preservable, so every other published path is overwritten even without `--force`, and the hash registry only protects a file you deleted — not one you edited. The registry lives under the git-ignored `storage/starter-kit/hashes.json`; if a stateless deploy loses it, the command treats the app as a first install and copies `.env.example` over your existing `.env`. To change an installed app use [`sk:update`](update.md) or `sk:publish --tag=<area>`.
+
 Before touching any file, the installer runs a **preflight** check (Node.js version — warns and lets the npm step degrade later if Node is missing or older than 20.19, the Vite 7 engine floor; never hard-fails) and loads any **checkpoint** left by a previous interrupted run (`storage/starter-kit/install-progress.json`). If a step throws, the installer stops with an actionable message ("Step failed: `<step>` — fix the issue, then run `sk:install --resume`") instead of a raw stack trace; completed steps are checkpointed so `--resume` skips them and continues from the failure point. The progress file is deleted automatically once the install completes successfully.
 
 The installer then walks through each step interactively:
@@ -142,7 +144,7 @@ The installer then walks through each step interactively:
 
 During the config step, `sk:install` adds the literal `'timezone' => '+00:00'` contract to the existing `mysql` and `mariadb` arrays in `config/database.php`. It does not replace a consumer-defined `timezone`, create a missing connection, or touch `sqlite`, `pgsql`, or `sqlsrv`.
 
-Fresh installs do not need a data conversion. Because `sk:install` is also the documented recovery path on an existing project, it first checks whether the default MySQL/MariaDB connection already holds data on a non-UTC session — if it does, it **skips** the pin and tells you to run `sk:upgrade`, whose consent gate handles that case, after reading the [one-time conversion guide](timezone.md#one-time-conversion-for-existing-data). An unreachable database is treated as a fresh install and does not block the step.
+Fresh installs do not need a data conversion. Because a consumer can point `sk:install` at a database that is already populated, it first checks whether the default MySQL/MariaDB connection already holds data on a non-UTC session — if it does, it **skips** the pin and tells you to run `sk:upgrade`, whose consent gate handles that case, after reading the [one-time conversion guide](timezone.md#one-time-conversion-for-existing-data). An unreachable database is treated as a fresh install and does not block the step.
 
 ### Default domain eject (User + Role)
 
