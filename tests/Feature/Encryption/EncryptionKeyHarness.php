@@ -107,6 +107,24 @@ function ekcRead(string $content, string $key): ?string
 }
 
 /**
+ * Call one of the command's private writer helpers directly, against a real file.
+ *
+ * The identity and durability guards refuse conditions a test process cannot
+ * create — handing a file to another user is root-only, and a filesystem that
+ * refuses fsync is not something a test can mount — so the guard itself is
+ * driven instead of the environment. The command is constructed bare; these
+ * helpers touch no command IO.
+ *
+ * @param  list<mixed>  $arguments
+ */
+function ekcInvoke(string $method, array $arguments): void
+{
+    $command = new EncryptionKeyCommand(new Filesystem);
+
+    (new ReflectionMethod($command, $method))->invokeArgs($command, $arguments);
+}
+
+/**
  * Run encryption:key with IO wired by hand so the Filesystem can be injected.
  *
  * Constructed directly rather than resolved through Artisan: the recording

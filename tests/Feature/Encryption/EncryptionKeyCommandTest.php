@@ -441,3 +441,62 @@ it('refuses to replace .env when the temporary file was written short', function
         ->and($result['output'])->toContain('written short')
         ->and($leftovers)->toBe([]);
 });
+
+/*
+|--------------------------------------------------------------------------
+| 10. The identity and durability checks FAIL CLOSED
+|--------------------------------------------------------------------------
+|
+| Both used to warn and rename anyway, which is the worse of the two outcomes:
+| the operator who cannot chown is exactly the deploy user who CAN rename into
+| the directory, so the warning shipped a .env the service could no longer read
+| while the command reported success; and a flush that silently did nothing
+| turns the two-write ordering back into a call order, which is the one failure
+| this command exists to prevent.
+|
+| Neither condition is reachable from a normal test process — handing a file to
+| another user is root-only, and a filesystem that refuses fsync is not
+| something a test can mount. So the guards are driven directly, against real
+| files. The end-to-end "nothing was renamed" half is already covered by the
+| short-write case above: every one of these throws on the same path, before the
+| rename.
+|
+*/
+
+it('refuses to replace .env when the ownership could not be handed back', function (): void {
+    $temp = $this->ekcBasePath.'/.env.tmp-ownership';
+    file_put_contents($temp, 'APP_KEY='.ekcKey('app')."\n");
+    chmod($temp, 0600);
+
+    // uid/gid 0 stands in for "the .env belongs to another user": the test
+    // process is unprivileged, so the chown inside restoreIdentity cannot take.
+    expect(fn () => ekcInvoke('restoreIdentity', [$temp, ekcEnvPath(), 0600, 0, 0]))
+        ->toThrow(RuntimeException::class, 'ownership could not be handed back');
+
+    @unlink($temp);
+})->skip(
+    fn (): bool => function_exists('posix_geteuid') && posix_geteuid() === 0,
+    'Running as root, which CAN hand the file over — the failure under test cannot occur.',
+);
+
+it('refuses to replace .env when the replacement cannot be flushed to disk', function (): void {
+    // A path with no file behind it cannot be reopened for the flush — the same
+    // branch a filesystem that refuses the handle takes.
+    expect(fn () => ekcInvoke('flushToDisk', [$this->ekcBasePath.'/.env.tmp-missing', ekcEnvPath()]))
+        ->toThrow(RuntimeException::class, 'could not be reopened to flush it to disk');
+});
+
+it('restores an identity it CAN restore without complaining', function (): void {
+    $temp = $this->ekcBasePath.'/.env.tmp-identity';
+    file_put_contents($temp, 'APP_KEY='.ekcKey('app')."\n");
+    chmod($temp, 0600);
+
+    // The process's own uid/gid: exactly the case a normal rotation is in.
+    ekcInvoke('restoreIdentity', [$temp, ekcEnvPath(), 0640, fileowner($temp), filegroup($temp)]);
+
+    clearstatcache(true, $temp);
+
+    expect(fileperms($temp) & 0777)->toBe(0640);
+
+    @unlink($temp);
+});

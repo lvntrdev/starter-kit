@@ -288,7 +288,11 @@ final class EncryptionKeyCommand extends Command
      * byte count instead of throwing, and an unchecked call renames a truncated
      * body over a good `.env`), and the bytes are fsync-ed before the rename, so
      * the "previous list is on disk before the primary changes" ordering is a
-     * durability guarantee and not just a call order.
+     * durability guarantee and not just a call order. Every one of those checks
+     * fails CLOSED: a short write, an unrestorable owner/group, a mode that came
+     * back different, a flush that did not happen — each aborts before the
+     * rename, so the outcome is a rotation that did not occur rather than an
+     * `.env` the service cannot read or a key that never reached the disk.
      */
     private function putEnvPreservingIdentity(string $path, string $contents): void
     {
@@ -296,11 +300,7 @@ final class EncryptionKeyCommand extends Command
         // temp directory, rename target) must be about the real file.
         $target = is_link($path) ? (realpath($path) ?: $path) : $path;
 
-        $exists = file_exists($target);
-
-        $mode = $exists ? (fileperms($target) & 0777) : 0600;
-        $owner = $exists ? @fileowner($target) : false;
-        $group = $exists ? @filegroup($target) : false;
+        [$mode, $owner, $group] = $this->fileIdentity($target);
 
         $dir = dirname($target);
         $temp = $dir.DIRECTORY_SEPARATOR.'.'.basename($target).'.tmp'.bin2hex(random_bytes(6));
@@ -334,7 +334,7 @@ final class EncryptionKeyCommand extends Command
 
             $this->restoreIdentity($temp, $target, $mode, $owner, $group);
 
-            $this->flushToDisk($temp);
+            $this->flushToDisk($temp, $target);
 
             if (! @rename($temp, $target)) {
                 throw new RuntimeException("Atomic write failed: could not move temp file into place for [{$target}].");
@@ -386,19 +386,20 @@ final class EncryptionKeyCommand extends Command
      * rotated in. Ownership therefore has to be carried over explicitly — the
      * same reason {@see InstallCommand::putEnvAtomically()} carries it.
      *
-     * Ownership is BEST-EFFORT: only root can hand a file to another user, and a
-     * non-root run already owns the file it replaces. When it does not stick we
-     * warn with the command that repairs it rather than aborting — the rotation
-     * itself is sound, and refusing here would leave an operator unable to
-     * rotate at all.
+     * Restoring is ATTEMPTED best-effort — only root can hand a file to another
+     * user — but the RESULT is verified and a mismatch ABORTS. Warning and
+     * renaming anyway was the wrong trade: the operator who cannot chown is
+     * exactly the deploy user who CAN rename into the directory, so the warning
+     * shipped a `.env` the service could no longer read while reporting success.
+     * Refusing costs a rotation that has not happened yet; continuing costs the
+     * running app. Nothing is renamed on this path, so the real `.env` — and the
+     * key it holds — is untouched either way.
      *
-     * The mode restore, in contrast, is VERIFIED, because chmod() reporting
-     * success is not the mode being applied (see {@see self::narrowOrFail()}).
-     * A mode that came back WIDER than the target is a privilege leak on a file
-     * holding key material and aborts — nothing has been renamed yet, so the
-     * real `.env` is untouched. A mode that stayed NARROWER (a mount that pins
-     * permissions) only warns: the key is safe, the app may not be able to read
-     * it, and that is the operator's call to make.
+     * The mode is verified for the same reason and by the same rule: chmod()
+     * reporting success is not the mode being applied (see
+     * {@see self::narrowOrFail()}). A mode that came back WIDER leaks the key to
+     * readers the operator excluded; one that came back NARROWER locks out the
+     * service that has to read it. Both abort.
      *
      * @param  int|false  $owner  the replaced file's uid, false when unknown
      * @param  int|false  $group  the replaced file's gid, false when unknown
@@ -443,27 +444,30 @@ final class EncryptionKeyCommand extends Command
         }
 
         if ($actual !== $mode) {
-            $this->components->warn(sprintf(
-                'The rotated .env is mode %o, not the %o the previous file carried — this filesystem pins '
-                .'permissions. The key is not exposed, but a service running as another user may no longer '
-                .'read .env. Fix it with: chmod %o %s',
+            throw new RuntimeException(sprintf(
+                'Refusing to replace [%s]: the replacement file came back mode %o where the existing file is '
+                .'%o, so a service that reads .env through the missing bits would lose access. This filesystem '
+                .'pins permissions. The existing file is untouched.',
+                $target,
                 $actual,
                 $mode,
-                $mode,
-                $target,
             ));
         }
 
-        $ownerKept = $owner === false || @fileowner($temp) === $owner;
-        $groupKept = $group === false || @filegroup($temp) === $group;
+        clearstatcache(true, $temp);
 
-        if (! $ownerKept || ! $groupKept) {
-            $this->components->warn(sprintf(
-                'The rotated .env is owned by %s:%s, not the %s:%s the previous file carried (only root can '
-                .'hand a file to another user). A service running as that user can no longer read .env. '
-                .'Fix it with: chown %s:%s %s',
-                (string) @fileowner($temp),
-                (string) @filegroup($temp),
+        $actualOwner = @fileowner($temp);
+        $actualGroup = @filegroup($temp);
+
+        if (($owner !== false && $actualOwner !== $owner) || ($group !== false && $actualGroup !== $group)) {
+            throw new RuntimeException(sprintf(
+                'Refusing to replace [%s]: the replacement file is owned by %s:%s and the existing file by '
+                .'%s:%s, and the ownership could not be handed back (only root can). A service running as that '
+                .'user would no longer be able to read .env. The existing file is untouched — re-run as a user '
+                .'that can chown, or run: chown %s:%s %s after rotating.',
+                $target,
+                $actualOwner === false ? '?' : (string) $actualOwner,
+                $actualGroup === false ? '?' : (string) $actualGroup,
                 $owner === false ? '?' : (string) $owner,
                 $group === false ? '?' : (string) $group,
                 $owner === false ? '?' : (string) $owner,
@@ -471,6 +475,24 @@ final class EncryptionKeyCommand extends Command
                 $target,
             ));
         }
+    }
+
+    /**
+     * The mode, owner and group of the file about to be replaced.
+     *
+     * Read in one place so the writer captures the identity of the file it will
+     * replace BEFORE it creates anything, and restores that same triple after
+     * the body is written.
+     *
+     * @return array{0: int, 1: int|false, 2: int|false}
+     */
+    private function fileIdentity(string $path): array
+    {
+        if (! file_exists($path)) {
+            return [0600, false, false];
+        }
+
+        return [fileperms($path) & 0777, @fileowner($path), @filegroup($path)];
     }
 
     /**
@@ -492,22 +514,46 @@ final class EncryptionKeyCommand extends Command
      * The flush opens its own handle so the content write can keep going through
      * $this->files->put(), which the write-order tests observe.
      *
-     * Best-effort by design: a filesystem that cannot fsync (some network and
-     * container mounts) must not fail an otherwise complete write.
+     * NOT best-effort here, unlike the generic writer: a flush that silently did
+     * nothing turns the ordering above back into a call order, and the failure
+     * it stops being able to prevent is the unrecoverable one. So an unopenable
+     * handle, a failed fflush() and a failed fsync() all abort BEFORE the
+     * rename — the existing `.env` is untouched and the operator is told the
+     * rotation did not happen, which is the outcome a filesystem that cannot
+     * fsync should produce for a file whose whole safety property is durability.
+     *
+     * The rename itself is deliberately NOT followed by a directory fsync. A
+     * rename that does not survive a crash leaves the PREVIOUS `.env` in place —
+     * the old primary, the old list, fully readable — which is a safe outcome,
+     * not a lossy one.
+     *
+     * @throws RuntimeException
      */
-    private function flushToDisk(string $temp): void
+    private function flushToDisk(string $temp, string $target): void
     {
         $handle = @fopen($temp, 'r+');
 
         if ($handle === false) {
-            return;
+            throw new RuntimeException(
+                "Refusing to replace [{$target}]: the replacement file could not be reopened to flush it to "
+                .'disk, so the write could not be made durable. The existing file is untouched.'
+            );
         }
 
         try {
-            @fflush($handle);
-            @fsync($handle);
+            $flushed = @fflush($handle) && @fsync($handle);
         } finally {
             fclose($handle);
+        }
+
+        if (! $flushed) {
+            throw new RuntimeException(sprintf(
+                'Refusing to replace [%s]: the replacement file could not be flushed to disk (this filesystem '
+                .'may not support fsync). Renaming it anyway would drop the guarantee that the retired key '
+                .'reaches the disk BEFORE the primary key changes, which is the one failure this command '
+                .'exists to prevent. The existing file is untouched.',
+                $target,
+            ));
         }
     }
 
