@@ -4,6 +4,7 @@ namespace Lvntr\StarterKit\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
+use Lvntr\StarterKit\Console\Commands\Concerns\RefusesPackageSourceTree;
 
 /**
  * Remove a previously scaffolded domain and all its associated files.
@@ -17,6 +18,8 @@ use Illuminate\Support\Str;
  */
 class RemoveDomainCommand extends Command
 {
+    use RefusesPackageSourceTree;
+
     protected $signature = 'remove:sk-domain
         {name : The domain name to remove (e.g. Student, Product)}
         {--force : Skip confirmation prompt}';
@@ -47,6 +50,10 @@ class RemoveDomainCommand extends Command
 
     public function handle(): int
     {
+        if ($this->isPackageSourceTree()) {
+            return $this->renderPackageSourceTreeStop();
+        }
+
         $raw = $this->argument('name');
 
         if (! $this->isValidDomainName($raw)) {

@@ -4,6 +4,7 @@ namespace Lvntr\StarterKit\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
+use Lvntr\StarterKit\Console\Commands\Concerns\RefusesPackageSourceTree;
 use Lvntr\StarterKit\Console\Commands\Concerns\WritesFilesAtomically;
 use Lvntr\StarterKit\StarterKitServiceProvider;
 use Symfony\Component\Process\Process;
@@ -49,6 +50,7 @@ use function Laravel\Prompts\confirm;
  */
 class EjectCommand extends Command
 {
+    use RefusesPackageSourceTree;
     use WritesFilesAtomically;
 
     protected $signature = 'sk:eject
@@ -321,6 +323,10 @@ class EjectCommand extends Command
 
     public function handle(): int
     {
+        if (! $this->option('dry-run') && $this->isPackageSourceTree($this->destinationOption())) {
+            return $this->renderPackageSourceTreeStop();
+        }
+
         $this->files = new Filesystem;
 
         $domain = (string) $this->argument('domain');

@@ -3,9 +3,12 @@
 namespace Lvntr\StarterKit\Console\Commands;
 
 use Illuminate\Console\Command;
+use Lvntr\StarterKit\Console\Commands\Concerns\RefusesPackageSourceTree;
 
 class EnvSyncCommand extends Command
 {
+    use RefusesPackageSourceTree;
+
     protected $signature = 'env:sync {--reverse : Check .env for missing keys from .env.example}';
 
     protected $description = 'Sync .env keys to .env.example (with blank values for sensitive keys)';
@@ -22,6 +25,10 @@ class EnvSyncCommand extends Command
 
     public function handle(): int
     {
+        if ($this->isPackageSourceTree()) {
+            return $this->renderPackageSourceTreeStop();
+        }
+
         $envPath = base_path('.env');
         $examplePath = base_path('.env.example');
 

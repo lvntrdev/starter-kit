@@ -7,6 +7,7 @@ use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
 use Lvntr\StarterKit\Console\Commands\Concerns\ChecksStepResults;
+use Lvntr\StarterKit\Console\Commands\Concerns\RefusesPackageSourceTree;
 use Lvntr\StarterKit\Support\DocsLink;
 use PhpParser\Error;
 use PhpParser\Node;
@@ -21,6 +22,7 @@ use function Laravel\Prompts\confirm;
 class UpgradeCommand extends Command
 {
     use ChecksStepResults;
+    use RefusesPackageSourceTree;
 
     protected $signature = 'sk:upgrade
         {--force : Skip confirmation prompts}
@@ -42,6 +44,10 @@ class UpgradeCommand extends Command
 
     public function handle(): int
     {
+        if ($this->isPackageSourceTree()) {
+            return $this->renderPackageSourceTreeStop();
+        }
+
         $this->files = new Filesystem;
 
         $this->newLine();

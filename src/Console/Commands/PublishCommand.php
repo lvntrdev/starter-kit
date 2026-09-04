@@ -4,6 +4,7 @@ namespace Lvntr\StarterKit\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
+use Lvntr\StarterKit\Console\Commands\Concerns\RefusesPackageSourceTree;
 use Lvntr\StarterKit\StarterKitServiceProvider;
 
 use function Laravel\Prompts\multiselect;
@@ -11,6 +12,8 @@ use function Laravel\Prompts\select;
 
 class PublishCommand extends Command
 {
+    use RefusesPackageSourceTree;
+
     protected $signature = 'sk:publish
         {--tag=* : Tag(s) to publish (components, datatable, form, tabs, skeleton, ui, filemanager, composables, plugins, lang, config, helpers)}
         {--force : Overwrite existing files}
@@ -90,6 +93,10 @@ class PublishCommand extends Command
 
     public function handle(): int
     {
+        if ($this->isPackageSourceTree($this->destinationOption())) {
+            return $this->renderPackageSourceTreeStop();
+        }
+
         $tags = $this->option('tag');
         $force = (bool) $this->option('force');
 

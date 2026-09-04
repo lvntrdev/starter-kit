@@ -4,6 +4,7 @@ namespace Lvntr\StarterKit\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
+use Lvntr\StarterKit\Console\Commands\Concerns\RefusesPackageSourceTree;
 
 /**
  * Scaffold a new domain with all layers following the DDD-inspired architecture.
@@ -21,6 +22,8 @@ use Illuminate\Support\Str;
  */
 class MakeDomainCommand extends Command
 {
+    use RefusesPackageSourceTree;
+
     protected $signature = 'make:sk-domain
         {name? : The domain name (e.g. Student, Product, Category)}
         {--fields= : Comma-separated fields with types (e.g. name:string,age:integer)}
@@ -129,6 +132,10 @@ class MakeDomainCommand extends Command
 
     public function handle(): int
     {
+        if ($this->isPackageSourceTree()) {
+            return $this->renderPackageSourceTreeStop();
+        }
+
         if (! $this->askDomainName()) {
             return self::FAILURE;
         }

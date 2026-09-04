@@ -16,6 +16,7 @@ use Dotenv\Store\StringStore;
 use Illuminate\Console\Command;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Filesystem\Filesystem;
+use Lvntr\StarterKit\Console\Commands\Concerns\RefusesPackageSourceTree;
 use Lvntr\StarterKit\Console\Concerns\HoldsEncryptionRotationLock;
 use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
 use RuntimeException;
@@ -76,6 +77,7 @@ use Throwable;
 final class EncryptionKeyCommand extends Command
 {
     use HoldsEncryptionRotationLock;
+    use RefusesPackageSourceTree;
 
     /**
      * Characters an `.env` value may carry verbatim.
@@ -139,6 +141,10 @@ final class EncryptionKeyCommand extends Command
 
     public function handle(): int
     {
+        if (! $this->option('show') && $this->isPackageSourceTree()) {
+            return $this->renderPackageSourceTreeStop();
+        }
+
         try {
             $cipher = $this->validatedCipher();
         } catch (Throwable $e) {

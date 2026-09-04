@@ -7,6 +7,7 @@ use Illuminate\Filesystem\Filesystem;
 use Lvntr\StarterKit\Console\Commands\Concerns\ChecksStepResults;
 use Lvntr\StarterKit\Console\Commands\Concerns\ComparesPublishedStubs;
 use Lvntr\StarterKit\Console\Commands\Concerns\MirrorsAiSkills;
+use Lvntr\StarterKit\Console\Commands\Concerns\RefusesPackageSourceTree;
 use Lvntr\StarterKit\Console\Commands\Concerns\WritesFilesAtomically;
 use Lvntr\StarterKit\StarterKitServiceProvider;
 use Lvntr\StarterKit\Support\DocsLink;
@@ -20,6 +21,7 @@ class UpdateCommand extends Command
     use ChecksStepResults;
     use ComparesPublishedStubs;
     use MirrorsAiSkills;
+    use RefusesPackageSourceTree;
     use WritesFilesAtomically;
 
     protected $signature = 'sk:update
@@ -525,6 +527,10 @@ class UpdateCommand extends Command
 
     public function handle(): int
     {
+        if (! $this->option('dry-run') && $this->isPackageSourceTree()) {
+            return $this->renderPackageSourceTreeStop();
+        }
+
         $this->files = new Filesystem;
 
         $this->newLine();
