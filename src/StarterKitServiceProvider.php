@@ -117,6 +117,7 @@ use Lvntr\StarterKit\Support\HtmlSanitizer;
 use Lvntr\StarterKit\Support\MediaPathGenerator;
 use Lvntr\StarterKit\Support\Scramble\ApiResponseExtension;
 use Lvntr\StarterKit\Support\TranslatableQueryHelpers;
+use Spatie\MediaLibrary\MediaCollections\FileAdder;
 use Spatie\MediaLibrary\MediaCollections\Filesystem as MediaFilesystem;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -1214,6 +1215,36 @@ class StarterKitServiceProvider extends ServiceProvider
                 config(['media-library.media_model' => 'App\\Models\\Media']);
             }
         }
+
+        // media-library: block active-content extensions at the media layer.
+        // Uploads keep their client file name and are served as-is from the
+        // public disk, so an .html/.svg/.js segment anywhere in the name is
+        // stored XSS. Applied unconditionally — outside the "config not
+        // published" guard above — so a consumer who published (or pinned an
+        // older copy of) config/media-library.php is hardened too.
+        $disallowedExtensions = config('media-library.disallowed_extensions');
+
+        if (! is_array($disallowedExtensions)) {
+            // property_exists() keeps this boot-safe on media-library builds
+            // that predate the disallowed-extension guard; the literal list
+            // mirrors Spatie's default so the kit's own per-segment check
+            // (FileManagerRequest::hasDisallowedExtensionSegment) blocks the
+            // same names on those builds.
+            $disallowedExtensions = property_exists(FileAdder::class, 'defaultDisallowedExtensions')
+                ? FileAdder::$defaultDisallowedExtensions
+                : [
+                    'php', 'php3', 'php4', 'php5', 'php6', 'php7', 'php8',
+                    'phtml', 'phtm', 'pht', 'phps', 'phar',
+                    'shtml', 'shtm', 'stm',
+                    'htaccess', 'htpasswd',
+                    'cgi', 'pl', 'asp', 'aspx', 'jsp', 'jspx',
+                ];
+        }
+
+        config(['media-library.disallowed_extensions' => array_values(array_unique([
+            ...$disallowedExtensions,
+            'html', 'htm', 'xhtml', 'xht', 'svg', 'svgz', 'xml', 'xsl', 'xslt', 'js', 'mjs', 'hta',
+        ]))]);
 
         // activitylog: include soft-deleted subjects in the subject relation.
         if (! file_exists($configPath('activitylog.php'))) {

@@ -40,6 +40,21 @@ abstract class FileManagerRequest extends FormRequest
         ];
     }
 
+    /**
+     * True when any dot segment after the base name is on the media library's
+     * disallowed-extension list — the same per-segment check the media
+     * library runs when a file is added, applied here so a rename (which
+     * never passes through FileAdder) or an older media-library build cannot
+     * store `shell.php.jpg`. Case-insensitive.
+     */
+    protected function hasDisallowedExtensionSegment(string $fileName): bool
+    {
+        $segments = array_map(trim(...), array_slice(explode('.', strtolower($fileName)), 1));
+        $blocked = array_map(strtolower(...), (array) config('media-library.disallowed_extensions', []));
+
+        return array_intersect($segments, $blocked) !== [];
+    }
+
     private function contextKeyRule(): callable
     {
         return function (string $attribute, mixed $value, callable $fail): void {

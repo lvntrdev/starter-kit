@@ -97,7 +97,6 @@ final class MfgStrategyRunner extends InstallCommand
 function mfgMethod(string $name): ReflectionMethod
 {
     $method = new ReflectionMethod(InstallCommand::class, $name);
-    $method->setAccessible(true);
 
     return $method;
 }

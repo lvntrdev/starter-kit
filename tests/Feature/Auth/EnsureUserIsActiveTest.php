@@ -399,7 +399,6 @@ function runActiveMiddlewareAttach(): void
 {
     $provider = app()->getProvider(StarterKitServiceProvider::class);
     $method = new ReflectionMethod($provider, 'attachActiveUserMiddleware');
-    $method->setAccessible(true);
     $method->invoke($provider, app('router'));
 }
 

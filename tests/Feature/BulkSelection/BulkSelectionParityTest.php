@@ -100,11 +100,9 @@ function bulkParityCandidateIds(array $range): array
     $query = new UserBulkSelectionQuery;
 
     $normalize = new ReflectionMethod($query, 'normalizeFilters');
-    $normalize->setAccessible(true);
     $filters = $normalize->invoke($query, $snapshot);
 
     $apply = new ReflectionMethod($query, 'applyFilters');
-    $apply->setAccessible(true);
 
     $builder = BulkParityTestUser::query();
     $apply->invoke($query, $builder, $filters);
@@ -143,10 +141,8 @@ function bulkParitySearchIds(string $search): array
     $query = new UserBulkSelectionQuery;
 
     $normalize = new ReflectionMethod($query, 'normalizeFilters');
-    $normalize->setAccessible(true);
 
     $apply = new ReflectionMethod($query, 'applyFilters');
-    $apply->setAccessible(true);
 
     $builder = BulkParityTestUser::query();
     $apply->invoke($query, $builder, $normalize->invoke($query, ['filter[search]' => $search]));
@@ -277,7 +273,6 @@ it('keeps parity with a comma in the search (Spatie explodes the value, the tabl
 it('rejects an active unknown filter key with a filter_snapshot 422 naming it', function (): void {
     $query = new UserBulkSelectionQuery;
     $normalize = new ReflectionMethod($query, 'normalizeFilters');
-    $normalize->setAccessible(true);
 
     try {
         $normalize->invoke($query, ['filter[evil]' => 'x']);
@@ -294,7 +289,6 @@ it('rejects an active unknown filter key with a filter_snapshot 422 naming it', 
 it('treats only null and [] as inactive on an unknown key — a blank string is active and rejected', function (): void {
     $query = new UserBulkSelectionQuery;
     $normalize = new ReflectionMethod($query, 'normalizeFilters');
-    $normalize->setAccessible(true);
 
     expect($normalize->invoke($query, ['filter[evil]' => null]))->toBe([])
         ->and($normalize->invoke($query, ['filter[evil]' => []]))->toBe([]);
@@ -309,7 +303,6 @@ it('treats only null and [] as inactive on an unknown key — a blank string is 
 it('never triggers the 422 on non-filter keys (sort, page, columns, type)', function (): void {
     $query = new UserBulkSelectionQuery;
     $normalize = new ReflectionMethod($query, 'normalizeFilters');
-    $normalize->setAccessible(true);
 
     $result = $normalize->invoke($query, [
         'sort' => '-created_at',

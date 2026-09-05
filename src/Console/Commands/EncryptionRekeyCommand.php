@@ -139,13 +139,6 @@ final class EncryptionRekeyCommand extends Command
         '2fa' => self::SURFACE_TWO_FACTOR,
     ];
 
-    /**
-     * Cache key {@see SettingService::allGrouped()}
-     * stores its decrypted snapshot under. Duplicated rather than imported
-     * because the service exposes no flush method; keep the two in step.
-     */
-    private const SETTINGS_CACHE_KEY = 'settings';
-
     protected $signature = 'encryption:rekey
         {--dry-run : Perform every decrypt attempt and print the identical summary without writing a single byte}
         {--only= : Limit the run to one surface: settings or two-factor (comma-separated to combine)}
@@ -271,13 +264,13 @@ final class EncryptionRekeyCommand extends Command
             }
         }
 
-        // The cached snapshot holds DECRYPTED values, so a rekey does not
-        // invalidate it on its own. It is flushed anyway because the run may
-        // have been preceded by a key change: entries cached while a value was
-        // unreadable are stored as null (SettingService swallows the decrypt
-        // failure), and only a flush turns those back into real values.
+        // The cached snapshot holds the RAW rows {@see SettingService::CACHE_KEY},
+        // so it now carries the PRE-rekey ciphertext — readable only while the
+        // retired key is still in the read chain. Flushing it is what makes
+        // dropping that key from DATA_ENCRYPTION_PREVIOUS_KEYS safe right after
+        // a run, instead of an hour later.
         if ($settingsTouched && ! $dryRun) {
-            Cache::forget(self::SETTINGS_CACHE_KEY);
+            Cache::forget(SettingService::CACHE_KEY);
         }
 
         return $this->report($reports, $dryRun);

@@ -200,6 +200,22 @@ Migration doğrudan geri alınabilir (`down()` `lang`'i 255'e geri genişletir �
 
 Migration'ı bilerek geri almak için önce media'yı **uygulama üzerinden** silin — böylece blob'lar satırlarla birlikte gider — sonra rollback'i tekrar çalıştırın. Korumayı aşmak için tabloyu ham SQL ile boşaltmayın; bu, korumanın engellemek için var olduğu öksüzleşmeyi bire bir üretir.
 
+### Dosya yüklemeleri artık bir client-uzantı allow-list'i uyguluyor
+
+FileManager ve avatar yüklemeleri artık yalnızca sniff edilen content-type eşleşmesiyle geçmiyor — client dosya adının uzantısı da kontrol ediliyor ve `media-library.disallowed_extensions` artık `html`, `htm`, `xhtml`, `xht`, `svg`, `svgz`, `xml`, `xsl`, `xslt`, `js`, `mjs` ve `hta`'yı adın yalnızca son değil her nokta segmentinde engelliyor (bu yüzden `name.html.pdf`, `.pdf` son uzantı olsa bile reddediliyor). Nedeni için `CHANGELOG.tr.md`'ye bakın. Burada hiçbir şey veritabanına veya `.env`'e dokunmuyor; iki şey bir operatörün dikkatini gerektiriyor.
+
+**Avatar request stub'ı consumer-sahipli.** `stubs/app/Http/Requests/UploadAvatarRequest.php`, `sk:install` tarafından uygulamanıza kopyalandı ve kit zaten size teslim ettiği bir dosyaya geri erişemez. Mevcut bir kurulum, siz ya tazelenmiş stub'ı almak için `php artisan sk:update` çalıştırana ya da kendi kopyanızın `rules()` dizisine — mevcut `'mimes:jpg,jpeg,png,webp'` satırının hemen ardına — `'extensions:jpg,jpeg,png,webp'`'i elle ekleyene kadar eski kurallarını (`image`, `mimes:jpg,jpeg,png,webp`, uzantı kontrolü yok) koruyor.
+
+**`media-library.disallowed_extensions` sertleştirmesi koşulsuz uygulanıyor — kapatacak bir bayrak yok.** Kendi kopyanızı publish ettiğiniz an geri çekilen kitin `media-library.php`/`activitylog.php` override'larının aksine, bu merge her boot'ta koşulsuz çalışıyor. Uygulamanız yeni engellenen uzantılardan birini gerçekten kabul etmesi gerekiyorsa, kabul ettiğiniz MIME/uzantı çiftini bildirmek için alt sınıflanmış bir request'te `mimeExtensionMap()`'i override edin ve o uzantıyı kendi service provider'ınızda (kitinkinden sonra register edilmiş) `media-library.disallowed_extensions`'tan kendiniz çıkarın — bunu yapmanın bu sertleştirmenin kapattığı aktif-içerik riskini yeniden açtığını bilerek.
+
+**Rename uzantıyı korur; boyut tavanı hizalandı.** `PATCH files/{media}` artık uzantısı saklanan dosyanınkinden farklı olan ya da yasaklı bir segment içeren (`report.php.pdf`) yeni adı 422 ile reddediyor. Kitin `mimeExtensionMap()`'i dışındaki kabul edilen MIME tipleri (PPTX, RAR, Markdown, …) uzantılarını Symfony'nin MIME veritabanından çözüyor; yukarıdaki alt sınıf override'ı yalnız ikisinin de tanımadığı bir MIME için gerekiyor. Media library'nin kendi `media-library.max_file_size` tavanı (varsayılan 10 MB) FileManager'ın `max_size_mb` ayarından bağımsızdır: bu tavanı aşan bir yükleme artık 500 yerine 422 ("The uploaded file is too large.") ile reddediliyor ve yenilenen `app/Providers/SettingsServiceProvider.php` stub'ı `max_file_size`'ı `max_size_mb`'den set ediyor — `php artisan sk:update` ile çekin ya da kendi kopyanızdaki mevcut `file-manager.settings.max_size_mb` yazımının yanına `config(['media-library.max_file_size' => $maxSizeMb * 1024 * 1024])` ekleyin.
+
+Segment bazlı engelleme (yukarıdaki `name.html.pdf` durumu) `spatie/laravel-medialibrary` **11.23.0** (2026-05-28) ile geldi; kitin `composer.json`'ı artık `^11.23` istiyor, dolayısıyla bu sürümü getiren `composer update` listeyi uygulayan bir build'i de çeker. Eski bir build'in hâlâ kurulu olduğu aralığı kitin kendi request seviyesindeki segment kontrolü kapatır. Şüphede kalırsanız `composer show spatie/laravel-medialibrary` ile kontrol edin.
+
+### Ayarlar cache anahtarı değişti — işlem gerekmiyor
+
+`SettingService` artık `settings` altında çözülmüş değerleri cache'lemek yerine `settings:v2` altında ham (ciphertext) satırları cache'liyor; nedeni için `CHANGELOG.tr.md`'ye bakın. Herhangi bir deploy adımı gerekmiyor: eski `settings` anahtarı, yeni snapshot ilk kurulduğunda otomatik olarak düşürülüyor. Beklemek yerine kalıcı bir düz-metin snapshot'ı hemen düşürmek isterseniz `php artisan cache:forget settings`'i elle çalıştırmak zararsızdır.
+
 ## v13.6.8 → v13.6.9
 
 ### `CheckResourcePermission` artık staging/demo'da fail-closed (davranış değişikliği)

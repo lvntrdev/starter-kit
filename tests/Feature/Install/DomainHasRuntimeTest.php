@@ -22,11 +22,9 @@ function domainHasRuntime(string $domain): bool
     $command = new InstallCommand;
 
     $filesProperty = new ReflectionProperty($command, 'files');
-    $filesProperty->setAccessible(true);
     $filesProperty->setValue($command, new Filesystem);
 
     $method = new ReflectionMethod($command, 'domainHasRuntime');
-    $method->setAccessible(true);
 
     return (bool) $method->invoke($command, $domain);
 }

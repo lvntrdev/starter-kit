@@ -18,14 +18,12 @@ function resolveProviderNames(string $code): array
     $stmts = (new ParserFactory)->createForHostVersion()->parse($code);
 
     $collectUse = new ReflectionMethod($command, 'collectUseAliases');
-    $collectUse->setAccessible(true);
     $useMap = $collectUse->invoke($command, $stmts);
 
     /** @var Node\Stmt\Return_ $return */
     $return = (new NodeFinder)->findFirstInstanceOf($stmts, Node\Stmt\Return_::class);
 
     $collectNames = new ReflectionMethod($command, 'collectProviderClassNames');
-    $collectNames->setAccessible(true);
 
     return $collectNames->invoke($command, $return->expr, $useMap);
 }

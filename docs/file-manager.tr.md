@@ -324,7 +324,7 @@ Kimlik doğrulaması gerektirmeksizin dosyaya süreli erişim sağlayan HMAC-SHA
 
 | Anahtar             | Tip  | Varsayılan | Açıklama                                              |
 | ------------------- | ---- | ---------- | ----------------------------------------------------- |
-| `enabled`           | bool | `false`    | Paylaşım bağlantısı özelliğini etkinleştirir          |
+| `enabled`           | bool | `true`     | Paylaşım bağlantısı özelliğini etkinleştirir          |
 | `default_ttl_hours` | int  | `24`       | Varsayılan bağlantı geçerlilik süresi (saat)          |
 | `max_ttl_hours`     | int  | `720`      | İzin verilen maksimum geçerlilik süresi (30 gün)      |
 | `allow_revoke`      | bool | `true`     | Süresi dolmadan bağlantı iptaline izin verir          |

@@ -10,7 +10,6 @@ function mergeGitignore(string $existing): string
 {
     $command = new InstallCommand;
     $method = new ReflectionMethod($command, 'buildGitignoreContent');
-    $method->setAccessible(true);
 
     return $method->invoke($command, $existing);
 }

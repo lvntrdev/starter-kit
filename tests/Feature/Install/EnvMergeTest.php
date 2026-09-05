@@ -11,7 +11,6 @@ function mergeEnv(string $env, string $example, bool $isFirstInstall = false): ?
 {
     $command = new InstallCommand;
     $method = new ReflectionMethod($command, 'buildMergedEnvContent');
-    $method->setAccessible(true);
 
     return $method->invoke($command, $env, $example, $isFirstInstall);
 }
@@ -25,11 +24,9 @@ function writeEnvAtomically(string $path, string $content): void
     $command = new InstallCommand;
 
     $files = new ReflectionProperty($command, 'files');
-    $files->setAccessible(true);
     $files->setValue($command, new Filesystem);
 
     $method = new ReflectionMethod($command, 'putEnvAtomically');
-    $method->setAccessible(true);
     $method->invoke($command, $path, $content);
 }
 

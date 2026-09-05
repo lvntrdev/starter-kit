@@ -15,7 +15,6 @@ function updateIgnoresStubFile(string $relativePath): bool
 {
     $command = new UpdateCommand;
     $method = new ReflectionMethod($command, 'isIgnoredStubFile');
-    $method->setAccessible(true);
 
     return $method->invoke($command, $relativePath);
 }
@@ -47,7 +46,6 @@ it('does not skip real stub source files on update', function (string $path): vo
 
 it('stays in lockstep with InstallCommand for the shared artifact set', function (string $path): void {
     $install = new ReflectionMethod(new InstallCommand, 'isIgnoredStubFile');
-    $install->setAccessible(true);
 
     expect(updateIgnoresStubFile($path))->toBe($install->invoke(new InstallCommand, $path));
 })->with([

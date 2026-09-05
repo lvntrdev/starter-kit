@@ -30,7 +30,6 @@ function deprecatedModifiablePaths(): array
 function deprecatedCopyIsUnmodified(string $currentHash, array $stockHashes, ?string $recordedHash): bool
 {
     $method = new ReflectionMethod(UpdateCommand::class, 'deprecatedCopyIsUnmodified');
-    $method->setAccessible(true);
 
     return $method->invoke(new UpdateCommand, $currentHash, $stockHashes, $recordedHash);
 }

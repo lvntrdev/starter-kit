@@ -279,7 +279,6 @@ test('runGuarded fırlatan bir check için warn üretir, exception sızdırmaz',
 
     $command = new DoctorCommand;
     $method = new ReflectionMethod($command, 'runGuarded');
-    $method->setAccessible(true);
 
     /** @var DoctorReport $report */
     $report = $method->invoke($command, $throwing);
@@ -306,7 +305,6 @@ test('runGuarded normal bir check sonucunu değiştirmeden döner', function () 
 
     $command = new DoctorCommand;
     $method = new ReflectionMethod($command, 'runGuarded');
-    $method->setAccessible(true);
 
     /** @var DoctorReport $report */
     $report = $method->invoke($command, $okCheck);

@@ -36,7 +36,6 @@ function bootSafePathUpdateCommand(): UpdateCommand
     $command = new UpdateCommand;
 
     $filesProperty = new ReflectionProperty($command, 'files');
-    $filesProperty->setAccessible(true);
     $filesProperty->setValue($command, new Filesystem);
 
     $buffer = new BufferedOutput;
@@ -45,7 +44,6 @@ function bootSafePathUpdateCommand(): UpdateCommand
     $command->setOutput($style);
 
     $componentsProperty = new ReflectionProperty($command, 'components');
-    $componentsProperty->setAccessible(true);
     $componentsProperty->setValue($command, new ComponentsFactory($style));
 
     return $command;
@@ -54,7 +52,6 @@ function bootSafePathUpdateCommand(): UpdateCommand
 function runSafePathUpdate(UpdateCommand $command, bool $force = false): void
 {
     $method = new ReflectionMethod($command, 'updateSafePaths');
-    $method->setAccessible(true);
     $method->invoke($command, $force, false);
 }
 
@@ -62,7 +59,6 @@ function runSafePathUpdate(UpdateCommand $command, bool $force = false): void
 function readSafePathProperty(UpdateCommand $command, string $property): array
 {
     $p = new ReflectionProperty($command, $property);
-    $p->setAccessible(true);
 
     /** @var list<string> */
     return $p->getValue($command);

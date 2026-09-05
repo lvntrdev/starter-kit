@@ -173,7 +173,6 @@ function normalizeUserFilters(array $snapshot): array
 {
     $q = new UserBulkSelectionQuery;
     $ref = new ReflectionMethod($q, 'normalizeFilters');
-    $ref->setAccessible(true);
 
     return $ref->invoke($q, $snapshot);
 }
@@ -325,7 +324,6 @@ function extractRoleSearch(array $snapshot): string|bool|null
 {
     $q = new RoleBulkSelectionQuery;
     $ref = new ReflectionMethod($q, 'extractSearch');
-    $ref->setAccessible(true);
 
     return $ref->invoke($q, $snapshot);
 }

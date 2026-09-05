@@ -41,7 +41,6 @@ function captureVerify(string $domain): string
     // so the private property is set before verifyEventBindingsInjected() runs.
     // Initialize $files (assigned lazily inside handle()).
     $filesProperty = new ReflectionProperty($command, 'files');
-    $filesProperty->setAccessible(true);
     $filesProperty->setValue($command, new Filesystem);
 
     $output = new BufferedOutput;
@@ -53,11 +52,9 @@ function captureVerify(string $domain): string
 
     // Initialize $components (set in Command::execute() → run()).
     $componentsProperty = new ReflectionProperty($command, 'components');
-    $componentsProperty->setAccessible(true);
     $componentsProperty->setValue($command, new ComponentsFactory($style));
 
     $method = new ReflectionMethod($command, 'verifyEventBindingsInjected');
-    $method->setAccessible(true);
     $method->invoke($command, $domain);
 
     return $output->fetch();

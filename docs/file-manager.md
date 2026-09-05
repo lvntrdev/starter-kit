@@ -326,7 +326,7 @@ HMAC-SHA256 signed links that grant time-limited access to a file without requir
 
 | Key                | Type | Default | Description                                      |
 | ------------------ | ---- | ------- | ------------------------------------------------ |
-| `enabled`          | bool | `false` | Enable the share link feature                    |
+| `enabled`          | bool | `true`  | Enable the share link feature                    |
 | `default_ttl_hours`| int  | `24`    | Default link lifetime in hours                   |
 | `max_ttl_hours`    | int  | `720`   | Maximum allowed lifetime (30 days)               |
 | `allow_revoke`     | bool | `true`  | Allow links to be revoked before expiry          |

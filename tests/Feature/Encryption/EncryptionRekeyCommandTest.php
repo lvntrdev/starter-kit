@@ -38,8 +38,10 @@
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Lvntr\StarterKit\Domain\Setting\SettingService;
 use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
 
 /**
@@ -191,9 +193,18 @@ it('rewrites only the rows still on an old key and leaves primary-key rows byte-
     $currentBefore = erkSettingValue($current);
     $plainBefore = erkSettingValue($plain);
 
+    // Seeded so the assertion below proves the command itself drops the
+    // cached snapshot rather than the flush being a no-op on an empty cache.
+    Cache::put(SettingService::CACHE_KEY, [], 3600);
+
     $result = erkRekey();
 
     expect($result['status'])->toBe(0);
+
+    // The settings surface was touched by a real (non-dry) run, so the RAW
+    // rows the cache held — the pre-rekey ciphertext — must not survive the
+    // command; a later read misses and rebuilds against the rekeyed data.
+    expect(Cache::has(SettingService::CACHE_KEY))->toBeFalse();
 
     // The two stale rows changed on disk and now read with the PRIMARY key alone.
     foreach ([$staleA => 'mail-secret', $staleB => 'storage-secret'] as $id => $expected) {

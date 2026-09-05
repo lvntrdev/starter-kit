@@ -31,13 +31,14 @@
     "laravel/wayfinder": "^0.1",
     "nikic/php-parser": "^5.0",
     "spatie/laravel-activitylog": "^5.0",
-    "spatie/laravel-medialibrary": "^11.12",
+    "spatie/laravel-medialibrary": "^11.23",
     "spatie/laravel-permission": "^7.2",
     "spatie/laravel-query-builder": "^6.3",
     "league/flysystem-aws-s3-v3": "^3.0",
     "spatie/laravel-translatable": "^6.11"
   },
   "require-dev": {
+    "larastan/larastan": "^3.11",
     "laravel/pint": "^1.29",
     "orchestra/testbench": "^11.0",
     "pestphp/pest": "^4.4"
@@ -78,6 +79,7 @@
   "scripts": {
     "test": "vendor/bin/pest tests/Feature",
     "lint": "vendor/bin/pint --test",
+    "analyse": "vendor/bin/phpstan analyse --memory-limit=1G",
     "security": "composer audit"
   },
   "minimum-stability": "stable",

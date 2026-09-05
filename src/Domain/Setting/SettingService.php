@@ -19,6 +19,14 @@ use Lvntr\StarterKit\Support\HtmlSanitizer;
 class SettingService
 {
     /**
+     * Cache key for the settings snapshot.
+     *
+     * Versioned because the v1 key (`settings`) cached DECRYPTED values, so a
+     * cache dump exposed every secret; v2 caches the raw rows {@see allGrouped()}.
+     */
+    public const CACHE_KEY = 'settings:v2';
+
+    /**
      * Keys that must be stored encrypted.
      *
      * @var list<string>
@@ -185,7 +193,7 @@ class SettingService
      */
     private function forgetCacheAfterCommit(): void
     {
-        DB::afterCommit(static fn () => Cache::forget('settings'));
+        DB::afterCommit(static fn () => Cache::forget(self::CACHE_KEY));
     }
 
     /**
@@ -218,11 +226,22 @@ class SettingService
     /**
      * Get all settings grouped by group name (cached).
      *
+     * The cache holds the RAW rows — ciphertext plus the `encrypted` flag — and
+     * every read decrypts AFTER the cache returns, so a cache dump (Redis
+     * keyspace, file store, a store shared with another app) never yields a
+     * setting secret in plaintext. Callers still get plaintext values.
+     *
      * @return array<string, array<string, mixed>>
      */
     public function allGrouped(): array
     {
-        return Cache::remember('settings', 3600, function () {
+        /** @var list<array{group: string, key: string, value: mixed, encrypted: bool}> $rows */
+        $rows = Cache::remember(self::CACHE_KEY, 3600, function (): array {
+            // The v1 key cached decrypted values and nothing reads it any more;
+            // drop it the first time the v2 snapshot is built so the plaintext
+            // copy does not linger for the rest of its hour.
+            Cache::forget('settings');
+
             // Read via the query builder, NOT Eloquent. allGrouped() can run from
             // a service-provider booting() callback (the auth-security config
             // bridge), which fires BEFORE any provider boot() — and Eloquent's
@@ -231,15 +250,29 @@ class SettingService
             // function connection() on null". The query builder resolves the
             // connection from the container's `db` binding, available that early.
             // The `encrypted` flag arrives as a raw int (no model cast), so the
-            // truthiness check below is equivalent to the boolean-cast model.
-            $grouped = [];
+            // cast below is equivalent to the boolean-cast model.
+            $rows = [];
 
             foreach (DB::table('settings')->get() as $row) {
-                $grouped[$row->group][$row->key] = $this->decryptIfNeeded($row->value, (bool) $row->encrypted);
+                $rows[] = [
+                    'group' => (string) $row->group,
+                    'key' => (string) $row->key,
+                    'value' => $row->value,
+                    'encrypted' => (bool) $row->encrypted,
+                ];
             }
 
-            return $grouped;
+            return $rows;
         });
+
+        $grouped = [];
+
+        // ponytail: decrypts N secrets per call; add a scoped binding + memo if profiling shows it
+        foreach ($rows as $row) {
+            $grouped[$row['group']][$row['key']] = $this->decryptIfNeeded($row['value'], $row['encrypted']);
+        }
+
+        return $grouped;
     }
 
     /**
@@ -252,11 +285,13 @@ class SettingService
                 return DataCrypt::decryptString((string) $value);
             } catch (DecryptException $e) {
                 // An unreadable row is a real operational event (wrong/rotated
-                // key, corrupted ciphertext) and the null we return here can be
-                // cached for an hour, so it must not stay silent. The CIPHERTEXT
-                // and the plaintext are both withheld — only the failure is
-                // logged. Everything else (a misconfigured cipher, a driver or
-                // programming error) is NOT swallowed: it propagates so the
+                // key, corrupted ciphertext) that the app then treats as
+                // "unset", so it must not stay silent. The cache holds the
+                // ciphertext, not this null, so the decrypt is re-attempted —
+                // and logged — on every read until the key is fixed. The
+                // CIPHERTEXT and the plaintext are both withheld; only the
+                // failure is logged. Everything else (a misconfigured cipher, a
+                // driver or programming error) is NOT swallowed: it propagates so the
                 // fault surfaces where it happens instead of degrading every
                 // encrypted setting to its env/default fallback.
                 Log::warning('starter-kit: an encrypted setting could not be decrypted; falling back to null.', [

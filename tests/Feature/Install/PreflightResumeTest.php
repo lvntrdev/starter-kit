@@ -16,7 +16,6 @@ function invokeInstallMethod(string $method, array $args): mixed
 {
     $command = new InstallCommand;
     $ref = new ReflectionMethod($command, $method);
-    $ref->setAccessible(true);
 
     return $ref->invoke($command, ...$args);
 }

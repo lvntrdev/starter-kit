@@ -79,7 +79,7 @@ function legacyReloadKeys(): void
     app()->forgetInstance('encrypter');
     Crypt::clearResolvedInstance('encrypter');
     StarterKitServiceProvider::flushDataEncrypter();
-    Cache::forget('settings');
+    Cache::forget(SettingService::CACHE_KEY);
 }
 
 /**

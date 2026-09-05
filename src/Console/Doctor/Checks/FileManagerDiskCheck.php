@@ -24,10 +24,18 @@ class FileManagerDiskCheck implements DoctorCheck
 
     public function run(): DoctorReport
     {
-        $diskName = config('filesystems.default', 'local');
+        // FileManager'ın gerçekten yazdığı disk media-library.disk_name'dir
+        // (SettingsServiceProvider Storage ayarından bunu set eder); tanımsızsa
+        // filesystems.default'a düş.
+        $fileManagerDisk = (string) (config('media-library.disk_name') ?: config('filesystems.default', 'local'));
 
-        // file-manager'a özgü disk tanımlıysa onu kullan
-        $fileManagerDisk = config('file-manager.disk', $diskName);
+        if (config("filesystems.disks.{$fileManagerDisk}") === null) {
+            return DoctorReport::fail(
+                $this->name(),
+                "FileManager disk \"{$fileManagerDisk}\" is not defined in filesystems.disks.",
+                'Set FILESYSTEM_DISK in your .env file or choose a valid disk under Settings → Storage.'
+            );
+        }
 
         $diskConfig = config("filesystems.disks.{$fileManagerDisk}", []);
         $driver = $diskConfig['driver'] ?? 'unknown';
@@ -38,6 +46,14 @@ class FileManagerDiskCheck implements DoctorCheck
 
         // Local/public driver: dizin mevcut mu ve yazılabilir mi?
         $root = $diskConfig['root'] ?? '';
+
+        if ($root !== '' && is_dir($root) && ! is_writable($root)) {
+            return DoctorReport::warn(
+                $this->name(),
+                "FileManager disk \"{$fileManagerDisk}\" ({$driver}) root directory is not writable: {$root}.",
+                'Fix directory permissions (chmod/chown) so the web server user can write.'
+            );
+        }
 
         if ($root !== '' && is_dir($root)) {
             return DoctorReport::ok(

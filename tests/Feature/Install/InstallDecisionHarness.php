@@ -51,7 +51,6 @@ function iciCommand(array $properties = []): array
         'components' => new ComponentsFactory($style),
     ] as $property => $value) {
         $ref = new ReflectionProperty($command, $property);
-        $ref->setAccessible(true);
         $ref->setValue($command, $value);
     }
 
@@ -61,7 +60,6 @@ function iciCommand(array $properties = []): array
 function iciProperty(InstallCommand $command, string $property): mixed
 {
     $ref = new ReflectionProperty($command, $property);
-    $ref->setAccessible(true);
 
     return $ref->getValue($command);
 }
@@ -69,7 +67,6 @@ function iciProperty(InstallCommand $command, string $property): mixed
 function iciInvoke(InstallCommand $command, string $method, array $args = []): mixed
 {
     $ref = new ReflectionMethod($command, $method);
-    $ref->setAccessible(true);
 
     return $ref->invoke($command, ...$args);
 }

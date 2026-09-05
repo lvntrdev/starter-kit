@@ -258,7 +258,6 @@ it('backwardCompatAliasPlan() skips User aliases when app/Domain/User exists', f
 
     $provider = new StarterKitServiceProvider(app());
     $reflect = new ReflectionMethod($provider, 'backwardCompatAliasPlan');
-    $reflect->setAccessible(true);
 
     /** @var array<class-string, class-string> $plan */
     $plan = $reflect->invoke($provider, $dest);
@@ -793,7 +792,6 @@ it('backwardCompatAliasPlan() omits ContentLanguageController after eject, and n
 
     $provider = new StarterKitServiceProvider(app());
     $method = new ReflectionMethod($provider, 'backwardCompatAliasPlan');
-    $method->setAccessible(true);
 
     /** @var array<class-string, class-string> $plan */
     $plan = $method->invoke($provider, $dest);

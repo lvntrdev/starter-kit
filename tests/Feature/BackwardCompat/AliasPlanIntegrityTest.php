@@ -53,7 +53,6 @@ function aliasPlanMethodSource(): string
 function resolvedAliasPlanForIntegrityCheck(): array
 {
     $method = new ReflectionMethod(StarterKitServiceProvider::class, 'backwardCompatAliasPlan');
-    $method->setAccessible(true);
 
     $provider = new StarterKitServiceProvider(app());
 

@@ -331,6 +331,10 @@ class SettingsServiceProvider extends ServiceProvider
         if ($fileManager = $settings['file_manager'] ?? null) {
             if (isset($fileManager['max_size_mb'])) {
                 config(['file-manager.settings.max_size_mb' => (int) $fileManager['max_size_mb']]);
+                // The media library enforces its own ceiling (media-library.max_file_size,
+                // 10 MB by default) after validation; keep it in step so an admin-permitted
+                // larger upload is not refused once the request rule has passed.
+                config(['media-library.max_file_size' => (int) $fileManager['max_size_mb'] * 1024 * 1024]);
             }
             if (isset($fileManager['storage_quota_gb'])) {
                 config(['file-manager.settings.storage_quota_gb' => (int) $fileManager['storage_quota_gb']]);

@@ -42,7 +42,6 @@ function stepCommand(array $options = []): array
         'dryRun' => true,
     ] as $property => $value) {
         $ref = new ReflectionProperty($command, $property);
-        $ref->setAccessible(true);
         $ref->setValue($command, $value);
     }
 
@@ -55,7 +54,6 @@ function stepCommand(array $options = []): array
 function stepProperty(InstallCommand $command, string $property): mixed
 {
     $ref = new ReflectionProperty($command, $property);
-    $ref->setAccessible(true);
 
     return $ref->getValue($command);
 }
@@ -66,7 +64,6 @@ function stepProperty(InstallCommand $command, string $property): mixed
 function runStep(InstallCommand $command, string $label, callable $callback, bool $mandatory = true): bool
 {
     $method = new ReflectionMethod($command, 'step');
-    $method->setAccessible(true);
 
     return (bool) $method->invoke($command, $label, $callback, $mandatory);
 }
@@ -96,7 +93,6 @@ it('aborts the run when a mandatory step fails', function (): void {
     [$command] = stepCommand();
 
     $detailProperty = new ReflectionProperty($command, 'stepFailureDetail');
-    $detailProperty->setAccessible(true);
 
     $run = fn () => runStep($command, 'Running migrations', function () use ($detailProperty, $command) {
         $detailProperty->setValue($command, '`php artisan migrate` exited with code 1.');
@@ -143,7 +139,6 @@ it('escapes and trims a sub-command output tail', function (): void {
     [$command] = stepCommand();
 
     $method = new ReflectionMethod($command, 'outputTail');
-    $method->setAccessible(true);
 
     $tail = $method->invoke($command, "line1\nline2\nline3\nline4", 2);
 
@@ -176,11 +171,9 @@ it('reports a failing artisan sub-command with its exit code and output tail', f
     // it builds is what runCommand() resolves sub-commands through.
     $kernel = $this->app[Kernel::class];
     $getArtisan = new ReflectionMethod($kernel, 'getArtisan');
-    $getArtisan->setAccessible(true);
     $command->setApplication($getArtisan->invoke($kernel));
 
     $method = new ReflectionMethod($command, 'runArtisan');
-    $method->setAccessible(true);
 
     expect($method->invoke($command, 'sk-test:passing-step'))->toBeTrue();
     expect(stepProperty($command, 'stepFailureDetail'))->toBeNull();
@@ -203,7 +196,6 @@ it('reports a failing artisan sub-command with its exit code and output tail', f
 function runProcess(InstallCommand $installer, array $command, int $timeout): bool
 {
     $method = new ReflectionMethod($installer, 'runProcessStep');
-    $method->setAccessible(true);
 
     return (bool) $method->invoke($installer, $command, $timeout);
 }

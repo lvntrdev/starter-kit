@@ -58,7 +58,6 @@ function vendorMigratedModules(): array
 function vendorMigratedCopyIsRemovable(string $currentHash, ?string $recordedHash, bool $force): bool
 {
     $method = new ReflectionMethod(UpdateCommand::class, 'vendorMigratedCopyIsRemovable');
-    $method->setAccessible(true);
 
     return $method->invoke(new UpdateCommand, $currentHash, $recordedHash, $force);
 }
@@ -79,7 +78,6 @@ function bootUpdateCommand(array $options = []): array
     $command = new UpdateCommand;
 
     $filesProperty = new ReflectionProperty($command, 'files');
-    $filesProperty->setAccessible(true);
     $filesProperty->setValue($command, new Filesystem);
 
     $buffer = new BufferedOutput;
@@ -88,7 +86,6 @@ function bootUpdateCommand(array $options = []): array
     $command->setOutput($style);
 
     $componentsProperty = new ReflectionProperty($command, 'components');
-    $componentsProperty->setAccessible(true);
     $componentsProperty->setValue($command, new ComponentsFactory($style));
 
     return [$command, $buffer];
@@ -106,12 +103,10 @@ function runVendorMigration(array $options = []): array
     [$command, $buffer] = bootUpdateCommand($options);
 
     $method = new ReflectionMethod($command, 'removeVendorMigratedPaths');
-    $method->setAccessible(true);
     $method->invoke($command, false);
 
     $read = function (string $prop) use ($command): array {
         $p = new ReflectionProperty($command, $prop);
-        $p->setAccessible(true);
 
         /** @var list<string> */
         return $p->getValue($command);

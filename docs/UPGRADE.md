@@ -200,6 +200,22 @@ The migration is a straight rollback (`down()` widens `lang` back to 255 — a w
 
 To roll the migration back deliberately, delete the media **through the application** first, so the blobs go with the rows, then run the rollback again. Do not empty the table with raw SQL to get past the guard — that reproduces exactly the orphaning the guard exists to prevent.
 
+### File uploads now enforce a client-extension allowlist
+
+FileManager and avatar uploads no longer pass purely on a sniffed content-type match — the client file name's extension is checked too, and `media-library.disallowed_extensions` now blocks `html`, `htm`, `xhtml`, `xht`, `svg`, `svgz`, `xml`, `xsl`, `xslt`, `js`, `mjs`, and `hta` in every dot segment of the name, not only the last one (so `name.html.pdf` is refused even though `.pdf` is the final extension). See `CHANGELOG.md` for why. Nothing here touches the database or `.env`; two things need an operator's attention.
+
+**The avatar request stub is consumer-owned.** `stubs/app/Http/Requests/UploadAvatarRequest.php` was copied into your app by `sk:install`, and the kit cannot reach back into a file it already handed you. An existing installation keeps its old rules — `image`, `mimes:jpg,jpeg,png,webp`, no extension check — until you either run `php artisan sk:update` to pull the refreshed stub, or add `'extensions:jpg,jpeg,png,webp'` to your own copy's `rules()` array by hand, right after the existing `'mimes:jpg,jpeg,png,webp'` entry.
+
+**The `media-library.disallowed_extensions` hardening applies unconditionally — there is no flag to opt out.** Unlike the kit's `media-library.php`/`activitylog.php` overrides, which back off the moment you publish your own copy of that config, this merge runs on every boot regardless. If your application genuinely needs to accept one of the newly blocked extensions, override `mimeExtensionMap()` in a subclassed request to declare the MIME/extension pair you accept, and remove that extension from `media-library.disallowed_extensions` yourself in your own service provider (registered after the kit's) — understanding that doing so reopens the active-content risk this hardening closes.
+
+**Renames keep their extension, and the size ceiling is aligned.** `PATCH files/{media}` now rejects (422) a new name whose extension differs from the stored file's or that contains a blocked segment (`report.php.pdf`). Accepted MIME types outside the kit's `mimeExtensionMap()` (PPTX, RAR, Markdown, …) resolve their extensions from Symfony's MIME database, so the subclass override above is only needed for a MIME neither knows. The media library's own `media-library.max_file_size` (10 MB by default) is independent of the FileManager `max_size_mb` setting: an upload above it now fails with a 422 ("The uploaded file is too large.") instead of a 500, and the refreshed `app/Providers/SettingsServiceProvider.php` stub sets `max_file_size` from `max_size_mb` — pull it with `php artisan sk:update`, or add `config(['media-library.max_file_size' => $maxSizeMb * 1024 * 1024])` next to the existing `file-manager.settings.max_size_mb` write in your copy.
+
+Per-segment blocking (the `name.html.pdf` case above) ships in `spatie/laravel-medialibrary` **11.23.0** (2026-05-28), and the kit's `composer.json` now requires `^11.23`, so the `composer update` that brings in this release pulls a build that enforces the list; the kit's own request-level segment check covers any interval in which an older build is still installed. Check with `composer show spatie/laravel-medialibrary` if in doubt.
+
+### The settings cache key changed — no action required
+
+`SettingService` now caches raw (ciphertext) rows under `settings:v2` instead of caching decrypted values under `settings`; see `CHANGELOG.md` for why. No deploy step is required: the old `settings` key is dropped automatically the first time the new snapshot is built. Running `php artisan cache:forget settings` by hand is harmless if you'd rather drop a lingering plaintext snapshot immediately instead of waiting for it to be replaced.
+
 ## v13.6.8 → v13.6.9
 
 ### `CheckResourcePermission` is now fail-closed on staging/demo (behavior change)

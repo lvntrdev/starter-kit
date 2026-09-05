@@ -42,7 +42,6 @@ function bootUpdateGoldenCommand(): array
     $command = new UpdateCommand;
 
     $filesProperty = new ReflectionProperty($command, 'files');
-    $filesProperty->setAccessible(true);
     $filesProperty->setValue($command, new Filesystem);
 
     $buffer = new BufferedOutput;
@@ -51,7 +50,6 @@ function bootUpdateGoldenCommand(): array
     $command->setOutput($style);
 
     $componentsProperty = new ReflectionProperty($command, 'components');
-    $componentsProperty->setAccessible(true);
     $componentsProperty->setValue($command, new ComponentsFactory($style));
 
     return [$command, $buffer];
@@ -60,14 +58,12 @@ function bootUpdateGoldenCommand(): array
 function runUpdateGoldenModifiableFiles(UpdateCommand $command): void
 {
     $method = new ReflectionMethod($command, 'updateModifiableFiles');
-    $method->setAccessible(true);
     $method->invoke($command, false, false);
 }
 
 function runUpdateGoldenHashRegistryRefresh(UpdateCommand $command): void
 {
     $method = new ReflectionMethod($command, 'updateHashRegistry');
-    $method->setAccessible(true);
     $method->invoke($command);
 }
 
@@ -75,7 +71,6 @@ function runUpdateGoldenHashRegistryRefresh(UpdateCommand $command): void
 function readUpdateGoldenProperty(UpdateCommand $command, string $property): array
 {
     $p = new ReflectionProperty($command, $property);
-    $p->setAccessible(true);
 
     /** @var list<string> */
     return $p->getValue($command);

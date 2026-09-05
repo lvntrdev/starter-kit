@@ -54,6 +54,9 @@ jobs:
       - name: Pint (code style)
         run: vendor/bin/pint --test
 
+      - name: PHPStan (static analysis)
+        run: composer analyse
+
   test:
     name: Tests (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest

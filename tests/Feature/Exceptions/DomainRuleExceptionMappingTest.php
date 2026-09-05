@@ -32,7 +32,6 @@ use Lvntr\StarterKit\Exceptions\DomainRuleException;
 function resolveException(Throwable $e): array
 {
     $method = new ReflectionMethod(ApiExceptionHandler::class, 'resolve');
-    $method->setAccessible(true);
 
     /** @var array{0: int, 1: string} $result */
     $result = $method->invoke(null, $e);

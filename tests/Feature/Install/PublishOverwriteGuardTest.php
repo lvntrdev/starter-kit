@@ -126,7 +126,6 @@ function pogBootCommand(?Filesystem $files = null): InstallCommand
 
     if ($files !== null) {
         $property = new ReflectionProperty($command, 'files');
-        $property->setAccessible(true);
         $property->setValue($command, $files);
     }
 
@@ -136,7 +135,6 @@ function pogBootCommand(?Filesystem $files = null): InstallCommand
 function pogPublish(InstallCommand $command, string $source, string $destination, bool $force = false): void
 {
     $method = new ReflectionMethod($command, 'publishDirectory');
-    $method->setAccessible(true);
     $method->invoke($command, $source, $destination, $force);
 }
 
@@ -155,7 +153,6 @@ function pogBootCommandWithOutput(): array
     $command->setOutput($style);
 
     $componentsProperty = new ReflectionProperty($command, 'components');
-    $componentsProperty->setAccessible(true);
     $componentsProperty->setValue($command, new ComponentsFactory($style));
 
     return [$command, $output];
@@ -164,7 +161,6 @@ function pogBootCommandWithOutput(): array
 function pogPrintPreserved(InstallCommand $command): void
 {
     $method = new ReflectionMethod($command, 'printPreservedFiles');
-    $method->setAccessible(true);
     $method->invoke($command);
 }
 
@@ -172,7 +168,6 @@ function pogPrintPreserved(InstallCommand $command): void
 function pogProperty(InstallCommand $command, string $property): array
 {
     $p = new ReflectionProperty($command, $property);
-    $p->setAccessible(true);
 
     /** @var list<string> */
     return $p->getValue($command);
@@ -181,7 +176,6 @@ function pogProperty(InstallCommand $command, string $property): array
 function pogDecide(string $stub, ?string $target, ?string $recorded, bool $force): string
 {
     $method = new ReflectionMethod(InstallCommand::class, 'decidePublishedStub');
-    $method->setAccessible(true);
 
     return $method->invoke(new InstallCommand, $stub, $target, $recorded, $force);
 }
@@ -402,7 +396,6 @@ it('writes the hash registry through a temp file and a rename, never in place', 
     $command = pogBootCommand($files);
 
     $method = new ReflectionMethod($command, 'writeHashRegistry');
-    $method->setAccessible(true);
     $method->invoke($command, ['app/Foo.php' => md5('x')]);
 
     expect(json_decode(file_get_contents($registryPath), true))
@@ -427,7 +420,6 @@ it('fails the write instead of renaming a truncated temp file into place', funct
     $command = pogBootCommand(new PogFailingFilesystem);
 
     $method = new ReflectionMethod($command, 'writeHashRegistry');
-    $method->setAccessible(true);
 
     expect(fn () => $method->invoke($command, ['app/Foo.php' => md5('x')]))
         ->toThrow(RuntimeException::class)
@@ -443,11 +435,9 @@ it('writes the resume checkpoint through the same atomic path', function (): voi
     $command = pogBootCommand($files);
 
     $pathMethod = new ReflectionMethod($command, 'progressFilePath');
-    $pathMethod->setAccessible(true);
     $progressPath = $pathMethod->invoke($command);
 
     $persist = new ReflectionMethod($command, 'persistProgress');
-    $persist->setAccessible(true);
     $persist->invoke($command);
 
     expect($files->puts)->not->toContain($progressPath)

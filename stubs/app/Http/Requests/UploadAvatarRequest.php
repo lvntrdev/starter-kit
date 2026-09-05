@@ -53,6 +53,11 @@ class UploadAvatarRequest extends FormRequest
                 'required',
                 'image',
                 'mimes:jpg,jpeg,png,webp',
+                // `image`/`mimes` only look at the sniffed content type; the
+                // avatar is stored under its client file name, so the client
+                // extension is pinned as well (avatar.html carrying JPEG bytes
+                // must not land on the public disk).
+                'extensions:jpg,jpeg,png,webp',
                 'max:2048',
                 'dimensions:max_width=4096,max_height=4096',
             ],

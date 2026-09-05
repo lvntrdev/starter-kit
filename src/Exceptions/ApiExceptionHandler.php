@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Lvntr\StarterKit\Http\Responses\ApiResponse;
+use Spatie\MediaLibrary\MediaCollections\Exceptions\FileIsTooBig;
+use Spatie\MediaLibrary\MediaCollections\Exceptions\FileNameNotAllowed;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -200,6 +202,24 @@ class ApiExceptionHandler
             $e instanceof HttpExceptionInterface => [
                 $e->getStatusCode(),
                 self::defaultMessageForStatus($e->getStatusCode()),
+            ],
+
+            // The media library refused the file for size (its own
+            // max_file_size, independent of the request rule). A client
+            // condition, so 422 like the validator's `max:` failure.
+            $e instanceof FileIsTooBig => [
+                422,
+                'The uploaded file is too large.',
+            ],
+
+            // The media library refused the file name: a blocked extension in
+            // any dot segment (shell.php.jpg) that the request validator's
+            // last-extension check cannot see. The request is well-formed, so
+            // this is the client's 422; the raw Spatie message (original and
+            // sanitized names) is dropped like every other message here.
+            $e instanceof FileNameNotAllowed => [
+                422,
+                'The uploaded file name is not allowed.',
             ],
 
             // Unexpected errors — never leak the raw exception message into

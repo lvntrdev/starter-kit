@@ -157,7 +157,6 @@ it('update removes an unmodified vendor-migrated controller when hash matches re
 
     // Invoke vendorMigratedCopyIsRemovable directly — filesystem is the proof.
     $method = new ReflectionMethod(UpdateCommand::class, 'vendorMigratedCopyIsRemovable');
-    $method->setAccessible(true);
 
     $removable = $method->invoke(
         new UpdateCommand,
@@ -173,7 +172,6 @@ it('update removes an unmodified vendor-migrated controller when hash matches re
 
 it('update preserves a modified vendor-migrated controller when hash differs from registry', function (): void {
     $method = new ReflectionMethod(UpdateCommand::class, 'vendorMigratedCopyIsRemovable');
-    $method->setAccessible(true);
 
     $removable = $method->invoke(
         new UpdateCommand,
@@ -223,7 +221,6 @@ it('vendorMigratedCopyIsRemovable respects __ejected__ guard in caller logic', f
     // Verify --force does NOT bypass the ejected guard: the method returns true
     // for arbitrary hashes under --force, but the caller exits before reaching it.
     $method = new ReflectionMethod(UpdateCommand::class, 'vendorMigratedCopyIsRemovable');
-    $method->setAccessible(true);
 
     // When --force is true the method says "removable", but the caller never
     // invokes it for __ejected__ entries — so there is no way for the force
@@ -530,7 +527,6 @@ it('a second sk:eject Logs exits with success but writes no new files (idempoten
 it('backwardCompatAliasPlan() includes App\\Http\\Controllers\\Admin\\LogController', function () use (&$vfmTempDest): void {
     $provider = new StarterKitServiceProvider(app());
     $method = new ReflectionMethod($provider, 'backwardCompatAliasPlan');
-    $method->setAccessible(true);
 
     $plan = $method->invoke($provider, $vfmTempDest); // no app copy → alias present
 
@@ -544,7 +540,6 @@ it('backwardCompatAliasPlan() includes App\\Http\\Controllers\\Admin\\LogControl
 it('backwardCompatAliasPlan() includes App\\Http\\Controllers\\Admin\\SettingsController', function () use (&$vfmTempDest): void {
     $provider = new StarterKitServiceProvider(app());
     $method = new ReflectionMethod($provider, 'backwardCompatAliasPlan');
-    $method->setAccessible(true);
 
     $plan = $method->invoke($provider, $vfmTempDest);
 
@@ -556,7 +551,6 @@ it('backwardCompatAliasPlan() includes App\\Http\\Controllers\\Admin\\SettingsCo
 it('backwardCompatAliasPlan() includes App\\Http\\Controllers\\Admin\\ActivityLogController', function () use (&$vfmTempDest): void {
     $provider = new StarterKitServiceProvider(app());
     $method = new ReflectionMethod($provider, 'backwardCompatAliasPlan');
-    $method->setAccessible(true);
 
     $plan = $method->invoke($provider, $vfmTempDest);
 
@@ -568,7 +562,6 @@ it('backwardCompatAliasPlan() includes App\\Http\\Controllers\\Admin\\ActivityLo
 it('backwardCompatAliasPlan() includes App\\Http\\Controllers\\Admin\\ApiRouteController', function () use (&$vfmTempDest): void {
     $provider = new StarterKitServiceProvider(app());
     $method = new ReflectionMethod($provider, 'backwardCompatAliasPlan');
-    $method->setAccessible(true);
 
     $plan = $method->invoke($provider, $vfmTempDest);
 
@@ -590,7 +583,6 @@ it('backwardCompatAliasPlan() omits LogController alias when app copy exists', f
 
     $provider = new StarterKitServiceProvider(app());
     $method = new ReflectionMethod($provider, 'backwardCompatAliasPlan');
-    $method->setAccessible(true);
 
     $plan = $method->invoke($provider, $dest);
 
@@ -604,7 +596,6 @@ it('backwardCompatAliasPlan() omits LogController alias when app copy exists', f
 it('backwardCompatAliasPlan() includes Log FormRequest aliases when no app copies exist', function () use (&$vfmTempDest): void {
     $provider = new StarterKitServiceProvider(app());
     $method = new ReflectionMethod($provider, 'backwardCompatAliasPlan');
-    $method->setAccessible(true);
 
     $plan = $method->invoke($provider, $vfmTempDest);
 
@@ -702,7 +693,6 @@ it('stubs directory has no request/resource/domain tree for any Faz 2 module', f
 it('backwardCompatAliasPlan() aliases every Faz 2 controller to its vendor class', function (string $appClass, string $vendorClass) use (&$vfmTempDest): void {
     $provider = new StarterKitServiceProvider(app());
     $method = new ReflectionMethod($provider, 'backwardCompatAliasPlan');
-    $method->setAccessible(true);
 
     $plan = $method->invoke($provider, $vfmTempDest); // no app copy → alias present
 
@@ -723,7 +713,6 @@ it('backwardCompatAliasPlan() aliases every Faz 2 controller to its vendor class
 it('backwardCompatAliasPlan() aliases the Faz 2 request/resource/domain classes', function (string $appClass, string $vendorClass) use (&$vfmTempDest): void {
     $provider = new StarterKitServiceProvider(app());
     $method = new ReflectionMethod($provider, 'backwardCompatAliasPlan');
-    $method->setAccessible(true);
 
     $plan = $method->invoke($provider, $vfmTempDest);
 
@@ -745,7 +734,6 @@ it('backwardCompatAliasPlan() aliases the Faz 2 request/resource/domain classes'
 it('backwardCompatAliasPlan() contains NO App\\Models\\* alias (models stay app-owned)', function () use (&$vfmTempDest): void {
     $provider = new StarterKitServiceProvider(app());
     $method = new ReflectionMethod($provider, 'backwardCompatAliasPlan');
-    $method->setAccessible(true);
 
     $plan = $method->invoke($provider, $vfmTempDest);
 
@@ -790,7 +778,6 @@ it('backwardCompatAliasPlan() omits the ApiClientController alias when an app co
 
     $provider = new StarterKitServiceProvider(app());
     $method = new ReflectionMethod($provider, 'backwardCompatAliasPlan');
-    $method->setAccessible(true);
 
     $plan = $method->invoke($provider, $dest);
 

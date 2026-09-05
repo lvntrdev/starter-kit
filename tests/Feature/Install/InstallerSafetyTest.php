@@ -53,7 +53,6 @@ final class IstEnsureEnvRunner extends InstallCommand
     public function handle(): int
     {
         $method = new ReflectionMethod(InstallCommand::class, 'ensureEnvFile');
-        $method->setAccessible(true);
         $method->invoke($this, (bool) $this->option('first-install'));
 
         return self::SUCCESS;
@@ -568,7 +567,6 @@ function istPublish(string $dir, string $shippedContents, bool $force): InstallC
     $command->setInput(new ArrayInput([], $command->getDefinition()));
 
     $method = new ReflectionMethod($command, 'publishDirectory');
-    $method->setAccessible(true);
     $method->invoke($command, $source, $dir, $force);
 
     istRemove($source);
@@ -580,7 +578,6 @@ function istPublish(string $dir, string $shippedContents, bool $force): InstallC
 function istProperty(InstallCommand $command, string $property): array
 {
     $reflected = new ReflectionProperty($command, $property);
-    $reflected->setAccessible(true);
 
     /** @var list<string> */
     return $reflected->getValue($command);

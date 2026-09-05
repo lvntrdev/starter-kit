@@ -57,7 +57,6 @@ final class ModuleRouteRegistryProbe extends StarterKitServiceProvider
     public function runRegisterRoutes(): void
     {
         $reflection = new \ReflectionMethod(StarterKitServiceProvider::class, 'registerRoutes');
-        $reflection->setAccessible(true);
         $reflection->invoke($this);
     }
 

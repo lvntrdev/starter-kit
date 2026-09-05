@@ -1,0 +1,1273 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Comparison operation "\>" between 0 and 0 is always false\.$#'
+			identifier: greater.alwaysFalse
+			count: 1
+			path: src/Console/Commands/EjectCommand.php
+
+		-
+			message: '#^Empty array passed to foreach\.$#'
+			identifier: foreach.emptyArray
+			count: 1
+			path: src/Console/Commands/EjectCommand.php
+
+		-
+			message: '#^Offset ''backend'' on array\{controllers\?\: array\<string, string\>, requests\?\: array\<string, string\>, route\?\: array\<string, string\>\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Console/Commands/EjectCommand.php
+
+		-
+			message: '#^Offset ''resources'' does not exist on array\{controllers\: int\<min, 0\>, requests\: int\<min, 0\>, skipped\: list\<string\>, routeRewritten\: list\<string\>, routeSkipped\: list\<string\>\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: src/Console/Commands/EjectCommand.php
+
+		-
+			message: '#^Offset ''resources'' on array\{controllers\: int, requests\: int, skipped\: list\<string\>, routeRewritten\: list\<string\>, routeSkipped\: list\<string\>\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Console/Commands/EjectCommand.php
+
+		-
+			message: '#^Offset ''resources'' on array\{controllers\?\: array\<string, string\>, requests\?\: array\<string, string\>, route\?\: array\<string, string\>\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Console/Commands/EjectCommand.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between '''' and '''' will always evaluate to false\.$#'
+			identifier: notIdentical.alwaysFalse
+			count: 1
+			path: src/Console/Commands/EjectCommand.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Console/Commands/EncryptionHealthCommand.php
+
+		-
+			message: '#^Parameter \#1 \$rows of method Lvntr\\StarterKit\\Console\\Commands\\EncryptionHealthCommand\:\:classifyRows\(\) expects Illuminate\\Support\\Collection\<int, object\>, Illuminate\\Support\\Collection\<int, stdClass\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Console/Commands/EncryptionHealthCommand.php
+
+		-
+			message: '#^Command "encryption\:key" does not have option "destination"\.$#'
+			identifier: larastan.console.undefinedOption
+			count: 1
+			path: src/Console/Commands/EncryptionKeyCommand.php
+
+		-
+			message: '#^Call to function is_string\(\) with non\-empty\-string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Console/Commands/EncryptionRekeyCommand.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: src/Console/Commands/EncryptionRekeyCommand.php
+
+		-
+			message: '#^Parameter \#1 \$rows of method Lvntr\\StarterKit\\Console\\Commands\\EncryptionRekeyCommand\:\:processRows\(\) expects Illuminate\\Support\\Collection\<int, object\>, Illuminate\\Support\\Collection\<int, stdClass\> given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Console/Commands/EncryptionRekeyCommand.php
+
+		-
+			message: '#^Command "env\:sync" does not have option "destination"\.$#'
+			identifier: larastan.console.undefinedOption
+			count: 1
+			path: src/Console/Commands/EnvSyncCommand.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 11
+			path: src/Console/Commands/InstallCommand.php
+
+		-
+			message: '#^Command "sk\:install" does not have option "destination"\.$#'
+			identifier: larastan.console.undefinedOption
+			count: 1
+			path: src/Console/Commands/InstallCommand.php
+
+		-
+			message: '#^Instanceof between PhpParser\\Node\\ArrayItem and PhpParser\\Node\\ArrayItem will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 2
+			path: src/Console/Commands/InstallCommand.php
+
+		-
+			message: '#^Method Lvntr\\StarterKit\\Console\\Commands\\InstallCommand\:\:verifyEventBindingsInjected\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: src/Console/Commands/InstallCommand.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: src/Console/Commands/InstallCommand.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: src/Console/Commands/InstallCommand.php
+
+		-
+			message: '#^Command "make\:domain" does not have option "destination"\.$#'
+			identifier: larastan.console.undefinedOption
+			count: 1
+			path: src/Console/Commands/MakeDomainCommand.php
+
+		-
+			message: '#^Command "make\:sk\-domain" does not have option "destination"\.$#'
+			identifier: larastan.console.undefinedOption
+			count: 1
+			path: src/Console/Commands/MakeDomainCommand.php
+
+		-
+			message: '#^Command "sk\-make\:domain" does not have option "destination"\.$#'
+			identifier: larastan.console.undefinedOption
+			count: 1
+			path: src/Console/Commands/MakeDomainCommand.php
+
+		-
+			message: '#^Match arm comparison between ''morphto'' and ''morphto'' is always true\.$#'
+			identifier: match.alwaysTrue
+			count: 1
+			path: src/Console/Commands/MakeDomainCommand.php
+
+		-
+			message: '#^Offset 1 on array\{list\<string\>, list\<non\-empty\-string\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Console/Commands/MakeDomainCommand.php
+
+		-
+			message: '#^Call to an undefined static method Illuminate\\Database\\Eloquent\\Model\:\:onlyTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 3
+			path: src/Console/Commands/PurgeFileManagerTrashCommand.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Console/Commands/RedactActivityLogSecretsCommand.php
+
+		-
+			message: '#^Command "remove\:domain" does not have option "destination"\.$#'
+			identifier: larastan.console.undefinedOption
+			count: 1
+			path: src/Console/Commands/RemoveDomainCommand.php
+
+		-
+			message: '#^Command "remove\:sk\-domain" does not have option "destination"\.$#'
+			identifier: larastan.console.undefinedOption
+			count: 1
+			path: src/Console/Commands/RemoveDomainCommand.php
+
+		-
+			message: '#^Command "sk\-remove\:domain" does not have option "destination"\.$#'
+			identifier: larastan.console.undefinedOption
+			count: 1
+			path: src/Console/Commands/RemoveDomainCommand.php
+
+		-
+			message: '#^Command "sk\:update" does not have option "destination"\.$#'
+			identifier: larastan.console.undefinedOption
+			count: 1
+			path: src/Console/Commands/UpdateCommand.php
+
+		-
+			message: '#^Constant Lvntr\\StarterKit\\Console\\Commands\\UpdateCommand\:\:VENDOR_MIGRATED_PATHS is unused\.$#'
+			identifier: classConstant.unused
+			count: 1
+			path: src/Console/Commands/UpdateCommand.php
+
+		-
+			message: '#^Offset ''php''\|''vue'' on array\{php\: array\{''app/Http…'', ''app/Http/Requests…'', ''app/Http/Resources…'', ''app/Domain…''\}\|array\{''app/Http…'', ''app/Http/Requests…'', ''app/Http/Resources…''\}\|array\{''app/Http…'', ''app/Http…''\}\|array\{''app/Http…''\}, vue\: array\{\}\}\|array\{php\: array\{''app/Http…'', ''app/Http/Requests…''\}, vue\: array\{''resources/js/pages…''\}\}\|array\{php\: array\{''app/Http…''\}, vue\: array\{''resources/js/pages…''\}\}\|array\{php\: array\{\}, vue\: array\{''resources/js/pages…''\}\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Console/Commands/UpdateCommand.php
+
+		-
+			message: '#^Offset ''vue'' on array\{php\: array\{''app/Http…'', ''app/Http/Requests…'', ''app/Http/Resources…'', ''app/Domain…''\}\|array\{''app/Http…'', ''app/Http/Requests…'', ''app/Http/Resources…''\}\|array\{''app/Http…'', ''app/Http…''\}\|array\{''app/Http…''\}, vue\: array\{\}\}\|array\{php\: array\{''app/Http…'', ''app/Http/Requests…''\}, vue\: array\{''resources/js/pages…''\}\}\|array\{php\: array\{''app/Http…''\}, vue\: array\{''resources/js/pages…''\}\}\|array\{php\: array\{\}, vue\: array\{''resources/js/pages…''\}\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Console/Commands/UpdateCommand.php
+
+		-
+			message: '#^Command "sk\:upgrade" does not have option "destination"\.$#'
+			identifier: larastan.console.undefinedOption
+			count: 1
+			path: src/Console/Commands/UpgradeCommand.php
+
+		-
+			message: '#^Comparison operation "\>\=" between int\<80400, 80599\> and 80400 is always true\.$#'
+			identifier: greaterOrEqual.alwaysTrue
+			count: 1
+			path: src/Console/Commands/UpgradeCommand.php
+
+		-
+			message: '#^Instanceof between PhpParser\\Node\\ArrayItem and PhpParser\\Node\\ArrayItem will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 2
+			path: src/Console/Commands/UpgradeCommand.php
+
+		-
+			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Console/Commands/UpgradeCommand.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: src/Console/Commands/UpgradeCommand.php
+
+		-
+			message: '#^Argument of an invalid type Illuminate\\Routing\\RouteCollectionInterface supplied for foreach, only iterables are supported\.$#'
+			identifier: foreach.nonIterable
+			count: 1
+			path: src/Console/Doctor/Checks/UnresolvedRouteCheck.php
+
+		-
+			message: '#^Parameter \#1 \$subject of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:for\(\) expects class\-string\<Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<Spatie\\Activitylog\\Models\\Activity\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domain/ActivityLog/Queries/ActivityLogDatatableQuery.php
+
+		-
+			message: '#^Access to an undefined property Laravel\\Passport\\Client\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/ApiClient/Actions/CreateApiClientAction.php
+
+		-
+			message: '#^Access to protected property Laravel\\Passport\\PersonalAccessTokenResult\:\:\$token\.$#'
+			identifier: property.protected
+			count: 1
+			path: src/Domain/ApiClient/Actions/CreatePersonalAccessTokenAction.php
+
+		-
+			message: '#^Access to an undefined property Laravel\\Passport\\Client\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/ApiClient/Actions/RevokeApiClientAction.php
+
+		-
+			message: '#^Access to an undefined property Laravel\\Passport\\Token\:\:\$user_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/ApiClient/Actions/RevokeApiTokenAction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ContentLanguage\:\:\$code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/ContentLanguage/Actions/CreateContentLanguageAction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ContentLanguage\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/ContentLanguage/Actions/CreateContentLanguageAction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ContentLanguage\:\:\$is_default\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/ContentLanguage/Actions/CreateContentLanguageAction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ContentLanguage\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/ContentLanguage/Actions/CreateContentLanguageAction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ContentLanguage\:\:\$code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/ContentLanguage/Actions/DeleteContentLanguageAction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ContentLanguage\:\:\$is_default\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/ContentLanguage/Actions/DeleteContentLanguageAction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ContentLanguage\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/ContentLanguage/Actions/DeleteContentLanguageAction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ContentLanguage\:\:\$code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/ContentLanguage/Actions/UpdateContentLanguageAction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ContentLanguage\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/ContentLanguage/Actions/UpdateContentLanguageAction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ContentLanguage\:\:\$is_default\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Domain/ContentLanguage/Actions/UpdateContentLanguageAction.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ContentLanguage\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/ContentLanguage/Actions/UpdateContentLanguageAction.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/ContentLanguage/DTOs/ContentLanguageDTO.php
+
+		-
+			message: '#^Parameter \#1 \$subject of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:for\(\) expects class\-string\<Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\ContentLanguage\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domain/ContentLanguage/Queries/ContentLanguageDatatableQuery.php
+
+		-
+			message: '#^Call to an undefined static method Illuminate\\Database\\Eloquent\\Model\:\:withTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 3
+			path: src/Domain/FileManager/Actions/BulkDeleteAction.php
+
+		-
+			message: '#^Call to an undefined static method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:withTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: src/Domain/FileManager/Actions/BulkDeleteAction.php
+
+		-
+			message: '#^Offset ''type'' on array\{type\: string, id\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/Domain/FileManager/Actions/BulkDeleteAction.php
+
+		-
+			message: '#^Access to an undefined property Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:\$folder_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Domain/FileManager/Actions/CopyFileAction.php
+
+		-
+			message: '#^Parameter \#1 \$model of method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:copy\(\) expects Spatie\\MediaLibrary\\HasMedia, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domain/FileManager/Actions/CopyFileAction.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/FileManager/Actions/DeleteFolderAction.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$parent_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/FileManager/Actions/DeleteFolderAction.php
+
+		-
+			message: '#^Call to an undefined static method Illuminate\\Database\\Eloquent\\Model\:\:onlyTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: src/Domain/FileManager/Actions/EmptyTrashAction.php
+
+		-
+			message: '#^Call to an undefined static method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:onlyTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: src/Domain/FileManager/Actions/EmptyTrashAction.php
+
+		-
+			message: '#^Call to an undefined static method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:withTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: src/Domain/FileManager/Actions/FileManagerAction.php
+
+		-
+			message: '#^Access to an undefined property Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:\$folder_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/FileManager/Actions/MoveItemAction.php
+
+		-
+			message: '#^Call to an undefined static method Illuminate\\Database\\Eloquent\\Model\:\:withTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 3
+			path: src/Domain/FileManager/Actions/PermanentlyDeleteItemAction.php
+
+		-
+			message: '#^Call to an undefined static method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:withTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: src/Domain/FileManager/Actions/PermanentlyDeleteItemAction.php
+
+		-
+			message: '#^Access to an undefined property Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:\$folder_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/FileManager/Actions/RenameFileAction.php
+
+		-
+			message: '#^Access to an undefined property Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:\$folder_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/FileManager/Actions/RestoreItemAction.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:restore\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Domain/FileManager/Actions/RestoreItemAction.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:trashed\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: src/Domain/FileManager/Actions/RestoreItemAction.php
+
+		-
+			message: '#^Call to an undefined method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:restore\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Domain/FileManager/Actions/RestoreItemAction.php
+
+		-
+			message: '#^Call to an undefined static method Illuminate\\Database\\Eloquent\\Model\:\:onlyTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 3
+			path: src/Domain/FileManager/Actions/RestoreItemAction.php
+
+		-
+			message: '#^Call to an undefined static method Illuminate\\Database\\Eloquent\\Model\:\:withTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: src/Domain/FileManager/Actions/RestoreItemAction.php
+
+		-
+			message: '#^Call to an undefined static method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:onlyTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: src/Domain/FileManager/Actions/RestoreItemAction.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/FileManager/Actions/UploadFileAction.php
+
+		-
+			message: '#^Access to an undefined property Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:\$folder_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/FileManager/Actions/UploadFileAction.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:addMedia\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Domain/FileManager/Actions/UploadFileAction.php
+
+		-
+			message: '#^Call to an undefined static method Illuminate\\Database\\Eloquent\\Model\:\:withTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: src/Domain/FileManager/Actions/UploadFileAction.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/FileManager/DTOs/CreateShareLinkDTO.php
+
+		-
+			message: '#^Access to an undefined property Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:\$folder_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/FileManager/DTOs/FileItemDTO.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/FileManager/DTOs/FileItemDTO.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Domain/FileManager/DTOs/FileManagerContextDTO.php
+
+		-
+			message: '#^Method Lvntr\\StarterKit\\Domain\\FileManager\\DTOs\\FileManagerContextDTO\:\:fromArray\(\) should return static\(Lvntr\\StarterKit\\Domain\\FileManager\\DTOs\\FileManagerContextDTO\) but returns Lvntr\\StarterKit\\Domain\\FileManager\\DTOs\\FileManagerContextDTO\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Domain/FileManager/DTOs/FileManagerContextDTO.php
+
+		-
+			message: '#^Offset ''context'' on array\{context\: string, context_id\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Domain/FileManager/DTOs/FileManagerContextDTO.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/FileManager/DTOs/FolderDTO.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/FileManager/DTOs/ShareLinkResultDTO.php
+
+		-
+			message: '#^Call to an undefined static method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:withTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: src/Domain/FileManager/Queries/FavoritesContentsQuery.php
+
+		-
+			message: '#^Call to an undefined static method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:withTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: src/Domain/FileManager/Queries/FolderContentsQuery.php
+
+		-
+			message: '#^Access to an undefined property Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:\$deleted_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/FileManager/Queries/TrashContentsQuery.php
+
+		-
+			message: '#^Access to an undefined property Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:\$folder_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/FileManager/Queries/TrashContentsQuery.php
+
+		-
+			message: '#^Call to an undefined static method Illuminate\\Database\\Eloquent\\Model\:\:onlyTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: src/Domain/FileManager/Queries/TrashContentsQuery.php
+
+		-
+			message: '#^Call to an undefined static method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:onlyTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: src/Domain/FileManager/Queries/TrashContentsQuery.php
+
+		-
+			message: '#^Call to an undefined static method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:withTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: src/Domain/FileManager/Queries/TrashContentsQuery.php
+
+		-
+			message: '#^Parameter \#1 \$user of method Lvntr\\StarterKit\\Domain\\FileManager\\Support\\ContextDefinition\:\:authorize\(\) expects Illuminate\\Database\\Eloquent\\Model, Illuminate\\Contracts\\Auth\\Authenticatable given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domain/FileManager/Services/FileManagerAuthorizer.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:can\(\)\.$#'
+			identifier: method.notFound
+			count: 6
+			path: src/Domain/FileManager/Support/ContextRegistry.php
+
+		-
+			message: '#^Call to an undefined static method Illuminate\\Database\\Eloquent\\Model\:\:singleton\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: src/Domain/FileManager/Support/ContextRegistry.php
+
+		-
+			message: '#^Right side of && is always true\.$#'
+			identifier: booleanAnd.rightAlwaysTrue
+			count: 1
+			path: src/Domain/FileManager/Support/ContextRegistry.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/Logs/DTOs/DeleteLogFilesDTO.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/Logs/DTOs/LogEntryDTO.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/Logs/DTOs/LogEntryFilterDTO.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/Logs/DTOs/LogFileDTO.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:clearMediaCollection\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Domain/Media/Actions/ClearMediaAction.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:addMediaFromRequest\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Domain/Media/Actions/UploadMediaAction.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:getMedia\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Domain/Media/Actions/UploadMediaAction.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:media\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Domain/Media/Actions/UploadMediaAction.php
+
+		-
+			message: '#^Anonymous function should return App\\Models\\Role but returns Spatie\\Permission\\Contracts\\Role\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Domain/Role/Actions/CreateRoleAction.php
+
+		-
+			message: '#^Class Database\\Seeders\\_01_RolePermissionSeeder not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/Domain/Role/Actions/SyncPermissionsAction.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/Role/DTOs/RoleDTO.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Role\:\:\$sort_order\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/Role/Queries/CanManageRoleQuery.php
+
+		-
+			message: '#^Parameter \#1 \$query of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:applySearchWords\(\) expects Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\Role\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domain/Role/Queries/RoleBulkSelectionQuery.php
+
+		-
+			message: '#^Parameter \#1 \$subject of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:for\(\) expects class\-string\<Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\Role\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domain/Role/Queries/RoleDatatableQuery.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: src/Domain/Session/Queries/UserSessionsQuery.php
+
+		-
+			message: '#^Call to an undefined method Lvntr\\StarterKit\\Domain\\Shared\\DTOs\\BaseDTO\:\:toArray\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Domain/Setting/Actions/UpdateSettingsAction.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/Setting/DTOs/ApidogSettingsDTO.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/Setting/DTOs/AppearanceSettingsDTO.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/Setting/DTOs/AuthSettingsDTO.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/Setting/DTOs/FileManagerSettingsDTO.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/Setting/DTOs/GeneralSettingsDTO.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/Setting/DTOs/MailSettingsDTO.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/Setting/DTOs/PostmanSettingsDTO.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/Setting/DTOs/StorageSettingsDTO.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/Setting/DTOs/TurnstileSettingsDTO.php
+
+		-
+			message: '#^Call to an undefined static method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:withTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: src/Domain/Setting/Queries/SettingsDefaultsQuery.php
+
+		-
+			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Domain/Setting/Queries/SettingsDefaultsQuery.php
+
+		-
+			message: '#^Parameter \#1 \$array \(non\-empty\-list\<string\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: src/Domain/Setting/SettingService.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/Shared/Pipelines/ActionPipeline.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Definition\:\:\$explanation\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/Shared/Services/DefinitionService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Definition\:\:\$icon\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/Shared/Services/DefinitionService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Definition\:\:\$label\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/Shared/Services/DefinitionService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Definition\:\:\$order\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/Shared/Services/DefinitionService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Definition\:\:\$severity\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/Shared/Services/DefinitionService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Definition\:\:\$value\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/Shared/Services/DefinitionService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Definition\:\:\$visibility\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/Shared/Services/DefinitionService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<\(int\|string\),Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Definition\>\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: src/Domain/Shared/Services/DefinitionService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Definition\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: src/Domain/Shared/Services/DefinitionService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/User/Actions/DeleteUserAction.php
+
+		-
+			message: '#^Call to function method_exists\(\) with ''Laravel\\\\Passport\\\\Passport'' and ''deviceCode'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Domain/User/Actions/RevokeUserAccessAction.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model&object\{pivot\: Illuminate\\Database\\Eloquent\\Relations\\Pivot\}\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/User/Actions/UpdateUserAction.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: src/Domain/User/DTOs/UserDTO.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/User/Listeners/LogUserCreated.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Domain/User/Listeners/LogUserUpdated.php
+
+		-
+			message: '#^Parameter \#1 \$query of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:applyCalendarDateRange\(\) expects Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\User\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domain/User/Queries/UserBulkSelectionQuery.php
+
+		-
+			message: '#^Parameter \#1 \$query of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:applySearchWords\(\) expects Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\User\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domain/User/Queries/UserBulkSelectionQuery.php
+
+		-
+			message: '#^Parameter \#1 \$subject of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:for\(\) expects class\-string\<Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\User\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domain/User/Queries/UserDatatableQuery.php
+
+		-
+			message: '#^Call to function is_string\(\) with class\-string\<Illuminate\\Database\\Eloquent\\Model\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Exceptions/ApiExceptionHandler.php
+
+		-
+			message: '#^Result of \|\| is always false\.$#'
+			identifier: booleanOr.alwaysFalse
+			count: 1
+			path: src/Exceptions/ApiExceptionHandler.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between class\-string\<Illuminate\\Database\\Eloquent\\Model\> and '''' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: src/Exceptions/ApiExceptionHandler.php
+
+		-
+			message: '#^Offset ''failed'' on array\{processed\: int, failed\: array\<int, array\{id\: int\|string, reason\: string\}\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Http/Bulk/BulkActionDispatcher.php
+
+		-
+			message: '#^Offset ''processed'' on array\{processed\: int, failed\: array\<int, array\{id\: int\|string, reason\: string\}\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Http/Bulk/BulkActionDispatcher.php
+
+		-
+			message: '#^Parameter \#1 \$subject of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:for\(\) expects class\-string\<Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<Laravel\\Passport\\Client\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Http/Controllers/Admin/ApiClientController.php
+
+		-
+			message: '#^Access to protected property Laravel\\Passport\\PersonalAccessTokenResult\:\:\$token\.$#'
+			identifier: property.protected
+			count: 1
+			path: src/Http/Controllers/Admin/ApiTokenController.php
+
+		-
+			message: '#^Parameter \#1 \$subject of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:for\(\) expects class\-string\<Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<Laravel\\Passport\\Token\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Http/Controllers/Admin/ApiTokenController.php
+
+		-
+			message: '#^Parameter \$user of method Lvntr\\StarterKit\\Domain\\ApiClient\\Actions\\CreatePersonalAccessTokenAction\:\:execute\(\) expects App\\Models\\User, Illuminate\\Foundation\\Auth\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Http/Controllers/Admin/ApiTokenController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Foundation\\Auth\\User\:\:hasRole\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Http/Controllers/Admin/SettingsController.php
+
+		-
+			message: '#^Call to an undefined static method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:withTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: src/Http/Controllers/FileManager/ShareController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Http/Controllers/FileManagerController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Http/Controllers/FileManagerController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$parent_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Http/Controllers/FileManagerController.php
+
+		-
+			message: '#^Access to an undefined property Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:\$folder_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/FileManagerController.php
+
+		-
+			message: '#^Instanceof between Symfony\\Component\\HttpFoundation\\Response and Symfony\\Component\\HttpFoundation\\Response will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Http/Middleware/AssignTraceId.php
+
+		-
+			message: '#^Instanceof between Illuminate\\Contracts\\Auth\\StatefulGuard and Illuminate\\Contracts\\Auth\\StatefulGuard will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Http/Middleware/EnsureUserIsActive.php
+
+		-
+			message: '#^Parameter \#3 \$fail of method Lvntr\\StarterKit\\Rules\\TurnstileRule\:\:validate\(\) expects Closure\(string, string\|null\=\)\: Illuminate\\Translation\\PotentiallyTranslatedString, Closure\(string\)\: void given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Http/Middleware/ValidateTurnstile.php
+
+		-
+			message: '#^Left side of && is always true\.$#'
+			identifier: booleanAnd.leftAlwaysTrue
+			count: 1
+			path: src/Http/Requests/Admin/ApiClient/UpdateApiClientRequest.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ContentLanguage\:\:\$code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Requests/Admin/ContentLanguage/UpdateContentLanguageRequest.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type App\\Models\\ContentLanguage\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: src/Http/Requests/Admin/ContentLanguage/UpdateContentLanguageRequest.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Foundation\\Auth\\User\:\:hasRole\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Http/Requests/Admin/Log/DeleteLogFilesRequest.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Foundation\\Auth\\User\:\:hasRole\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Http/Requests/Admin/Log/EntryFilterRequest.php
+
+		-
+			message: '#^Call to an undefined static method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:withTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: src/Http/Requests/FileManager/CreateShareLinkRequest.php
+
+		-
+			message: '#^Call to an undefined static method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:withTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: src/Http/Requests/FileManager/RevokeShareLinkRequest.php
+
+		-
+			message: '#^Call to an undefined static method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:withTrashed\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: src/Http/Requests/FileManager/UploadFileRequest.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between Illuminate\\Http\\UploadedFile and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 2
+			path: src/Http/Requests/FileManager/UploadFileRequest.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ApiClient\\ApiClientResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ApiClient/ApiClientResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ApiClient\\ApiClientResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ApiClient/ApiClientResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ApiClient\\ApiClientResource\:\:\$revoked\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ApiClient/ApiClientResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ApiClient\\ApiClientResource\:\:\$secret\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ApiClient/ApiClientResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ApiClient\\ApiClientResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ApiClient/ApiClientResource.php
+
+		-
+			message: '#^Access to an undefined property Laravel\\Passport\\Token\:\:\$user_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ApiToken/ApiTokenResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ApiToken\\ApiTokenResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ApiToken/ApiTokenResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ApiToken\\ApiTokenResource\:\:\$expires_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ApiToken/ApiTokenResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ApiToken\\ApiTokenResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ApiToken/ApiTokenResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ApiToken\\ApiTokenResource\:\:\$revoked\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ApiToken/ApiTokenResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ApiToken\\ApiTokenResource\:\:\$user_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ApiToken/ApiTokenResource.php
+
+		-
+			message: '#^Argument of an invalid type class\-string\|object supplied for foreach, only iterables are supported\.$#'
+			identifier: foreach.nonIterable
+			count: 1
+			path: src/Http/Resources/Admin/ApiToken/ApiTokenResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ContentLanguage\\ContentLanguageResource\:\:\$code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ContentLanguage/ContentLanguageResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ContentLanguage\\ContentLanguageResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ContentLanguage/ContentLanguageResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ContentLanguage\\ContentLanguageResource\:\:\$direction\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ContentLanguage/ContentLanguageResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ContentLanguage\\ContentLanguageResource\:\:\$fallback_code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ContentLanguage/ContentLanguageResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ContentLanguage\\ContentLanguageResource\:\:\$flag\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ContentLanguage/ContentLanguageResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ContentLanguage\\ContentLanguageResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ContentLanguage/ContentLanguageResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ContentLanguage\\ContentLanguageResource\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ContentLanguage/ContentLanguageResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ContentLanguage\\ContentLanguageResource\:\:\$is_default\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ContentLanguage/ContentLanguageResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ContentLanguage\\ContentLanguageResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ContentLanguage/ContentLanguageResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ContentLanguage\\ContentLanguageResource\:\:\$native_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ContentLanguage/ContentLanguageResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ContentLanguage\\ContentLanguageResource\:\:\$sort_order\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ContentLanguage/ContentLanguageResource.php
+
+		-
+			message: '#^Access to an undefined property Lvntr\\StarterKit\\Http\\Resources\\Admin\\ContentLanguage\\ContentLanguageResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Resources/Admin/ContentLanguage/ContentLanguageResource.php
+
+		-
+			message: '#^Instanceof between Illuminate\\Http\\Request and Illuminate\\Http\\Request will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Http/Responses/ApiResponse.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 5
+			path: src/Http/Responses/ApiResponse.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: src/StarterKitServiceProvider.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Support/BulkFilterSnapshot.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Support/Encryption/EncrypterCoverage.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: src/Support/Encryption/EncrypterCoverage.php
+
+		-
+			message: '#^Call to function method_exists\(\) with Illuminate\\Foundation\\Application and ''environmentFilePath'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Support/Encryption/EncrypterCoverage.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 3
+			path: src/Support/Encryption/EncrypterCoverage.php
+
+		-
+			message: '#^Trait Lvntr\\StarterKit\\Support\\HasTranslatableRules is used zero times and is not analysed\.$#'
+			identifier: trait.unused
+			count: 1
+			path: src/Support/HasTranslatableRules.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: src/Support/ThemeResolver.php
+
+		-
+			message: '#^Trait Lvntr\\StarterKit\\Traits\\HasActivityLogging is used zero times and is not analysed\.$#'
+			identifier: trait.unused
+			count: 1
+			path: src/Traits/HasActivityLogging.php
+
+		-
+			message: '#^Trait Lvntr\\StarterKit\\Traits\\HasMediaCollections is used zero times and is not analysed\.$#'
+			identifier: trait.unused
+			count: 1
+			path: src/Traits/HasMediaCollections.php

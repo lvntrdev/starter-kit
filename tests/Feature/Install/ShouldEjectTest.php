@@ -17,7 +17,6 @@ function shouldEject(bool $isFirstInstall, array $options = []): bool
     $command->setInput($input);
 
     $method = new ReflectionMethod($command, 'shouldEjectDefaultDomains');
-    $method->setAccessible(true);
 
     return (bool) $method->invoke($command, $isFirstInstall);
 }
