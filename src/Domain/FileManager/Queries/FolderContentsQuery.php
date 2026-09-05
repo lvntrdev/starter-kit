@@ -113,8 +113,8 @@ class FolderContentsQuery
         $mediaList = $mediaQuery->get();
 
         $files = $mediaList
-            ->map(function (Media $media) use ($favoritedFileIds) {
-                $payload = FileItemDTO::fromModel($media)->toArray();
+            ->map(function (Media $media) use ($favoritedFileIds, $context) {
+                $payload = FileItemDTO::fromModel($media, $context)->toArray();
                 $payload['is_favorited'] = isset($favoritedFileIds[(string) $media->id]);
 
                 return $payload;

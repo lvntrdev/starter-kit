@@ -40,6 +40,12 @@ export interface FileItem {
     size: number;
     folder_id: string | null;
     url: string;
+    /**
+     * Permanent public URL, set only when the backing disk is public. The
+     * editor embeds this into persisted rich text; `url` is session-gated and
+     * would break for visitors. Null on a private disk.
+     */
+    public_url?: string | null;
     created_at: string | null;
     is_favorited?: boolean;
     deleted_at?: string | null;

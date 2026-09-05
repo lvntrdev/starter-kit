@@ -22,7 +22,12 @@ readonly class FileManagerContextDTO extends BaseDTO
     ) {}
 
     /**
-     * @param  array{context: string, context_id?: ?string}  $data
+     * The shape is deliberately permissive: this factory is fed straight from
+     * request input, so every field is validated in the body rather than
+     * assumed. Declaring the keys as required/non-null would contradict the
+     * guards below.
+     *
+     * @param  array{context?: string|null, context_id?: string|null}  $data
      */
     public static function fromArray(array $data): static
     {

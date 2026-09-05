@@ -509,7 +509,7 @@ final class EncryptionRekeyCommand extends Command
      * string primary key (the kit's `users.id` is a UUID) before it ever
      * reached the WHERE clause.
      *
-     * @param  Collection<int, object>  $rows
+     * @param  Collection<int, \stdClass>  $rows
      * @param  array<string, mixed>  $report
      * @param  array<string, mixed>  $surface
      * @param  list<string>  $columns

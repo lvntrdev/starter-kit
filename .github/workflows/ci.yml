@@ -88,14 +88,13 @@ jobs:
       - name: Run tests
         run: vendor/bin/pest tests/Feature
 
-  # NOTE: continue-on-error is temporary for one release after these jobs are
-  # introduced. They only exercise the migration-sensitive slice (not the
-  # whole suite) to keep CI time reasonable; drop continue-on-error once the
-  # jobs have been green for a release so red here actually blocks merges.
+  # Both real-DB jobs below are blocking. They exercise only the
+  # migration-sensitive slice (not the whole suite) to keep CI time reasonable,
+  # so a red result here means the migration chain is genuinely broken on a real
+  # MySQL/MariaDB server — not that the slice is too wide.
   test-mysql:
     name: Tests — MySQL 8 (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -150,7 +149,6 @@ jobs:
   test-mariadb:
     name: Tests — MariaDB 11 (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -231,6 +229,12 @@ jobs:
       - name: Security audit
         working-directory: stubs
         run: npm audit --audit-level=high --omit=dev
+
+      # Visibility only. The gate above blocks on high/critical; this step keeps
+      # moderate/low advisories readable in the log without making them red.
+      - name: Security audit report (moderate/low — non-blocking)
+        working-directory: stubs
+        run: npm audit --omit=dev || true
 
       - name: Create vendor symlink for @lvntr resolution
         working-directory: stubs

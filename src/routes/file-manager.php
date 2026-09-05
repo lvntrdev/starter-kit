@@ -68,6 +68,12 @@ Route::prefix('file-manager')
         Route::post('files/{media}/copy', 'copyFile')->name('files.copy');
         Route::delete('files/{media}', 'deleteFile')->name('files.destroy');
         Route::get('files/{media}/download', 'download')->name('files.download');
+        // Authorized in-app replacement for a raw public media URL. Same gate
+        // as `files.download` (authorizeRead + context guard); it exists so
+        // FileItemDTO never has to hand out an unauthenticated permanent link
+        // on a disk without temporary-URL support. Deliberately un-throttled,
+        // like download: a folder listing renders one request per image.
+        Route::get('files/{media}/preview', 'preview')->name('files.preview');
     });
 
 /*

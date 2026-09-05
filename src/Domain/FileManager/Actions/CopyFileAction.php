@@ -56,7 +56,23 @@ class CopyFileAction extends FileManagerAction
             folderId: $resolvedFolderId,
         );
 
-        // 5. Spatie copy: new Media row + new physical file (UUID-based)
+        // 5. Quota guard — reuses ResolvesMediaModel (mixed into
+        // FileManagerAction) so upload and copy share one quota
+        // implementation. Runs BEFORE the physical copy: on rejection
+        // nothing has been created yet, so there is nothing to clean up.
+        $current = $this->computeStorageUsed();
+        $incoming = (int) $media->size;
+        $quota = $this->storageQuotaBytes();
+
+        if ($current + $incoming > $quota) {
+            throw new DomainRuleException(__('sk-file-manager.errors.quota_exceeded', [
+                'used' => $this->formatMb($current),
+                'incoming' => $this->formatMb($incoming),
+                'quota' => $this->formatMb($quota),
+            ]));
+        }
+
+        // 6. Spatie copy: new Media row + new physical file (UUID-based)
         // Not transactional — Spatie does I/O. Manual cleanup on failure.
         $copy = null;
 
@@ -116,5 +132,20 @@ class CopyFileAction extends FileManagerAction
 
         // Fallback (1000+ copies — astronomically unlikely)
         return $base.' (copy '.uniqid().')'.$extPart;
+    }
+
+    /**
+     * Byte value → human MB string for the quota_exceeded message
+     * placeholders. Mirrors UploadFileRequest::mb() inline (that helper is
+     * private to the request) rather than extracting a shared utility for
+     * a single call site.
+     */
+    private function formatMb(int $bytes): string
+    {
+        $mb = $bytes / (1024 * 1024);
+
+        return $mb < 10
+            ? number_format($mb, 1)
+            : (string) (int) round($mb);
     }
 }

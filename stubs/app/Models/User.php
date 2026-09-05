@@ -12,16 +12,17 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Passport\AccessToken;
 use Laravel\Passport\Contracts\OAuthenticatable;
 use Laravel\Passport\HasApiTokens;
-use Laravel\Passport\Token;
+use Laravel\Passport\TransientToken;
 use Lvntr\StarterKit\Traits\HasActivityLogging;
 use Lvntr\StarterKit\Traits\HasMediaCollections;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
- * @method Token|null token()
+ * @method AccessToken|TransientToken|null token()
  */
 class User extends Authenticatable implements HasMedia, MustVerifyEmail, OAuthenticatable
 {

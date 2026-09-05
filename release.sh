@@ -1,4 +1,26 @@
 #!/usr/bin/env bash
+#
+# Starter Kit yayın scripti — sürümü seçer, kalite kapısını çalıştırır, etiketi
+# oluşturur ve remote'a gönderir.
+#
+# Kullanım: ./release.sh [--skip-checks] [--allow-branch]
+#   --skip-checks   Kalite kapısının TAMAMINI atlar (yerel kontroller + uzak CI
+#                   doğrulaması + changelog kontrolü). Bilinçli ve tek kaçamak.
+#   --allow-branch  'main' dışındaki bir branch'ten yayına izin verir.
+#
+# Gereksinimler (kapı --skip-checks olmadan çalıştığında):
+#   - php + composer      → composer lint / test / analyse / security
+#   - node + npm          → stubs frontend kapısı (ci · build · typecheck ·
+#                           lint:ci · test); Wayfinder route stub'ları PHP
+#                           olmadan scripts/ci/generate-route-stubs.mjs ile üretilir
+#   - gh (GitHub CLI) + AĞ ERİŞİMİ + 'gh auth login'
+#                         → etiketlenecek TAM commit'in GitHub Actions sonucu
+#                           doğrulanır. gh kurulu değilse ya da oturum açılmamışsa
+#                           yayın DURUR; sessizce atlanmaz (bkz. verify_remote_ci).
+#
+# Yayın akışı: commit → 'git push origin main' → CI yeşillenene kadar bekle →
+# ./release.sh. Uzak CI kapısı, koşusu olmayan bir commit'in etiketlenmesini
+# engeller.
 set -euo pipefail
 
 RED='\033[0;31m'
@@ -154,17 +176,114 @@ smoke_test_dist() {
     fi
 }
 
+# Frontend kapısı — CI'daki "node" job'ının adım SIRASINI birebir izler
+# (bkz. .github/workflows/ci.yml). Sıra rastgele değil: `vite build`,
+# `auto-imports.d.ts` / `components.d.ts` dosyalarını üretir ve `vue-tsc`
+# bunlara bağımlıdır; bu yüzden build, typecheck'ten ÖNCE koşar.
+# Üretilen her şey (.gitignore'lu): stubs/node_modules, stubs/vendor symlink'i,
+# stubs/resources/js/routes, build çıktıları — çalışma ağacını kirletmez.
+run_frontend_gate() {
+    local stubs="${DIR}/stubs"
+
+    npm --prefix "${stubs}" ci \
+        || error "npm ci (stubs) başarısız. Düzelt ve tekrar dene (ya da --skip-checks ile atla)."
+
+    # @lvntr/* alias'ı paket kökünü gösteren symlink ile çözülür (CI ile aynı).
+    if [[ ! -e "${stubs}/vendor/lvntr/laravel-starter-kit" ]]; then
+        mkdir -p "${stubs}/vendor/lvntr"
+        ln -s "${DIR}" "${stubs}/vendor/lvntr/laravel-starter-kit" \
+            || error "stubs/vendor/lvntr symlink'i oluşturulamadı."
+    fi
+
+    # Bu depoda artisan yok; Wayfinder route'ları CI fallback'iyle üretilir.
+    node "${DIR}/scripts/ci/generate-route-stubs.mjs" \
+        || error "Wayfinder route stub üretimi başarısız. Düzelt ve tekrar dene (ya da --skip-checks ile atla)."
+
+    npm --prefix "${stubs}" run build \
+        || error "npm run build (stubs) başarısız. Düzelt ve tekrar dene (ya da --skip-checks ile atla)."
+    npm --prefix "${stubs}" run typecheck \
+        || error "npm run typecheck (stubs) başarısız. Düzelt ve tekrar dene (ya da --skip-checks ile atla)."
+    npm --prefix "${stubs}" run lint:ci \
+        || error "npm run lint:ci (stubs) başarısız. Düzelt ve tekrar dene (ya da --skip-checks ile atla)."
+    npm --prefix "${stubs}" run test \
+        || error "npm run test (stubs) başarısız. Düzelt ve tekrar dene (ya da --skip-checks ile atla)."
+
+    detail "Frontend kapısı" "${GREEN}GEÇTİ${NC} ${GRAY}(build · typecheck · lint · test)${NC}"
+}
+
+# Etiketlenecek TAM commit'in (HEAD) uzak CI sonucunu doğrular.
+# Her workflow için YALNIZCA en son koşu değerlendirilir (databaseId'si en büyük
+# olan): yeniden çalıştırılmış ya da concurrency ile iptal edilmiş eski koşular
+# yanlış kırmızı üretmesin diye. `skipped` sonucu geçerli sayılır (koşul gereği
+# atlanan workflow), bunun dışında success olmayan her şey yayını durdurur.
+#
+# gh yoksa ya da oturum açılmamışsa DURUR — sessiz atlama, bu kapının kapatmak
+# için var olduğu hatanın ta kendisi. Tek bilinçli kaçamak: --skip-checks.
+verify_remote_ci() {
+    local sha rows name status conclusion
+    local failed=0 pending=0
+
+    sha=$(git -C "${DIR}" rev-parse HEAD)
+
+    if ! command -v gh >/dev/null 2>&1; then
+        error "GitHub CLI (gh) bulunamadı — etiketlenecek commit'in CI sonucu doğrulanamıyor.\n  Kur: https://cli.github.com  (bilinçli atlamak için --skip-checks)."
+    fi
+
+    if ! gh auth status >/dev/null 2>&1; then
+        error "GitHub CLI kimlik doğrulaması yok — 'gh auth login' çalıştır.\n  (bilinçli atlamak için --skip-checks)."
+    fi
+
+    rows=$(cd "${DIR}" && gh run list --commit "${sha}" --limit 100 \
+        --json workflowName,status,conclusion,databaseId \
+        --jq 'group_by(.workflowName) | map(max_by(.databaseId)) | .[] | "\(.workflowName)\t\(.status)\t\(.conclusion)"') \
+        || error "Uzak CI sorgusu başarısız (gh run list). Ağ/erişim sorununu çöz ve tekrar dene (ya da --skip-checks ile atla)."
+
+    if [[ -z "${rows}" ]]; then
+        error "${sha:0:12} commit'i için uzak CI koşusu yok.\n  Bu commit remote'a gönderilmemiş olabilir: 'git push origin ${CURRENT_BRANCH}' çalıştır, CI yeşillenince tekrar dene (ya da --skip-checks ile atla)."
+    fi
+
+    while IFS=$'\t' read -r name status conclusion; do
+        [[ -z "${name}" ]] && continue
+        if [[ "${status}" != "completed" ]]; then
+            warn "CI '${name}' henüz bitmedi (${status})."
+            pending=1
+            continue
+        fi
+        case "${conclusion}" in
+            success|skipped) ;;
+            *) warn "CI '${name}' yeşil değil (${conclusion:-bilinmiyor})."; failed=1 ;;
+        esac
+    done <<< "${rows}"
+
+    if [[ "${pending}" -eq 1 ]]; then
+        error "Uzak CI ${sha:0:12} için hâlâ çalışıyor. Bitmesini bekle ve tekrar dene (ya da --skip-checks ile atla)."
+    fi
+    if [[ "${failed}" -eq 1 ]]; then
+        error "Uzak CI ${sha:0:12} için yeşil değil. Düzelt, yeni commit'i gönder ve tekrar dene (ya da --skip-checks ile atla)."
+    fi
+
+    detail "Uzak CI (${sha:0:12})" "${GREEN}GEÇTİ${NC}"
+}
+
 if [[ "${SKIP_CHECKS}" -eq 1 ]]; then
-    warn "Kalite kapısı atlandı (--skip-checks)."
+    warn "Kalite kapısı atlandı (--skip-checks): yerel kontroller, frontend zinciri ve uzak CI doğrulaması çalıştırılmadı."
 else
     echo ""
-    echo -e "  ${GRAY}→${NC} Kalite kapısı çalıştırılıyor (composer lint && composer test && composer security)..."
+    # Önce uzak CI: saniyeler sürer ve "commit'i push etmeyi unuttun" durumunu,
+    # dakikalarca süren yerel zinciri çalıştırmadan yakalar.
+    echo -e "  ${GRAY}→${NC} Etiketlenecek commit için uzak CI sonucu doğrulanıyor..."
+    verify_remote_ci
+
+    echo -e "  ${GRAY}→${NC} Kalite kapısı çalıştırılıyor (lint · test · analyse · security · frontend)..."
     composer --working-dir="${DIR}" lint \
         || error "composer lint başarısız. Düzelt ve tekrar dene (ya da --skip-checks ile atla)."
     composer --working-dir="${DIR}" test \
         || error "composer test başarısız. Düzelt ve tekrar dene (ya da --skip-checks ile atla)."
+    composer --working-dir="${DIR}" analyse \
+        || error "composer analyse (PHPStan) başarısız. Düzelt ve tekrar dene (ya da --skip-checks ile atla)."
     composer --working-dir="${DIR}" security \
         || error "composer security başarısız. Düzelt ve tekrar dene (ya da --skip-checks ile atla)."
+    run_frontend_gate
     verify_changelogs "${CLEAN_VERSION}"
     smoke_test_dist
     detail "Kalite kapısı" "${GREEN}GEÇTİ${NC}"

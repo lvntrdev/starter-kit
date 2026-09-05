@@ -440,7 +440,7 @@ final class EncryptionHealthCommand extends Command
      * Classify every value in a page. Pure reporting — nothing is written and
      * no plaintext is retained beyond the decrypt attempt.
      *
-     * @param  Collection<int, object>  $rows
+     * @param  Collection<int, \stdClass>  $rows
      * @param  array<string, mixed>  $report
      * @param  array<string, mixed>  $surface
      * @param  list<string>  $columns

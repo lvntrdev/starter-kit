@@ -529,9 +529,9 @@ class EjectCommand extends Command
      * guard as the Vue eject — a customized controller/request is never silently
      * overwritten. Every written path is appended to $ejectedRelativePaths.
      *
-     * @param  array{controllers?: array<string, string>, requests?: array<string, string>, route?: array<string, string>}  $descriptor
+     * @param  array{backend?: string, controllers?: array<string, string>, requests?: array<string, string>, resources?: array<string, string>, route?: array<string, string>}  $descriptor
      * @param  list<string>  $ejectedRelativePaths  (by ref)
-     * @return array{controllers: int, requests: int, skipped: list<string>, routeRewritten: list<string>, routeSkipped: list<string>}
+     * @return array{controllers: int, requests: int, resources: int, skipped: list<string>, routeRewritten: list<string>, routeSkipped: list<string>}
      */
     private function ejectHttpLayer(string $domain, array $descriptor, bool $force, bool $dryRun, array &$ejectedRelativePaths): array
     {
@@ -1265,7 +1265,7 @@ class EjectCommand extends Command
     // ══════════════════════════════════════════════════════════════════════
 
     /**
-     * @param  array{controllers: int, requests: int, skipped: list<string>, routeRewritten: list<string>, routeSkipped: list<string>}  $httpResult
+     * @param  array{controllers: int, requests: int, resources: int, skipped: list<string>, routeRewritten: list<string>, routeSkipped: list<string>}  $httpResult
      * @param  array{copied: int, skipped: list<string>}  $vueResult
      * @param  list<string>  $bindings
      */

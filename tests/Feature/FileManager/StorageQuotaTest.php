@@ -23,13 +23,17 @@
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Lvntr\StarterKit\Domain\FileManager\Actions\CopyFileAction;
 use Lvntr\StarterKit\Domain\FileManager\DTOs\FileManagerContextDTO;
 use Lvntr\StarterKit\Domain\FileManager\Queries\FavoritesContentsQuery;
 use Lvntr\StarterKit\Domain\FileManager\Queries\FolderContentsQuery;
 use Lvntr\StarterKit\Domain\FileManager\Queries\TrashContentsQuery;
+use Lvntr\StarterKit\Exceptions\DomainRuleException;
 use Lvntr\StarterKit\Tests\Stubs\StorageQuoteHelper;
 use Lvntr\StarterKit\Tests\Stubs\TestMedia;
+use Lvntr\StarterKit\Tests\Stubs\TestOwner;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Yardımcı: media tablosuna doğrudan kayıt ekler (dosya yükleme olmadan)
@@ -243,6 +247,105 @@ it('storageQuotaBytes correctly converts GB to bytes', function (): void {
 
     config(['file-manager.settings.storage_quota_gb' => 1024]);
     expect($helper->getQuotaBytes())->toBe(1024 * 1024 * 1024 * 1024);
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// F) CopyFileAction — kopyalamada kota kontrolü (SK-AUD-003)
+//
+//    Upload'da olduğu gibi kopyalama da aynı kotaya tabi olmalı: kota
+//    aşılacaksa ne DB satırı ne de fiziksel dosya oluşmalı (guard, Spatie'nin
+//    gerçek kopyalama I/O'sundan ÖNCE çalışır).
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * media tablosuna doğrudan `files` koleksiyonunda bir kaynak kayıt ekler
+ * (TestOwner context'i altında) — CopyFileAction'ın beklediği model_type/
+ * model_id eşleşmesini taşır.
+ */
+function insertCopyQuotaMedia(string $ownerId, int $sizeBytes, string $fileName = 'doc.pdf'): TestMedia
+{
+    $id = DB::table('media')->insertGetId([
+        'model_type' => TestOwner::class,
+        'model_id' => $ownerId,
+        'uuid' => Str::uuid()->toString(),
+        'collection_name' => 'files',
+        'name' => pathinfo($fileName, PATHINFO_FILENAME),
+        'file_name' => $fileName,
+        'mime_type' => 'application/pdf',
+        'disk' => 'public',
+        'conversions_disk' => null,
+        'size' => $sizeBytes,
+        'manipulations' => '[]',
+        'custom_properties' => '[]',
+        'generated_conversions' => '[]',
+        'responsive_images' => '[]',
+        'order_column' => null,
+        'folder_id' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+        'deleted_at' => null,
+    ]);
+
+    return TestMedia::query()->findOrFail($id);
+}
+
+function copyQuotaContext(string $ownerId): FileManagerContextDTO
+{
+    $owner = (new TestOwner)->forceFill(['id' => $ownerId]);
+
+    // Spatie's FileAdder::attachMedia() only writes the new Media row
+    // immediately when the subject `exists`; otherwise it defers the
+    // attach to the model's `created` event, which never fires here since
+    // no `test_owners` row is persisted. Marking it existing (without an
+    // actual row — the `media` table has no FK on model_type/model_id)
+    // makes the real Spatie copy path run synchronously, same as it would
+    // for a real, already-persisted owner in production.
+    $owner->exists = true;
+
+    return new FileManagerContextDTO(
+        context: 'copy_quota_ctx',
+        contextId: $ownerId,
+        owner: $owner,
+        ownerType: TestOwner::class,
+        ownerId: $ownerId,
+    );
+}
+
+it('CopyFileAction allows a copy that fits within the storage quota', function (): void {
+    Storage::fake('public');
+
+    config(['file-manager.settings.storage_quota_gb' => 1]);
+
+    // 5 MB kaynak dosya — kopyalanınca toplam 10 MB, 1 GiB kotanın çok altında.
+    $media = insertCopyQuotaMedia('copy-owner-fits', 5 * 1024 * 1024);
+    Storage::disk('public')->put($media->getPathRelativeToRoot(), 'copy-quota-fits-bytes');
+
+    $copy = (new CopyFileAction)->execute(copyQuotaContext('copy-owner-fits'), $media, null);
+
+    expect($copy)->toBeInstanceOf(TestMedia::class)
+        ->and($copy->id)->not->toBe($media->id)
+        ->and(TestMedia::query()->count())->toBe(2);
+
+    Storage::disk('public')->assertExists($copy->getPathRelativeToRoot());
+});
+
+it('CopyFileAction rejects a copy that would cross the storage quota, leaving no row and no file behind', function (): void {
+    Storage::fake('public');
+
+    config(['file-manager.settings.storage_quota_gb' => 1]); // 1 GiB = 1073741824 bytes
+
+    // 600 MiB kaynak — kopyalanınca 1200 MiB olur, 1 GiB kotayı aşar.
+    // Guard, Spatie'nin fiziksel kopyalamasından ÖNCE çalıştığı için kaynak
+    // dosyanın diskte gerçekten var olmasına gerek yok — reddedilen yol hiç
+    // I/O'ya ulaşmıyor.
+    $media = insertCopyQuotaMedia('copy-owner-exceeds', 600 * 1024 * 1024);
+
+    expect(fn () => (new CopyFileAction)->execute(copyQuotaContext('copy-owner-exceeds'), $media, null))
+        ->toThrow(DomainRuleException::class);
+
+    // Reddedilen kopya ne yeni bir DB satırı ne de fiziksel dosya bırakmalı.
+    expect(TestMedia::query()->count())->toBe(1);
+    expect(Storage::disk('public')->allFiles())->toBe([]);
 });
 
 // ──────────────────────────────────────────────────────────────────────────────

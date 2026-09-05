@@ -112,16 +112,193 @@ function ekcRead(string $content, string $key): ?string
  * The identity and durability guards refuse conditions a test process cannot
  * create — handing a file to another user is root-only, and a filesystem that
  * refuses fsync is not something a test can mount — so the guard itself is
- * driven instead of the environment. The command is constructed bare; these
- * helpers touch no command IO.
+ * driven instead of the environment.
+ *
+ * IO is wired even though most of these helpers never touch it: the
+ * --allow-acl-loss branch of carryOverAcl() warns on the console instead of
+ * throwing, and that warning is the whole point of the flag, so it has to be
+ * observable. The buffer is returned for that one case.
  *
  * @param  list<mixed>  $arguments
+ * @return string whatever the helper wrote to the console
  */
-function ekcInvoke(string $method, array $arguments): void
+function ekcInvoke(string $method, array $arguments): string
+{
+    $command = new EncryptionKeyCommand(new Filesystem);
+    $command->setLaravel(app());
+
+    $input = new ArrayInput([], $command->getDefinition());
+    $input->setInteractive(false);
+
+    $buffer = new BufferedOutput;
+    $style = new OutputStyle($input, $buffer);
+
+    foreach (['input' => $input, 'output' => $style, 'components' => new Factory($style)] as $property => $value) {
+        (new ReflectionProperty($command, $property))->setValue($command, $value);
+    }
+
+    (new ReflectionMethod($command, $method))->invokeArgs($command, $arguments);
+
+    return $buffer->fetch();
+}
+
+/**
+ * A file's file-specific ACL as the command itself reads it — null when this
+ * platform or host has no ACL tooling.
+ *
+ * The ACL tests gate on THIS rather than on `PHP_OS_FAMILY`: a Linux container
+ * without the `acl` package, or one with `exec()` disabled, is exactly the host
+ * the null path exists for, and a test that assumed tooling there would fail for
+ * the reason the feature is designed to tolerate.
+ */
+function ekcAcl(string $path): ?string
 {
     $command = new EncryptionKeyCommand(new Filesystem);
 
-    (new ReflectionMethod($command, $method))->invokeArgs($command, $arguments);
+    /** @var string|null $acl */
+    $acl = (new ReflectionMethod($command, 'readFileAcl'))->invoke($command, $path);
+
+    return $acl;
+}
+
+/**
+ * Put a real, file-specific ACL on $path, or return false when the platform
+ * cannot. Uses the same tools the command does, from the opposite direction.
+ *
+ * The grantee is root/uid 0 — the one account that exists on every runner, and
+ * the one a name lookup can never fail on. Granting it READ on a scratch file
+ * costs nothing: root could read it regardless.
+ */
+function ekcGrantAcl(string $path): bool
+{
+    $quoted = escapeshellarg($path);
+
+    $command = match (PHP_OS_FAMILY) {
+        // macOS has no setfacl; +a appends one ACE and resolves the name to a UUID.
+        'Darwin' => 'chmod +a '.escapeshellarg('root allow read').' '.$quoted.' 2>/dev/null',
+        // Numeric qualifier: no name service involved, so a minimal container
+        // still produces the extended entry the test needs.
+        'Linux' => 'setfacl -m u:0:r -- '.$quoted.' 2>/dev/null',
+        default => null,
+    };
+
+    if ($command === null) {
+        return false;
+    }
+
+    $output = [];
+    $status = 1;
+
+    @exec($command, $output, $status);
+
+    if ($status !== 0) {
+        return false;
+    }
+
+    $acl = ekcAcl($path);
+
+    return $acl !== null && $acl !== '';
+}
+
+/**
+ * Put a directory-level INHERITANCE rule on $dir, so every file created inside
+ * it is born carrying an ACL entry — the condition normaliseTempAcl() exists
+ * for. Returns false when the platform or host cannot express one.
+ *
+ * The grantee is root/uid 0 for the same reason ekcGrantAcl() uses it: it is
+ * the one account present on every runner and the one no name lookup can fail
+ * on, and granting it read on a scratch file costs nothing.
+ *
+ * Verified by PROBE rather than by the tool's exit status: `setfacl -d` and
+ * `chmod +a` both succeed on filesystems that then quietly decline to hand the
+ * entry to new files (a tmpfs without ACL support, a mount without `acl`), and
+ * a test that assumed inheritance there would fail for a reason that is not the
+ * behaviour under test.
+ */
+function ekcGrantInheritedAcl(string $dir): bool
+{
+    $quoted = escapeshellarg($dir);
+
+    $command = match (PHP_OS_FAMILY) {
+        'Darwin' => 'chmod +a '.escapeshellarg('root allow read,file_inherit').' '.$quoted.' 2>/dev/null',
+        'Linux' => 'setfacl -d -m u:0:r -- '.$quoted.' 2>/dev/null',
+        default => null,
+    };
+
+    if ($command === null) {
+        return false;
+    }
+
+    $output = [];
+    $status = 1;
+
+    @exec($command, $output, $status);
+
+    if ($status !== 0) {
+        return false;
+    }
+
+    $probe = $dir.'/.ekc-inherit-probe';
+
+    touch($probe);
+    chmod($probe, 0600);
+
+    $inherited = ekcAcl($probe);
+
+    @unlink($probe);
+
+    return $inherited !== null && $inherited !== '';
+}
+
+/**
+ * Shadow the external binary the ACL WRITE half shells out to — carryOverAcl()'s
+ * re-apply and normaliseTempAcl()'s clear reach the SAME binary (`chmod` on
+ * Darwin, `setfacl` on Linux) — with one that always fails, by
+ * prepending a scratch bin directory to PATH. The READ half (`ls -lde` /
+ * `getfacl`) is left alone, so readFileAcl() still reports the real ACL —
+ * only the re-apply fails, the same way a real tool would on a host where it
+ * cannot write (a read-only mount, a hardened `PATH`, a missing package that
+ * still ships the read-only counterpart).
+ *
+ * Returns null on a platform carryOverAcl() has no write tool for at all,
+ * since there is then no failure to force — the caller should skip.
+ */
+function ekcShadowAclWriteTool(string $binDir): ?string
+{
+    $binary = match (PHP_OS_FAMILY) {
+        'Darwin' => 'chmod',
+        'Linux' => 'setfacl',
+        default => null,
+    };
+
+    if ($binary === null) {
+        return null;
+    }
+
+    mkdir($binDir, 0755, true);
+
+    $script = $binDir.'/'.$binary;
+    file_put_contents($script, "#!/bin/sh\nexit 1\n");
+    chmod($script, 0755);
+
+    return $binDir;
+}
+
+/**
+ * Run $callback with PATH temporarily prefixed by $prefix, restoring the
+ * original value even if $callback throws or an assertion fails.
+ */
+function ekcWithPath(string $prefix, callable $callback): mixed
+{
+    $original = getenv('PATH');
+
+    putenv('PATH='.$prefix.PATH_SEPARATOR.($original === false ? '' : $original));
+
+    try {
+        return $callback();
+    } finally {
+        putenv($original === false ? 'PATH' : 'PATH='.$original);
+    }
 }
 
 /**

@@ -4,6 +4,46 @@ This file is the cross-major-version migration guide. Every release gets its own
 
 ---
 
+## Unreleased
+
+### FileManager file URLs on a local/public disk are no longer permanent public links
+
+**Affects:** installs where the FileManager (or avatar) media disk is `local` or `public` — anything without temporary/signed-URL support. **Not affected:** S3 and any other disk that supports temporary URLs (unchanged).
+
+`FileItemDTO::fromModel()` used to fall back to `Media::getUrl()` whenever the disk throws on `getTemporaryUrl()` — every local/public disk does. That URL is permanent, unauthenticated, and works forever: it bypasses `FileManagerAuthorizer` entirely, keeps serving the file after a permission revoke, and keeps serving it after the file is moved to trash. It now falls back to a new authorized `files.preview` route instead, gated by the same `authorizeRead()` check and context guard `files.download` already uses, and it requires an authenticated session (the browser sends the session cookie automatically for an `<img>`/`<a>` on the same origin).
+
+**What to check:** any URL your app stored, emailed, or otherwise handed out from a FileManager listing on a local/public disk (a saved link, a value cached client-side, a link sent in a notification) now points at the old bare `/storage/...` path and will keep working only as long as that file is still physically on disk at that path — it will NOT gain authorization retroactively, and it will NOT auto-update to the new preview URL. Any such link needs to be regenerated from a fresh FileManager listing (or download link) if it needs to keep working, or reissued as a `files.preview`/`files.download` link if it needs to be access-controlled. A consumer that reads `FileItemDTO->url` fresh on every request (the normal case — nothing in the shipped frontend persists it) needs no changes.
+
+**Publishing an image is still possible — use `public_url`.** A FileManager listing entry now carries a second URL field: `public_url` is `Media::getUrl()` when the backing disk is declared `'visibility' => 'public'`, and `null` on any disk that is not publicly readable. `url` stays the session-gated preview link and is what the file browser uses everywhere. Anything that writes a file URL into content that outlives the admin session — the rich-text editor's embedded `<img src>` is the shipped case — must read `public_url` and fall back to `url` only when it is `null`. The kit's own `EditorInput.vue` already does. If you built your own publishing surface on `FileItemDTO->url`, switch it to `public_url`.
+
+**Range requests.** The `files.preview` route serves from a `BinaryFileResponse` on `local`-driver disks, so `Range`/`206` works and inline `<video>`/`<audio>` can seek. Remote drivers (no real filesystem path) keep the streamed response and answer `200` with the full body, as before.
+
+`Lvntr\StarterKit\Traits\HasMediaCollections::getMediaForForm()` (used for avatar and other form-attached media) still calls `Media::getUrl()` directly and is **deliberately unchanged in this wave** — it is a separate, narrower surface (a bound form field, not a public listing) and carries the same raw-URL pattern; not addressed here.
+
+### Two `@tiptap/*` packages removed from `stubs/package.json`
+
+`@tiptap/extension-task-item` and `@tiptap/extension-task-list` were removed from the stub's direct dependencies — neither is imported anywhere in the kit's own code (`EditorInput.vue` or elsewhere). If your own code imports either of these directly (a custom rich-text extension, a task-list feature built on top of the editor), add them back to your own app's `package.json`; `sk:update`/`composer update`/`npm install` no longer pull them in for you, even transitively.
+
+### `LogoutUserAction` now revokes the refresh token bound to the current credential too
+
+`app/Http/Controllers/Admin/*`'s logout path is not affected, but the stub `app/Domain/Auth/Actions/LogoutUserAction.php` is: it used to call `$user->token()?->revoke()` and stop there, leaving a live OAuth refresh token bound to the just-revoked access token — a refresh token deliberately outlives its access token, so the caller could mint a brand-new access token immediately after "logging out." The action now uses a new `Lvntr\StarterKit\Domain\User\Concerns\RevokesOAuthCredentials` trait that revokes the refresh token first and the access token second.
+
+**This is a published stub — `sk:update` will not silently overwrite a copy you modified.** If you have customised `LogoutUserAction` (added an audit log call, a `Fortify::logout()` hook, a custom response), the fix will not reach you automatically: your on-disk hash no longer matches the shipped one, so the three-way comparison treats the file as a consumer edit and skips it (see the "consumer-modified published file" note above). Port the change over by hand — add `use Lvntr\StarterKit\Domain\User\Concerns\RevokesOAuthCredentials;`, `use RevokesOAuthCredentials;` on the class, and replace the `$user->token()?->revoke()` line with `$this->revokeCurrentOAuthCredentials($user);`. Do **not** reach for `sk:update --force` here: the command takes no file argument, so `--force` drops the modification guard for *every* published file at once and overwrites all of your customisations, not just this one. An install that never customised the stub picks the fix up automatically on the next `sk:update`.
+
+The same gap in `Lvntr\StarterKit\Domain\User\Actions\RevokeUserAccessAction` (used when an operator revokes a user's access, e.g. via the Users screen) is fixed in vendor code and needs only `composer update` — no stub to carry over.
+
+### `encryption:key` gained `--allow-acl-loss` — now covers an inherited-ACL mismatch too, not only a loss
+
+If your `.env` has a POSIX ACL grant on it (`setfacl -m u:www-data:r .env`, or the macOS `chmod +a` equivalent) rather than relying on group ownership alone, `encryption:key` now refuses to complete a rotation unless it can verify that ACL survived onto the replacement file — it previously carried over owner/group/mode but silently dropped the ACL, which `fileperms()` cannot see either before or after. Most installs have no file-specific ACL and see no change in behavior.
+
+The flag also now covers the MIRROR direction: the temporary file is created inside `.env`'s own directory, so a directory-level ACL inheritance rule (`setfacl -d -m …`, or the macOS `chmod +a "… file_inherit"` equivalent) can put a grant on it that `.env` itself never had — invisible to the mode check the same way, and present before a single byte of the new key is written. The rotation now refuses to complete unless that inherited entry is normalised away too. Only relevant if `.env`'s directory carries an inheritance rule; most installs see no change.
+
+If either refusal fires and you plan to reconcile the ACL by hand right after rotating, pass `--allow-acl-loss` to downgrade it to a warning (printed to the console and written to the log — the warning carries the file path and ACL text only, never key material) instead of aborting the rotation. Do not pass it as a default habit: the refusal exists because a `.env` the web server cannot read after rotation — or one that grants access to a principal it shouldn't — is a broken deploy, not a cosmetic warning.
+
+### `release.sh` now requires `gh` and a green remote CI run on the tagged commit
+
+This only affects whoever runs `./release.sh` for this package — it has no effect on any consumer app. The release flow is now: commit → `git push origin main` → wait for CI to go green → `./release.sh`. The script queries `gh run list --commit <HEAD sha>` before running the local quality gate and stops if `gh` is missing, unauthenticated (`gh auth login`), the commit was never pushed, or any workflow's latest run for that commit is not `success`/`skipped`. `--skip-checks` bypasses this along with the rest of the local gate, same as before.
+
 ## v13.6.16 → v13.7.0
 
 ### `sk:install` now refuses to run on an app it did not install

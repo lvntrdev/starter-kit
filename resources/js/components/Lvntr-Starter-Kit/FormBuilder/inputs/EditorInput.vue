@@ -252,7 +252,12 @@
                 try {
                     const envelope = JSON.parse(xhr.responseText);
                     if (xhr.status >= 200 && xhr.status < 300) {
-                        const url = envelope?.data?.files?.[0]?.url;
+                        // public_url first: the src ends up persisted in the
+                        // document, so it has to survive past the admin
+                        // session. `url` is session-gated and only a fallback
+                        // (private disk -- nothing publishable exists there).
+                        const uploaded = envelope?.data?.files?.[0];
+                        const url = uploaded?.public_url ?? uploaded?.url;
                         if (typeof url === 'string' && url.length > 0) {
                             resolve(url);
                         } else {
@@ -363,7 +368,8 @@
             .focus()
             .insertContent({
                 type: 'image',
-                attrs: { src: file.url, alt: file.name, width: defaultImageWidth },
+                // public_url, not url -- see the upload path above.
+                attrs: { src: file.public_url ?? file.url, alt: file.name, width: defaultImageWidth },
             })
             .insertContent(' ')
             .run();

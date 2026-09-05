@@ -14,6 +14,7 @@ use Lvntr\StarterKit\Domain\FileManager\Actions\DownloadFileAction;
 use Lvntr\StarterKit\Domain\FileManager\Actions\EmptyTrashAction;
 use Lvntr\StarterKit\Domain\FileManager\Actions\MoveItemAction;
 use Lvntr\StarterKit\Domain\FileManager\Actions\PermanentlyDeleteItemAction;
+use Lvntr\StarterKit\Domain\FileManager\Actions\PreviewFileAction;
 use Lvntr\StarterKit\Domain\FileManager\Actions\RemoveFavoriteAction;
 use Lvntr\StarterKit\Domain\FileManager\Actions\RenameFileAction;
 use Lvntr\StarterKit\Domain\FileManager\Actions\RenameFolderAction;
@@ -308,6 +309,18 @@ class FileManagerController extends Controller
     }
 
     public function download(FileManagerContextRequest $request, Media $media, DownloadFileAction $action): BinaryFileResponse|StreamedResponse
+    {
+        $context = $request->context();
+        $this->authorizer->authorizeRead($context);
+
+        return $action->execute($context, $media);
+    }
+
+    /**
+     * Same bytes and the same gate as download() — only the disposition
+     * differs. `read`, never anything weaker: this streams file content.
+     */
+    public function preview(FileManagerContextRequest $request, Media $media, PreviewFileAction $action): BinaryFileResponse|StreamedResponse
     {
         $context = $request->context();
         $this->authorizer->authorizeRead($context);

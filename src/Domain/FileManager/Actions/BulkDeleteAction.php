@@ -14,7 +14,10 @@ use Lvntr\StarterKit\Domain\FileManager\DTOs\FileManagerContextDTO;
 class BulkDeleteAction extends FileManagerAction
 {
     /**
-     * @param  array<int, array{type: string, id: string}>  $items
+     * $items arrives from request input, so each entry is guarded in the loop
+     * below rather than assumed present — the shape mirrors that.
+     *
+     * @param  array<int, array{type?: string|null, id?: string|int|null}>  $items
      * @return array{folders: int, files: int}
      */
     public function execute(FileManagerContextDTO $context, array $items, bool $force = false): array

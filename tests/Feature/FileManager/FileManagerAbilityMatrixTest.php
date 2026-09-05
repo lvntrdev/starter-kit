@@ -225,6 +225,8 @@ it('maps every FileManager handler to the ability its operation actually needs',
         'favoritesContents' => 'read',
         'moveItem' => 'update',
         'permanentlyDeleteItem' => 'delete',
+        // Streams file bytes inline — same gate as download, never weaker.
+        'preview' => 'read',
         'removeFavorite' => 'update',
         'renameFile' => 'update',
         'renameFolder' => 'update',

@@ -80,8 +80,8 @@ class FavoritesContentsQuery
                 ->get();
 
         $files = $mediaModels
-            ->map(function (Media $media) {
-                $payload = FileItemDTO::fromModel($media)->toArray();
+            ->map(function (Media $media) use ($context) {
+                $payload = FileItemDTO::fromModel($media, $context)->toArray();
                 $payload['is_favorited'] = true;
 
                 return $payload;

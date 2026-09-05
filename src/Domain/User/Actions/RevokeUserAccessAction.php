@@ -192,7 +192,7 @@ class RevokeUserAccessAction extends BaseAction
             return $counts;
         }
 
-        $ids = $this->liveTokenIds($user);
+        $ids = $this->revocableTokenIds($user);
 
         if ($ids !== null) {
             $counts['access_tokens'] = 0;
@@ -310,7 +310,24 @@ class RevokeUserAccessAction extends BaseAction
     }
 
     /**
-     * Ids of the tokens to revoke, or null when the relation cannot be read.
+     * Ids of EVERY access token of the user, or null when the relation cannot
+     * be read.
+     *
+     * ── THE SET IS DELIBERATELY NOT FILTERED BY `revoked` ───────────────────
+     *
+     * A refresh token hangs off its access token (`access_token_id`), not off
+     * the user, and it deliberately outlives that access token. So the row that
+     * matters most here belongs to an access token that is ALREADY revoked: the
+     * user logged out — which revokes the access token — and kept a live
+     * refresh token that mints a new access token on demand. Adding
+     * `where('revoked', false)` is precisely what would hide that refresh token
+     * from the statement below and leave a disabled account able to re-mint.
+     *
+     * Widening the set cannot double-count or double-write: both UPDATE
+     * statements in revokePassportCredentials() carry their own
+     * `where('revoked', false)`, so an already-revoked row matches nothing and
+     * the reported counts stay the number of credentials this run actually
+     * flipped. The wider `whereIn` input is what ID_CHUNK exists for.
      *
      * `tokens()` needs HasApiTokens AND a passport guard whose provider matches
      * this model — Passport throws a LogicException when it cannot map the two.
@@ -320,7 +337,7 @@ class RevokeUserAccessAction extends BaseAction
      *
      * @return list<string>|null
      */
-    private function liveTokenIds(Authenticatable $user): ?array
+    private function revocableTokenIds(Authenticatable $user): ?array
     {
         if (! method_exists($user, 'tokens')) {
             return null;
@@ -329,7 +346,6 @@ class RevokeUserAccessAction extends BaseAction
         try {
             /** @var list<string> $ids */
             $ids = $user->tokens()
-                ->where('revoked', false)
                 ->pluck('id')
                 ->all();
 

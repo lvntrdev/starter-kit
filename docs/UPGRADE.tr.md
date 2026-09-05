@@ -4,6 +4,46 @@ Bu dosya büyük sürümler arası geçiş rehberidir. Her sürüm kendi bölüm
 
 ---
 
+## Unreleased
+
+### Local/public disk üzerindeki FileManager dosya URL'leri artık kalıcı public link değil
+
+**Etkilenen:** FileManager (ya da avatar) media diski `local` ya da `public` olan kurulumlar — temporary/signed-URL desteği olmayan her disk. **Etkilenmeyen:** S3 ve temporary URL destekleyen herhangi bir disk (değişmedi).
+
+`FileItemDTO::fromModel()`, disk `getTemporaryUrl()`'de hata fırlattığında (her local/public disk fırlatır) daha önce `Media::getUrl()`'e düşüyordu. Bu URL kalıcı, kimlik doğrulaması gerektirmiyor ve sonsuza dek çalışıyor: `FileManagerAuthorizer`'ı tamamen atlıyor, bir izin iptalinden sonra da dosyayı sunmaya devam ediyor, dosya çöp kutusuna taşındıktan sonra da sunmaya devam ediyor. Artık bunun yerine `files.download`'ın zaten kullandığı aynı `authorizeRead()` kontrolünden ve context guard'dan geçen yeni bir yetkili `files.preview` route'una düşülüyor; kimlik doğrulanmış bir oturum gerektiriyor (aynı origin'deki bir `<img>`/`<a>` için tarayıcı session cookie'sini otomatik gönderir).
+
+**Kontrol edilecek:** local/public disk üzerindeki bir FileManager listelemesinden uygulamanızın sakladığı, e-postayla gönderdiği ya da başka şekilde dağıttığı herhangi bir URL (kaydedilmiş bir link, client tarafında cache'lenmiş bir değer, bir bildirimde gönderilen link) artık eski çıplak `/storage/...` yoluna işaret ediyor ve yalnızca o dosya o yolda fiziksel olarak durduğu sürece çalışmaya devam ediyor — geriye dönük olarak yetkilendirme KAZANMAYACAK, yeni preview URL'ine de OTOMATİK GÜNCELLENMEYECEK. Çalışmaya devam etmesi gerekiyorsa böyle bir link taze bir FileManager listelemesinden (ya da download linkinden) yeniden üretilmeli, erişim kontrollü olması gerekiyorsa `files.preview`/`files.download` linki olarak yeniden verilmeli. `FileItemDTO->url`'i her istekte taze okuyan bir tüketici (normal durum — shipped frontend'in hiçbir yeri onu kalıcılaştırmıyor) hiçbir değişiklik yapmak zorunda değil.
+
+**Görsel yayımlamak hâlâ mümkün — `public_url` kullanın.** FileManager listeleme kaydı artık ikinci bir URL alanı taşıyor: disk `'visibility' => 'public'` ilan edilmişse `public_url` = `Media::getUrl()`, herkese açık okunmayan disklerde `null`. `url` oturuma bağlı önizleme bağlantısı olarak kalır ve dosya tarayıcısının her yerde kullandığı alandır. Yönetim oturumundan uzun yaşayan içeriğe dosya URL'si yazan her şey — kit'te bunun örneği zengin metin editörünün gömdüğü `<img src>` — `public_url` okumalı, yalnızca `null` ise `url`'ye düşmelidir. Kit'in kendi `EditorInput.vue` dosyası bunu zaten yapıyor. Kendi yayımlama yüzeyinizi `FileItemDTO->url` üzerine kurduysanız `public_url`'e geçirin.
+
+**Range istekleri.** `files.preview` route'u `local` sürücülü disklerde `BinaryFileResponse` üzerinden servis eder; `Range`/`206` çalışır, satır içi oynatıcı ileri/geri sarabilir. Gerçek dosya sistemi yolu olmayan uzak sürücüler akış yanıtını korur ve eskisi gibi tüm gövdeyi `200` ile döndürür.
+
+`Lvntr\StarterKit\Traits\HasMediaCollections::getMediaForForm()` (avatar ve diğer forma bağlı media için kullanılır) hâlâ doğrudan `Media::getUrl()` çağırıyor ve bu turda **kasıtlı olarak değiştirilmedi** — ayrı, daha dar bir yüzey (bir listeleme değil, bağlı bir form field'ı) ve aynı ham-URL desenini taşıyor; burada ele alınmadı.
+
+### `stubs/package.json`'dan iki `@tiptap/*` paketi kaldırıldı
+
+`@tiptap/extension-task-item` ve `@tiptap/extension-task-list`, stub'ın doğrudan bağımlılıklarından kaldırıldı — hiçbiri kitin kendi kodunda (`EditorInput.vue` ya da başka bir yerde) import edilmiyor. Kendi kodunuz bunlardan birini doğrudan import ediyorsa (özel bir rich-text extension'ı, editörün üzerine kurulmuş bir task-list özelliği) kendi uygulamanızın `package.json`'ına geri ekleyin; `sk:update`/`composer update`/`npm install` artık bunları sizin için, transitively bile, çekmiyor.
+
+### `LogoutUserAction` artık mevcut credential'a bağlı refresh token'ı da iptal ediyor
+
+`app/Http/Controllers/Admin/*`'ın logout yolu etkilenmiyor, ama stub `app/Domain/Auth/Actions/LogoutUserAction.php` etkileniyor: daha önce yalnızca `$user->token()?->revoke()` çağırıp duruyordu; bu, az önce iptal edilen access token'a bağlı canlı bir OAuth refresh token bırakıyordu — bir refresh token tasarım gereği access token'ından daha uzun yaşar, yani "logout" olduktan hemen sonra çağıran yeni bir access token basabiliyordu. Action artık önce refresh token'ı, sonra access token'ı iptal eden yeni bir `Lvntr\StarterKit\Domain\User\Concerns\RevokesOAuthCredentials` trait'ini kullanıyor.
+
+**Bu published bir stub — `sk:update` düzenlediğiniz bir kopyanın üzerine sessizce yazmayacak.** `LogoutUserAction`'ı özelleştirdiyseniz (bir audit log çağrısı, bir `Fortify::logout()` hook'u, özel bir response eklediyseniz) düzeltme size otomatik ulaşmaz: diskteki hash artık yayınlanan hashle eşleşmiyor, bu yüzden üç-yönlü karşılaştırma dosyayı consumer düzenlemesi sayıp atlıyor (yukarıdaki "consumer tarafından değiştirilmiş published dosya" notuna bakın). Değişikliği elle taşıyın — `use Lvntr\StarterKit\Domain\User\Concerns\RevokesOAuthCredentials;`, sınıfa `use RevokesOAuthCredentials;` ekleyip `$user->token()?->revoke()` satırını `$this->revokeCurrentOAuthCredentials($user);` ile değiştirin. Burada `sk:update --force`'a **başvurmayın**: komut dosya argümanı almıyor, bu yüzden `--force` değişiklik korumasını yalnız bu dosya için değil *tüm* published dosyalar için kaldırır ve bütün özelleştirmelerinizi ezer. Stub'ı hiç özelleştirmemiş bir kurulum, düzeltmeyi bir sonraki `sk:update`'te otomatik alır.
+
+`Lvntr\StarterKit\Domain\User\Actions\RevokeUserAccessAction`'daki aynı boşluk (bir operatör bir kullanıcının erişimini iptal ettiğinde, örn. Users ekranından) vendor kodunda düzeltildi ve yalnızca `composer update` gerektiriyor — taşınacak bir stub yok.
+
+### `encryption:key` `--allow-acl-loss` bayrağı kazandı — artık miras alınan bir ACL uyuşmazlığını da kapsıyor, yalnızca kaybı değil
+
+`.env`'inizde yalnızca grup sahipliğine güvenmek yerine bir POSIX ACL izni varsa (`setfacl -m u:www-data:r .env`, ya da macOS'ta `chmod +a` karşılığı), `encryption:key` artık bu ACL'in replacement dosyaya taşındığını doğrulayamadığı sürece rotasyonu tamamlamayı reddediyor — önceden sahip/grup/mode'u taşıyordu ama ACL'i sessizce düşürüyordu; `fileperms()` bunu ne öncesinde ne sonrasında görebiliyor. Dosyaya özel ACL'i olmayan kurulumların büyük çoğunluğu davranış değişikliği görmez.
+
+Bayrak artık AYNA yönü de kapsıyor: geçici dosya `.env`'in kendi dizini içinde oluşturulduğundan, dizin seviyesinde bir ACL inheritance kuralı (`setfacl -d -m …`, ya da macOS'ta `chmod +a "… file_inherit"` karşılığı) `.env`'in hiç sahip olmadığı bir izni bu dosyaya koyabiliyor — mode kontrolü için aynı şekilde görünmez ve yeni anahtarın tek bir byte'ı bile yazılmadan önce orada. Rotasyon artık bu miras alınan girdi de normalize edilmediği sürece tamamlanmayı reddediyor. Yalnızca `.env`'in dizini bir inheritance kuralı taşıyorsa ilgili; çoğu kurulum davranış değişikliği görmez.
+
+Ret tetiklenirse ve rotasyondan hemen sonra ACL'i elle uzlaştırmayı planlıyorsanız, işlemi durdurmak yerine bir uyarıya düşürmek için `--allow-acl-loss` geçin (konsola yazdırılır ve loga yazılır — uyarı yalnızca dosya yolu ve ACL metnini taşır, asla anahtar materyalini değil). Bunu varsayılan bir alışkanlık olarak geçmeyin: bu ret, rotasyondan sonra web sunucusunun okuyamadığı — ya da olmaması gereken bir prensibe erişim veren — bir `.env`'in kozmetik bir uyarı değil, bozuk bir deploy olduğu için var.
+
+### `release.sh` artık `gh` ve etiketlenecek commit için yeşil bir uzak CI koşusu istiyor
+
+Bu yalnızca bu paket için `./release.sh` çalıştıranı etkiler — herhangi bir tüketici uygulamasını etkilemez. Yayın akışı artık şu şekilde: commit → `git push origin main` → CI yeşillensin → `./release.sh`. Script, yerel kalite kapısını çalıştırmadan önce `gh run list --commit <HEAD sha>` sorguluyor ve `gh` yoksa, oturum açılmamışsa (`gh auth login`), commit hiç push edilmemişse ya da o commit için herhangi bir workflow'un en son koşusu `success`/`skipped` değilse duruyor. `--skip-checks`, öncekiyle aynı şekilde bunu da yerel kapının geri kalanıyla birlikte atlıyor.
+
 ## v13.6.16 → v13.7.0
 
 ### `sk:install` artık kendisinin kurmadığı bir uygulamada çalışmayı reddediyor

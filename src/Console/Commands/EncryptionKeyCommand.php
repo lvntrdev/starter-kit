@@ -16,6 +16,7 @@ use Dotenv\Store\StringStore;
 use Illuminate\Console\Command;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Log;
 use Lvntr\StarterKit\Console\Commands\Concerns\RefusesPackageSourceTree;
 use Lvntr\StarterKit\Console\Concerns\HoldsEncryptionRotationLock;
 use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
@@ -70,9 +71,13 @@ use Throwable;
  * printing path: it emits one freshly generated key on stdout and writes
  * nothing at all.
  *
- * Nothing here writes to the logger. Values that reach an exception message do
- * so through {@see DataEncrypterFactory::parseKey()}, which withholds key
- * material by design.
+ * The only lines this command logs are the two `--allow-acl-loss` downgrades —
+ * {@see self::carryOverAcl()} for an ACL that could not be carried over, and
+ * {@see self::normaliseTempAcl()} for one the replacement inherited and could
+ * not shed — and both carry a file path and ACL text, never a value out of
+ * `.env`. Values that reach an exception message do so through
+ * {@see DataEncrypterFactory::parseKey()}, which withholds key material by
+ * design.
  */
 final class EncryptionKeyCommand extends Command
 {
@@ -116,9 +121,23 @@ final class EncryptionKeyCommand extends Command
         # and `encryption:health` reports OK. A key dropped from that list is unrecoverable.
         TXT;
 
+    /**
+     * Option name for the deliberate-ACL-mismatch escape hatch, referenced from
+     * both refusal messages so the flag and the text can never drift apart.
+     *
+     * The name says "loss" because that was the first direction it covered — an
+     * ACL on `.env` that the replacement could not be given. It now covers the
+     * MIRROR direction too ({@see self::normaliseTempAcl()}): an ACL the
+     * replacement carries and `.env` does not. Renaming the option would break
+     * every deploy script that already passes it, so the help text carries the
+     * widened meaning instead.
+     */
+    private const ACL_LOSS_OPTION = 'allow-acl-loss';
+
     protected $signature = 'encryption:key
         {--show : Print a freshly generated key and write nothing}
-        {--force : Run even when the environment looks like production}';
+        {--force : Run even when the environment looks like production}
+        {--allow-acl-loss : Rotate even when the ACL of the replacement file cannot be made to match the ACL of .env: a file-specific ACL that could not be carried over, or one inherited from the directory that could not be cleared}';
 
     protected $description = 'Generate a dedicated DATA_ENCRYPTION_KEY, preserving the current key in DATA_ENCRYPTION_PREVIOUS_KEYS.';
 
@@ -299,6 +318,54 @@ final class EncryptionKeyCommand extends Command
      * back different, a flush that did not happen — each aborts before the
      * rename, so the outcome is a rotation that did not occur rather than an
      * `.env` the service cannot read or a key that never reached the disk.
+     *
+     * The ORDER of the last two steps is load-bearing and reads backwards, so:
+     * the flush runs BEFORE {@see self::restoreIdentity()}, not after. A
+     * hardened `.env` is commonly `0400` or `0440`, and POSIX applies the owner
+     * class verbatim — a mode with no owner-write bit makes `fopen($temp, 'r+')`
+     * fail for every non-root owner. Restoring the identity first therefore made
+     * {@see self::flushToDisk()} abort with "could not be reopened to flush" on
+     * exactly the permissions this kit tells operators to set: rotation was
+     * impossible on a hardened `.env`, which pushes the operator toward widening
+     * the file that holds the encryption key. Flushing while the temp file still
+     * carries the `0600` that {@see self::narrowOrFail()} PROVED keeps the handle
+     * openable, and it costs the durability argument nothing: restoreIdentity()
+     * only chgrp/chown/chmods — it never writes to the file BODY, so there is no
+     * byte left unflushed behind it, and its own metadata change is ordered
+     * ahead of the rename by the same journal that orders the rename itself.
+     * Do not swap these back.
+     *
+     * ## The ACL is part of the identity too
+     *
+     * Mode, owner and group are only the POSIX third of "who can read this
+     * file". An operator who granted the web user read access to a `0600` `.env`
+     * with `setfacl -m u:www-data:r` (or macOS `chmod +a`) holds that grant in a
+     * file-specific ACL, and `rename()` drops it exactly the way it drops the
+     * mode — except nothing above would notice, because `fileperms()` reports
+     * `0600` before AND after. The service then cannot read `.env` at the moment
+     * its key changed. So the ACL is captured with the rest of the identity and
+     * re-applied by {@see self::carryOverAcl()}, which fails CLOSED like every
+     * other check here. That step runs AFTER {@see self::restoreIdentity()} on
+     * purpose: on Linux `setfacl` writes the ACL's mask into the mode's group
+     * bits, so a chmod afterwards would rewrite the mask that was just verified.
+     * A platform or host without ACL tooling reads back `null` and changes
+     * nothing at all — see {@see self::readFileAcl()}.
+     *
+     * ## …and the ACL runs in BOTH directions
+     *
+     * carryOverAcl() answers "does the replacement keep what `.env` granted".
+     * The mirror question — "does the replacement grant something `.env` never
+     * did" — has its own answer, {@see self::normaliseTempAcl()}, and it is
+     * asked EARLIER on purpose. The temp file is created inside `.env`'s own
+     * directory, so a directory-level inheritance rule (`setfacl -d -m …`,
+     * `chmod +a "… file_inherit"`) puts an entry on it that the target never
+     * had, and narrowOrFail() cannot see it: `fileperms() & 0077` reports `0600`
+     * with the inherited grant sitting right next to it. Normalising AFTER the
+     * body write would already be too late — the key would have spent that
+     * window readable by the inherited principal — so the order here is
+     * touch → narrowOrFail() → normaliseTempAcl() → write the key. There is no
+     * point in the file's life at which it holds key material and an ACL entry
+     * the file it replaces does not have.
      */
     private function putEnvPreservingIdentity(string $path, string $contents): void
     {
@@ -307,6 +374,10 @@ final class EncryptionKeyCommand extends Command
         $target = is_link($path) ? (realpath($path) ?: $path) : $path;
 
         [$mode, $owner, $group] = $this->fileIdentity($target);
+
+        // Captured together with the mode/owner/group, before anything exists
+        // next to the target: this is the identity the replacement must carry.
+        $acl = $this->readFileAcl($target);
 
         $dir = dirname($target);
         $temp = $dir.DIRECTORY_SEPARATOR.'.'.basename($target).'.tmp'.bin2hex(random_bytes(6));
@@ -324,6 +395,13 @@ final class EncryptionKeyCommand extends Command
 
             $this->narrowOrFail($temp);
 
+            // BEFORE the key exists in this file: the mode is only the POSIX
+            // third of "who can read it", and a directory that carries an
+            // inheritance rule has already put an ACL entry on the file touch()
+            // just made. Shedding it after the write would leave a window in
+            // which the rotated key was readable by a principal .env excludes.
+            $this->normaliseTempAcl($temp, $target, $acl, (bool) $this->option(self::ACL_LOSS_OPTION));
+
             // put() reports a full disk or a failed open by RETURNING (false, or
             // a short byte count), not by throwing. Renaming that temp file into
             // place would replace a complete .env with a truncated one — and on
@@ -338,9 +416,24 @@ final class EncryptionKeyCommand extends Command
                 );
             }
 
+            // FLUSH FIRST, identity SECOND — see the docblock. flushToDisk()
+            // reopens this file `r+`, which POSIX refuses to a non-root owner
+            // once the mode has lost its owner-write bit, so restoring a
+            // 0400/0440 identity first made the rotation abort on exactly the
+            // hardened permissions the kit recommends. Flushing while the file
+            // still carries the 0600 narrowOrFail() PROVED keeps the handle
+            // openable; restoreIdentity() writes nothing to the body, so it
+            // cannot leave anything unflushed behind it.
+            $this->flushToDisk($temp, $target);
+
             $this->restoreIdentity($temp, $target, $mode, $owner, $group);
 
-            $this->flushToDisk($temp, $target);
+            // ACL LAST of the identity steps: on Linux setfacl folds the ACL
+            // mask into the mode's group bits, so a chmod after it would
+            // rewrite what was just verified. Reading the option here (not
+            // inside the helper) keeps every writer helper callable without
+            // command IO, which the identity tests depend on.
+            $this->carryOverAcl($temp, $target, $acl, (bool) $this->option(self::ACL_LOSS_OPTION));
 
             if (! @rename($temp, $target)) {
                 throw new RuntimeException("Atomic write failed: could not move temp file into place for [{$target}].");
@@ -499,6 +592,454 @@ final class EncryptionKeyCommand extends Command
         }
 
         return [fileperms($path) & 0777, @fileowner($path), @filegroup($path)];
+    }
+
+    /**
+     * Strip from the replacement any ACL grant the replaced file does not have,
+     * BEFORE a single byte of key material is written into it.
+     *
+     * The temp file is created next to `.env`, in `.env`'s own directory, and a
+     * directory can carry an inheritance rule — `setfacl -d -m u:deploy:r` on
+     * Linux, `chmod +a "deploy allow read,file_inherit"` on macOS. Every file
+     * created in it is then born with that entry, including this one. Nothing
+     * else in this class notices: {@see self::narrowOrFail()} proves
+     * `fileperms() & 0077 === 0` and that stays true — a POSIX mode simply does
+     * not describe an ACL — and {@see self::carryOverAcl()} looks only at
+     * whether the TARGET's ACL survived, so a `''` target (no ACL at all, the
+     * common case) makes it return without ever inspecting the temp. The rename
+     * then installs the inherited grant as the new `.env`, and the account named
+     * in it can read the key that was just rotated in. The mode reads `0600`
+     * before and after, so there is nothing on screen to notice either.
+     *
+     * ## Ordering
+     *
+     * This runs between narrowOrFail() and the body write, so the file is empty
+     * while its ACL is being corrected and the key lands only into a file whose
+     * access set is already a subset of the target's. Fixing it later — next to
+     * carryOverAcl(), after the write — would close the hole for the FINAL file
+     * but leave the key sitting in a temp file the inherited principal could
+     * read for the whole write/fsync window. Do not move it.
+     *
+     * ## What is acted on, and what is deliberately not
+     *
+     * `$acl` is the TARGET's ACL as {@see self::readFileAcl()} reports it,
+     * `$current` the temp's. Four of the five combinations do nothing:
+     *
+     * - `$acl === null` — no ACL tooling on this host/platform. Strict no-op,
+     *   exactly as before this check existed: a stock container without
+     *   `getfacl` must not start refusing rotations.
+     * - `$current === null` — unreachable in practice (a non-null `$acl` proves
+     *   the reader works in this very directory, and the temp was just created
+     *   and stat'd), and treated as the same unknown for the same reason.
+     * - `$current === ''` — the temp carries no file-specific ACL, so it cannot
+     *   grant anything. Nothing to strip. This is the branch EVERY rotation on
+     *   a directory without an inheritance rule takes, which is why this check
+     *   adds no new refusal to hosts that do not have the problem — and why an
+     *   ACL that merely failed to be carried OVER is still carryOverAcl's single
+     *   report, not two.
+     * - `$current === $acl` — already an exact mirror of the target.
+     *
+     * Only a temp that carries a non-empty ACL DIFFERENT from the target's is
+     * touched: the target's ACL is written onto it when the target has one, and
+     * the temp's ACL is cleared when the target provably has none (`''`). The
+     * clear is gated on `''` and never on `null` on purpose — clearing is the
+     * wider operation, and treating "the tooling could not answer" as "there is
+     * nothing to keep" would strip ACLs on every host where the reader failed.
+     *
+     * The result is VERIFIED by re-reading, for the same reason every other
+     * guard here verifies: the tool reporting success is not the file having
+     * changed. A mismatch refuses, and refusing costs nothing — the temp is
+     * empty and `.env` has not been touched. `--allow-acl-loss` downgrades it to
+     * a warning on screen AND in the log, the same escape hatch, in the same
+     * voice, as the opposite direction.
+     *
+     * @param  string|null  $acl  the target's ACL, `''` for none, null for unknown
+     *
+     * @throws RuntimeException
+     */
+    private function normaliseTempAcl(string $temp, string $target, ?string $acl, bool $allowMismatch): void
+    {
+        if ($acl === null) {
+            return;
+        }
+
+        $current = $this->readFileAcl($temp);
+
+        if ($current === null || $current === '' || $current === $acl) {
+            return;
+        }
+
+        $failure = $acl === ''
+            ? $this->clearFileAcl($temp)
+            : $this->writeFileAcl($temp, $acl);
+
+        $result = $failure === null ? $this->readFileAcl($temp) : null;
+
+        if ($result !== $acl) {
+            $this->reportTempAclMismatch(
+                $target,
+                $current,
+                $failure ?? 'the ACL read back from the replacement file still did not match the original',
+                $allowMismatch,
+            );
+        }
+
+        // Both ACL tools rewrite the mode while they work — Linux setfacl folds
+        // the ACL mask into the group bits, and `setfacl -b` hands them back to
+        // the group entry — so the owner-write bit the body write needs, and the
+        // owner-only guarantee the key write depends on, are re-proved here
+        // rather than assumed. This also runs after a downgraded mismatch: the
+        // operator accepted an ACL they can see, not a widened mode nobody
+        // reported.
+        $this->narrowOrFail($temp);
+    }
+
+    /**
+     * The refusal (or, under `--allow-acl-loss`, the warning) for a replacement
+     * file that carries an ACL entry the file it replaces does not have.
+     *
+     * Kept beside {@see self::normaliseTempAcl()} rather than inlined so the
+     * decision above reads as three lines of policy. Only the path and the ACL
+     * text are emitted: neither is key material, and the ACL is precisely what
+     * the operator needs in order to act on the report.
+     *
+     * @throws RuntimeException
+     */
+    private function reportTempAclMismatch(string $target, string $current, string $reason, bool $allowMismatch): void
+    {
+        $acl = str_replace("\n", ' | ', $current);
+
+        if ($allowMismatch) {
+            Log::warning(sprintf(
+                'encryption:key replaced [%s] with a file WHOSE INHERITED ACL COULD NOT BE NORMALISED (%s). --%s '
+                .'was given, so the rotation continued and the rotated key is now reachable through that entry. '
+                .'Review it: %s',
+                $target,
+                $reason,
+                self::ACL_LOSS_OPTION,
+                $acl,
+            ));
+
+            $this->components->warn(sprintf(
+                'The replacement for [%s] carries a file-specific ACL that [%s] does not (%s) — a directory-level '
+                .'inheritance rule put it there. --%s was given, so the rotation continued, and the account named '
+                .'in that entry can read the rotated key. Remove it by hand. The ACL was: %s',
+                $target,
+                $target,
+                $reason,
+                self::ACL_LOSS_OPTION,
+                $acl,
+            ));
+
+            return;
+        }
+
+        throw new RuntimeException(sprintf(
+            'Refusing to replace [%s]: the temporary file created next to it inherited a file-specific ACL that '
+            .'[%s] does not carry, and it could not be normalised (%s). A directory-level inheritance rule '
+            .'(setfacl -d on Linux, chmod +a with file_inherit on macOS) puts that entry on every file created in '
+            .'the directory, so renaming anyway would widen who can read the encryption key while the mode still '
+            .'reads %s. The existing file is untouched. Drop the inherited entry from the directory, or re-run '
+            .'with --%s to accept the mismatch. The inherited ACL is: %s',
+            $target,
+            $target,
+            $reason,
+            sprintf('%o', fileperms($target) & 0777),
+            self::ACL_LOSS_OPTION,
+            $acl,
+        ));
+    }
+
+    /**
+     * Carry the replaced file's ACL onto the replacement, or refuse the rename.
+     *
+     * `$acl` is what {@see self::readFileAcl()} found on the target. Two of its
+     * three possible values mean "do nothing", and that is deliberate:
+     *
+     * - `null` — this platform or this host cannot report an ACL (no `getfacl`,
+     *   a Windows/BSD runner, `exec()` in `disable_functions`). Unknown is NOT
+     *   treated as "there is one": an install without ACL tooling has to behave
+     *   exactly as it did before this check existed, or a stock Linux container
+     *   would start refusing every rotation over a file that has no ACL at all.
+     * - `''` — tooling answered and the file carries no file-specific ACL. The
+     *   overwhelming majority of installs; nothing to preserve, nothing to do.
+     *
+     * A non-empty ACL is re-applied and then VERIFIED by re-reading, because the
+     * tool reporting success is not the ACL being on the file — the same reason
+     * {@see self::narrowOrFail()} and {@see self::restoreIdentity()} verify their
+     * own writes. An ACL that silently did not take is the failure this exists to
+     * catch: it is invisible in `ls -l`, so the operator sees a `0600` `.env`
+     * before and after and no sign that the `u:www-data:r` grant their service
+     * boots through is gone.
+     *
+     * `--allow-acl-loss` downgrades the refusal to a warning on screen AND in the
+     * log. Deliberate loss stays reachable — an operator who is about to re-apply
+     * the ACL by hand should not be blocked — but it is never silent, and the log
+     * line is what makes it auditable after the terminal is closed.
+     *
+     * @param  string|null  $acl  the target's ACL, `''` for none, null for unknown
+     *
+     * @throws RuntimeException
+     */
+    private function carryOverAcl(string $temp, string $target, ?string $acl, bool $allowLoss): void
+    {
+        if ($acl === null || $acl === '') {
+            return;
+        }
+
+        $failure = $this->writeFileAcl($temp, $acl);
+
+        if ($failure === null && $this->readFileAcl($temp) === $acl) {
+            return;
+        }
+
+        $reason = $failure ?? 'the ACL read back from the replacement file did not match the original';
+
+        if ($allowLoss) {
+            // Path and ACL text only. Neither is key material, and the ACL is
+            // the one thing the operator needs in order to put it back.
+            Log::warning(sprintf(
+                'encryption:key replaced [%s] WITHOUT its file-specific ACL (%s). --%s was given, so the '
+                .'rotation continued. Re-apply the ACL by hand: %s',
+                $target,
+                $reason,
+                self::ACL_LOSS_OPTION,
+                str_replace("\n", ' | ', $acl),
+            ));
+
+            $this->components->warn(sprintf(
+                'The file-specific ACL on [%s] was NOT carried over (%s). --%s was given, so the rotation '
+                .'continued. Re-apply it by hand — until then, only the POSIX mode governs who can read the '
+                .'encryption key. The ACL was: %s',
+                $target,
+                $reason,
+                self::ACL_LOSS_OPTION,
+                str_replace("\n", ' | ', $acl),
+            ));
+
+            return;
+        }
+
+        throw new RuntimeException(sprintf(
+            'Refusing to replace [%s]: it carries a file-specific ACL that could not be carried over to the '
+            .'replacement file (%s). Renaming anyway would drop the ACL silently — the mode would still read '
+            .'%s, while a service that reaches .env through the ACL would lose the key it was just given. The '
+            .'existing file is untouched. Re-apply the ACL by hand after rotating, or re-run with --%s to '
+            .'accept the loss. The ACL is: %s',
+            $target,
+            $reason,
+            sprintf('%o', fileperms($target) & 0777),
+            self::ACL_LOSS_OPTION,
+            str_replace("\n", ' | ', $acl),
+        ));
+    }
+
+    /**
+     * A file's file-specific ACL as a normalised string, or null when this
+     * platform/host cannot say.
+     *
+     * The `null` return is the whole safety design of this feature: it is the
+     * DEFAULT for everything that is not a Linux or macOS host with working ACL
+     * tooling and a callable `exec()`, and {@see self::carryOverAcl()} treats it
+     * as "change nothing". Turning an unknown into a refusal would break
+     * rotation on a stock container that has no `getfacl` and no ACL either.
+     *
+     * Platform commands, both reading only the file named on the command line:
+     *
+     * - macOS has no `getfacl`; `ls -lde` prints the long listing and then the
+     *   ACL as NUMBERED entries. Only the numbered lines are kept — the listing
+     *   line carries the PATH, and target and temp have different names, so
+     *   including it would make every comparison fail.
+     * - Linux `getfacl --omit-header --skip-base` prints nothing at all for a
+     *   file whose ACL is just its mode, which is exactly the "no file-specific
+     *   ACL" answer, and prints the COMPLETE ACL (base entries included) for one
+     *   that has more — the complete form `setfacl --set-file` requires.
+     *
+     * The path is passed through escapeshellarg(): base_path() is not
+     * attacker-controlled, but a space or a quote in a deploy directory is
+     * ordinary, and an unescaped path would turn a working rotation into a
+     * shell-parsed one.
+     */
+    private function readFileAcl(string $path): ?string
+    {
+        if (! function_exists('exec') || ! is_file($path)) {
+            return null;
+        }
+
+        $quoted = escapeshellarg($path);
+
+        $command = match ($this->osFamily()) {
+            'Darwin' => 'ls -lde '.$quoted.' 2>/dev/null',
+            'Linux' => 'getfacl --omit-header --skip-base -- '.$quoted.' 2>/dev/null',
+            default => null,
+        };
+
+        if ($command === null) {
+            return null;
+        }
+
+        $lines = [];
+        $status = 1;
+
+        @exec($command, $lines, $status);
+
+        // A missing tool exits 127, an unreadable file non-zero: both are
+        // "cannot say", never "there is no ACL".
+        return $status === 0 ? $this->normaliseAcl($lines) : null;
+    }
+
+    /**
+     * Replace $path's ACL with $acl. Returns the tool's own message on failure,
+     * null on success.
+     *
+     * macOS ships no `setfacl`; `chmod -E` reads a complete ACL from STDIN in
+     * the very format `ls -le` prints, which is why the reader keeps that format
+     * verbatim. Linux `setfacl --set-file=-` is the same contract.
+     *
+     * Both the path and the ACL text go through escapeshellarg() — the ACL text
+     * is multi-line and carries account names, and `printf %s` re-emits it
+     * byte-for-byte with no format expansion (the format string is the literal
+     * `%s`; the ACL is the ARGUMENT, so a `%` inside it is data). The trailing
+     * newline is added before escaping rather than as a shell `\n` escape, so
+     * nothing here depends on how the shell renders backslashes.
+     */
+    private function writeFileAcl(string $path, string $acl): ?string
+    {
+        if (! function_exists('exec')) {
+            return 'exec() is unavailable, so no ACL tool could be run';
+        }
+
+        $target = escapeshellarg($path);
+        $payload = escapeshellarg($acl."\n");
+
+        $command = match ($this->osFamily()) {
+            'Darwin' => 'printf %s '.$payload.' | chmod -E '.$target.' 2>&1',
+            'Linux' => 'printf %s '.$payload.' | setfacl --set-file=- -- '.$target.' 2>&1',
+            default => null,
+        };
+
+        if ($command === null) {
+            return 'this platform has no supported ACL tool';
+        }
+
+        $output = [];
+        $status = 1;
+
+        @exec($command, $output, $status);
+
+        if ($status === 0) {
+            return null;
+        }
+
+        $message = trim(implode(' ', $output));
+
+        return $message === '' ? 'the ACL tool exited with status '.$status : $message;
+    }
+
+    /**
+     * Remove $path's file-specific ACL entirely, leaving the POSIX mode as the
+     * only thing that governs access. Returns the tool's own message on failure,
+     * null on success.
+     *
+     * The counterpart of {@see self::writeFileAcl()}, and a separate command
+     * rather than "write the empty ACL": neither tool accepts an empty document
+     * as "no ACL" — Linux `setfacl --set-file=-` rejects it, and macOS
+     * `chmod -E` reads it as a parse error — so the reset has to be asked for by
+     * name. `chmod -N` on macOS and `setfacl -b` on Linux both keep the base
+     * owner/group/other entries and drop only the extended ones, which is
+     * exactly the "no file-specific ACL" state {@see self::readFileAcl()}
+     * reports as `''`.
+     *
+     * Reaching this is narrow by construction — see {@see self::normaliseTempAcl()},
+     * the sole caller: it runs only against a temp file that provably carries an
+     * ACL, only when the file being replaced provably carries none, and never on
+     * the `null` (cannot say) answer. Clearing is the wider of the two
+     * operations and it never runs on an unknown.
+     *
+     * Note that on Linux dropping the ACL also drops its mask, which hands the
+     * mode's group bits back to the `group::` entry and can therefore WIDEN the
+     * mode. The caller re-runs {@see self::narrowOrFail()} afterwards for that
+     * reason; do not treat a successful clear as leaving the mode alone.
+     */
+    private function clearFileAcl(string $path): ?string
+    {
+        if (! function_exists('exec')) {
+            return 'exec() is unavailable, so no ACL tool could be run';
+        }
+
+        $quoted = escapeshellarg($path);
+
+        $command = match ($this->osFamily()) {
+            'Darwin' => 'chmod -N '.$quoted.' 2>&1',
+            'Linux' => 'setfacl -b -- '.$quoted.' 2>&1',
+            default => null,
+        };
+
+        if ($command === null) {
+            return 'this platform has no supported ACL tool';
+        }
+
+        $output = [];
+        $status = 1;
+
+        @exec($command, $output, $status);
+
+        if ($status === 0) {
+            return null;
+        }
+
+        $message = trim(implode(' ', $output));
+
+        return $message === '' ? 'the ACL tool exited with status '.$status : $message;
+    }
+
+    /**
+     * ACL tool output reduced to the entries themselves, so the target's ACL and
+     * the replacement's compare as equal when they mean the same thing.
+     *
+     * Three kinds of noise are removed. On macOS every non-numbered line — the
+     * `ls` listing line, which carries the file's own PATH and would make the
+     * comparison structurally impossible. Everywhere: comments, because
+     * `getfacl` annotates masked entries with a trailing `#effective:` note that
+     * is DERIVED from the `mask::` entry, which is compared on its own line
+     * anyway. And blank lines.
+     *
+     * Entry ORDER is preserved, never sorted: macOS evaluates an ACL top-down,
+     * so a `deny` ahead of an `allow` is not the same ACL as the reverse.
+     *
+     * @param  list<string>  $lines
+     */
+    private function normaliseAcl(array $lines): string
+    {
+        $entries = [];
+
+        foreach ($lines as $line) {
+            if ($this->osFamily() === 'Darwin') {
+                if (preg_match('/^\s*\d+:\s*(.*)$/', $line, $matches) !== 1) {
+                    continue;
+                }
+
+                $line = $matches[1];
+            }
+
+            $line = trim((string) preg_replace('/#.*$/', '', $line));
+
+            if ($line !== '') {
+                $entries[] = $line;
+            }
+        }
+
+        return implode("\n", $entries);
+    }
+
+    /**
+     * The OS family, behind a method on purpose: read as the bare constant, the
+     * platform switches above fold into whichever host ran static analysis, and
+     * the other platform's arm reads as dead code.
+     */
+    private function osFamily(): string
+    {
+        return PHP_OS_FAMILY;
     }
 
     /**

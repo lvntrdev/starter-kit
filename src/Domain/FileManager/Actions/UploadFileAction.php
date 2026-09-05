@@ -61,7 +61,7 @@ class UploadFileAction extends FileManagerAction
                 $media->save();
             }
 
-            $uploaded[] = FileItemDTO::fromModel($media->refresh())->toArray();
+            $uploaded[] = FileItemDTO::fromModel($media->refresh(), $context)->toArray();
         }
 
         return $uploaded;

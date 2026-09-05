@@ -34,7 +34,7 @@ use Spatie\QueryBuilder\QueryBuilderRequest;
  */
 class DatatableQueryBuilder
 {
-    /** @var class-string<Model>|Builder<Model> */
+    /** @var class-string<Model>|Builder<covariant Model> */
     private string|Builder $subject;
 
     /** @var string[] */
@@ -69,7 +69,7 @@ class DatatableQueryBuilder
     }
 
     /**
-     * @param  class-string<Model>|Builder<Model>  $subject
+     * @param  class-string<Model>|Builder<covariant Model>  $subject
      */
     public static function for(string|Builder $subject): self
     {
@@ -149,7 +149,7 @@ class DatatableQueryBuilder
      * A value that is not a valid `Y-m-d` calendar date is ignored — exactly as
      * the datatable ignores it — rather than raising an error.
      *
-     * @param  Builder<Model>  $query
+     * @param  Builder<covariant Model>  $query
      */
     public static function applyCalendarDateRange(Builder $query, string $column, mixed $from = null, mixed $to = null): void
     {
@@ -186,7 +186,7 @@ class DatatableQueryBuilder
      * losslessly; the bulk side applies that raw text from the snapshot, so
      * both sides end up with the same predicate.
      *
-     * @param  Builder<Model>  $query
+     * @param  Builder<covariant Model>  $query
      * @param  list<string>  $fields
      * @param  string|bool|array<int|string, mixed>  $value
      */

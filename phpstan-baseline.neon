@@ -1,56 +1,60 @@
+# PHPStan baseline — Larastan level 5, package runtime only (see phpstan.neon).
+#
+# A DELIBERATE record, not a dumping ground. Triaged in 13.7.0 (MRG-14): every
+# typing gap that could be closed with a docblock, without touching runtime
+# behaviour, was fixed instead of suppressed (259 -> 238 errors, 212 -> 193
+# rules). What is left falls into two categories, and both stay on purpose.
+#
+# 1. DELIBERATE DEFENSIVE CODE — the analyser is right about the declared types
+#    and wrong about the world.
+#      function.alreadyNarrowedType · instanceof.alwaysTrue · identical.always*
+#      booleanAnd.* · booleanOr.* · booleanNot.* · match.alwaysTrue
+#      greaterOrEqual.alwaysTrue · deadCode.unreachable · nullCoalesce.offset
+#      nullsafe.neverNull · arrayValues.list
+#    The kit is fail-closed: an is_string() on a value the signature already
+#    calls a string, or a `?? 0` on a key a docblock promises, guards a trust
+#    boundary the type system cannot see — HTTP input, a consumer-implemented
+#    handler, a config() value, a third-party model. DO NOT delete one of these
+#    because PHPStan calls it unreachable. If one looks genuinely dead, remove
+#    it in its own commit with a test, never by shrinking this file.
+#    Same bucket, other reason: trait.unused / method.unused /
+#    classConstant.unused are seams kept for consumers and tests, and
+#    larastan.noEnvCallsOutsideOfConfig is the installer / encryption surface,
+#    which MUST read raw .env state rather than cached config.
+#
+# 2. SCANNING-SCOPE LIMITS — not code debt.
+#      property.notFound · staticMethod.notFound · method.notFound
+#      class.notFound · foreach.nonIterable · argument.type · return.type
+#      argument.unresolvableType · property.protected · new.static
+#      larastan.console.undefinedOption
+#    The runtime is analysed alone yet addresses symbols it does not own:
+#    consumer models (App\Models\*, scanned from stubs/app with no @property
+#    metadata), traits the CONSUMER applies (SoftDeletes -> onlyTrashed()/
+#    withTrashed(), InteractsWithMedia -> addMedia()), columns the kit's own
+#    migrations add to a vendor model (Media::$folder_id), and class-string
+#    <Model> values resolved from config at runtime. new.static is the BaseDTO
+#    factory idiom. larastan.console.undefinedOption is one trait method
+#    analysed in the context of every command using the trait, although only
+#    sk:publish and sk:eject — which both declare --destination — call it.
+#    Closing these needs @property docblocks on the stubs/app models and
+#    PHPStan stub files for Passport / MediaLibrary: a separate task, outside
+#    the package runtime.
+#
+# Regenerate from a CLEAN tree (a dirty one absorbs in-flight errors):
+#   vendor/bin/phpstan analyse --generate-baseline
+# then restore this header — PHPStan drops it.
+
 parameters:
 	ignoreErrors:
 		-
-			message: '#^Comparison operation "\>" between 0 and 0 is always false\.$#'
-			identifier: greater.alwaysFalse
-			count: 1
-			path: src/Console/Commands/EjectCommand.php
-
-		-
-			message: '#^Empty array passed to foreach\.$#'
-			identifier: foreach.emptyArray
-			count: 1
-			path: src/Console/Commands/EjectCommand.php
-
-		-
-			message: '#^Offset ''backend'' on array\{controllers\?\: array\<string, string\>, requests\?\: array\<string, string\>, route\?\: array\<string, string\>\} on left side of \?\? does not exist\.$#'
+			message: '#^Offset ''resources'' on array\{controllers\: int, requests\: int, resources\: int, skipped\: list\<string\>, routeRewritten\: list\<string\>, routeSkipped\: list\<string\>\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Console/Commands/EjectCommand.php
-
-		-
-			message: '#^Offset ''resources'' does not exist on array\{controllers\: int\<min, 0\>, requests\: int\<min, 0\>, skipped\: list\<string\>, routeRewritten\: list\<string\>, routeSkipped\: list\<string\>\}\.$#'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: src/Console/Commands/EjectCommand.php
-
-		-
-			message: '#^Offset ''resources'' on array\{controllers\: int, requests\: int, skipped\: list\<string\>, routeRewritten\: list\<string\>, routeSkipped\: list\<string\>\} on left side of \?\? does not exist\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Console/Commands/EjectCommand.php
-
-		-
-			message: '#^Offset ''resources'' on array\{controllers\?\: array\<string, string\>, requests\?\: array\<string, string\>, route\?\: array\<string, string\>\} on left side of \?\? does not exist\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Console/Commands/EjectCommand.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between '''' and '''' will always evaluate to false\.$#'
-			identifier: notIdentical.alwaysFalse
 			count: 1
 			path: src/Console/Commands/EjectCommand.php
 
 		-
 			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
-			count: 1
-			path: src/Console/Commands/EncryptionHealthCommand.php
-
-		-
-			message: '#^Parameter \#1 \$rows of method Lvntr\\StarterKit\\Console\\Commands\\EncryptionHealthCommand\:\:classifyRows\(\) expects Illuminate\\Support\\Collection\<int, object\>, Illuminate\\Support\\Collection\<int, stdClass\> given\.$#'
-			identifier: argument.type
 			count: 1
 			path: src/Console/Commands/EncryptionHealthCommand.php
 
@@ -69,12 +73,6 @@ parameters:
 		-
 			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
-			count: 2
-			path: src/Console/Commands/EncryptionRekeyCommand.php
-
-		-
-			message: '#^Parameter \#1 \$rows of method Lvntr\\StarterKit\\Console\\Commands\\EncryptionRekeyCommand\:\:processRows\(\) expects Illuminate\\Support\\Collection\<int, object\>, Illuminate\\Support\\Collection\<int, stdClass\> given\.$#'
-			identifier: argument.type
 			count: 2
 			path: src/Console/Commands/EncryptionRekeyCommand.php
 
@@ -241,12 +239,6 @@ parameters:
 			path: src/Console/Doctor/Checks/UnresolvedRouteCheck.php
 
 		-
-			message: '#^Parameter \#1 \$subject of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:for\(\) expects class\-string\<Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<Spatie\\Activitylog\\Models\\Activity\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Domain/ActivityLog/Queries/ActivityLogDatatableQuery.php
-
-		-
 			message: '#^Access to an undefined property Laravel\\Passport\\Client\:\:\$name\.$#'
 			identifier: property.notFound
 			count: 1
@@ -343,12 +335,6 @@ parameters:
 			path: src/Domain/ContentLanguage/DTOs/ContentLanguageDTO.php
 
 		-
-			message: '#^Parameter \#1 \$subject of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:for\(\) expects class\-string\<Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\ContentLanguage\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Domain/ContentLanguage/Queries/ContentLanguageDatatableQuery.php
-
-		-
 			message: '#^Call to an undefined static method Illuminate\\Database\\Eloquent\\Model\:\:withTrashed\(\)\.$#'
 			identifier: staticMethod.notFound
 			count: 3
@@ -357,12 +343,6 @@ parameters:
 		-
 			message: '#^Call to an undefined static method Spatie\\MediaLibrary\\MediaCollections\\Models\\Media\:\:withTrashed\(\)\.$#'
 			identifier: staticMethod.notFound
-			count: 2
-			path: src/Domain/FileManager/Actions/BulkDeleteAction.php
-
-		-
-			message: '#^Offset ''type'' on array\{type\: string, id\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
 			count: 2
 			path: src/Domain/FileManager/Actions/BulkDeleteAction.php
 
@@ -517,20 +497,8 @@ parameters:
 			path: src/Domain/FileManager/DTOs/FileItemDTO.php
 
 		-
-			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: src/Domain/FileManager/DTOs/FileManagerContextDTO.php
-
-		-
 			message: '#^Method Lvntr\\StarterKit\\Domain\\FileManager\\DTOs\\FileManagerContextDTO\:\:fromArray\(\) should return static\(Lvntr\\StarterKit\\Domain\\FileManager\\DTOs\\FileManagerContextDTO\) but returns Lvntr\\StarterKit\\Domain\\FileManager\\DTOs\\FileManagerContextDTO\.$#'
 			identifier: return.type
-			count: 1
-			path: src/Domain/FileManager/DTOs/FileManagerContextDTO.php
-
-		-
-			message: '#^Offset ''context'' on array\{context\: string, context_id\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
 			count: 1
 			path: src/Domain/FileManager/DTOs/FileManagerContextDTO.php
 
@@ -683,18 +651,6 @@ parameters:
 			identifier: property.notFound
 			count: 1
 			path: src/Domain/Role/Queries/CanManageRoleQuery.php
-
-		-
-			message: '#^Parameter \#1 \$query of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:applySearchWords\(\) expects Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\Role\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Domain/Role/Queries/RoleBulkSelectionQuery.php
-
-		-
-			message: '#^Parameter \#1 \$subject of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:for\(\) expects class\-string\<Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\Role\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Domain/Role/Queries/RoleDatatableQuery.php
 
 		-
 			message: '#^Negated boolean expression is always true\.$#'
@@ -859,6 +815,12 @@ parameters:
 			path: src/Domain/User/Actions/UpdateUserAction.php
 
 		-
+			message: '#^Trait Lvntr\\StarterKit\\Domain\\User\\Concerns\\RevokesOAuthCredentials is used zero times and is not analysed\.$#'
+			identifier: trait.unused
+			count: 1
+			path: src/Domain/User/Concerns/RevokesOAuthCredentials.php
+
+		-
 			message: '#^Unsafe usage of new static\(\)\.$#'
 			identifier: new.static
 			count: 1
@@ -875,24 +837,6 @@ parameters:
 			identifier: property.notFound
 			count: 1
 			path: src/Domain/User/Listeners/LogUserUpdated.php
-
-		-
-			message: '#^Parameter \#1 \$query of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:applyCalendarDateRange\(\) expects Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\User\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Domain/User/Queries/UserBulkSelectionQuery.php
-
-		-
-			message: '#^Parameter \#1 \$query of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:applySearchWords\(\) expects Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\User\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Domain/User/Queries/UserBulkSelectionQuery.php
-
-		-
-			message: '#^Parameter \#1 \$subject of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:for\(\) expects class\-string\<Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\User\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Domain/User/Queries/UserDatatableQuery.php
 
 		-
 			message: '#^Call to function is_string\(\) with class\-string\<Illuminate\\Database\\Eloquent\\Model\> will always evaluate to true\.$#'
@@ -925,20 +869,8 @@ parameters:
 			path: src/Http/Bulk/BulkActionDispatcher.php
 
 		-
-			message: '#^Parameter \#1 \$subject of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:for\(\) expects class\-string\<Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<Laravel\\Passport\\Client\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Http/Controllers/Admin/ApiClientController.php
-
-		-
 			message: '#^Access to protected property Laravel\\Passport\\PersonalAccessTokenResult\:\:\$token\.$#'
 			identifier: property.protected
-			count: 1
-			path: src/Http/Controllers/Admin/ApiTokenController.php
-
-		-
-			message: '#^Parameter \#1 \$subject of static method Lvntr\\StarterKit\\Http\\Responses\\DatatableQueryBuilder\:\:for\(\) expects class\-string\<Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Builder\<Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Builder\<Laravel\\Passport\\Token\> given\.$#'
-			identifier: argument.type
 			count: 1
 			path: src/Http/Controllers/Admin/ApiTokenController.php
 
