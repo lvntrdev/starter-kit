@@ -4,7 +4,7 @@ Bu dosya büyük sürümler arası geçiş rehberidir. Her sürüm kendi bölüm
 
 ---
 
-## Unreleased
+## v13.6.16 → v13.7.0
 
 ### Local/public disk üzerindeki FileManager dosya URL'leri artık kalıcı public link değil
 
@@ -43,8 +43,6 @@ Ret tetiklenirse ve rotasyondan hemen sonra ACL'i elle uzlaştırmayı planlıyo
 ### `release.sh` artık `gh` ve etiketlenecek commit için yeşil bir uzak CI koşusu istiyor
 
 Bu yalnızca bu paket için `./release.sh` çalıştıranı etkiler — herhangi bir tüketici uygulamasını etkilemez. Yayın akışı artık şu şekilde: commit → `git push origin main` → CI yeşillensin → `./release.sh`. Script, yerel kalite kapısını çalıştırmadan önce `gh run list --commit <HEAD sha>` sorguluyor ve `gh` yoksa, oturum açılmamışsa (`gh auth login`), commit hiç push edilmemişse ya da o commit için herhangi bir workflow'un en son koşusu `success`/`skipped` değilse duruyor. `--skip-checks`, öncekiyle aynı şekilde bunu da yerel kapının geri kalanıyla birlikte atlıyor.
-
-## v13.6.16 → v13.7.0
 
 ### `sk:install` artık kendisinin kurmadığı bir uygulamada çalışmayı reddediyor
 

@@ -4,7 +4,7 @@ This file is the cross-major-version migration guide. Every release gets its own
 
 ---
 
-## Unreleased
+## v13.6.16 → v13.7.0
 
 ### FileManager file URLs on a local/public disk are no longer permanent public links
 
@@ -43,8 +43,6 @@ If either refusal fires and you plan to reconcile the ACL by hand right after ro
 ### `release.sh` now requires `gh` and a green remote CI run on the tagged commit
 
 This only affects whoever runs `./release.sh` for this package — it has no effect on any consumer app. The release flow is now: commit → `git push origin main` → wait for CI to go green → `./release.sh`. The script queries `gh run list --commit <HEAD sha>` before running the local quality gate and stops if `gh` is missing, unauthenticated (`gh auth login`), the commit was never pushed, or any workflow's latest run for that commit is not `success`/`skipped`. `--skip-checks` bypasses this along with the rest of the local gate, same as before.
-
-## v13.6.16 → v13.7.0
 
 ### `sk:install` now refuses to run on an app it did not install
 
