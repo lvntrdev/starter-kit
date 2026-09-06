@@ -1446,7 +1446,7 @@
                         <!-- Create: link button -->
                         <Link v-if="config.createButton?.url" :href="config.createButton.url">
                             <Button
-                                :label="$t(config.createButton.label ?? 'Add')"
+                                :label="$t(config.createButton.label ?? 'sk-button.create')"
                                 :icon="config.createButton.icon ?? 'pi pi-plus'"
                                 :severity="config.createButton.severity ?? 'success'"
                                 :size="config.createButton.size"
@@ -1461,7 +1461,7 @@
                         <!-- Create: dialog/action button -->
                         <Button
                             v-else-if="config.createButton?.onClick"
-                            :label="$t(config.createButton.label ?? 'Add')"
+                            :label="$t(config.createButton.label ?? 'sk-button.create')"
                             :icon="config.createButton.icon ?? 'pi pi-plus'"
                             :severity="config.createButton.severity ?? 'success'"
                             :size="config.createButton.size"

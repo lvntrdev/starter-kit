@@ -121,7 +121,7 @@
     // Create butonu yalnızca `aura` temasında datatable toolbar'ında görünür;
     // diğer temalarda header page-action butonu (template'te) kullanılır.
     if (theme.value === 'aura' && can('users.create')) {
-        tableBuilder.create({ onClick: openCreateDialog });
+        tableBuilder.create({ onClick: openCreateDialog, label: 'sk-user.create' });
     }
 
     const tableConfig = tableBuilder
