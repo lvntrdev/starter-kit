@@ -199,6 +199,7 @@ php artisan sk:install --no-interaction
 php artisan sk:install --without-ai-skill
 php artisan sk:install --without-eject
 php artisan sk:install --resume
+php artisan sk:install --modules=telescope,pulse
 ```
 
 - `--force` overwrites existing publishable files — including a file you edited and one the registry has never tracked — and bypasses the already-installed safety stop. A `--force` run is no longer treated as a first install
@@ -208,6 +209,26 @@ php artisan sk:install --resume
 - `--without-ai-skill` skips publishing the Lvntr Starter Kit AI skills entirely — both the Claude Code copies (`.claude/skills/`) and their Codex mirror (`.codex/skills/`). Useful when the consumer uses neither Claude Code nor Codex with the kit's skill bundle
 - `--without-eject` skips the default `User` and `Role` domain eject; runtime stays in vendor and resolves via `class_alias`
 - `--resume` picks up an install that failed partway through: steps already checkpointed in `storage/starter-kit/install-progress.json` are skipped and the run continues from the failed step. Passed without a prior checkpoint, it just runs a full install with a warning.
+- `--modules=` selects optional observability packages to install alongside the kit (`telescope`, `pulse`, `sentry`; comma-separated or repeated, e.g. `--modules=telescope --modules=pulse`). Left empty, you are prompted interactively in a TTY; in a non-interactive run (`--no-interaction` or no TTY) it is skipped and no optional module is installed. See [Optional Observability Recipes](#optional-observability-recipes) below.
+
+### Optional Observability Recipes
+
+During installation `sk:install` can `composer require` and wire up one or more optional monitoring/debugging packages for you:
+
+| Key | Package | Post-install |
+|-----|---------|--------------|
+| `telescope` | `laravel/telescope` (dev dependency) | runs `telescope:install` |
+| `pulse` | `laravel/pulse` | none |
+| `sentry` | `sentry/sentry-laravel` | runs `vendor:publish --tag=sentry-config` |
+
+Selection works two ways:
+
+- **Interactive** — when `--modules=` is not passed and the terminal is interactive, the installer prompts "Install optional monitoring/debugging modules?" with the three recipes as a multi-select; picking none is a valid answer.
+- **Flag** — pass `--modules=telescope,pulse,sentry` (or repeat the flag) to select recipes non-interactively, including under `--no-interaction`. An unrecognized key fails fast with an error before anything is written.
+
+Each recipe is attempted independently and best-effort: a `composer require` failure or a failing post-install command for one recipe does not abort the install or block the others. A recipe that installs and completes its post-install step cleanly is listed under "Optional modules" in the install summary; one that partially fails is reported in the failure list with a note to run the remaining step by hand.
+
+This step only requires the package and runs its own installer command — it does **not** configure the package (e.g. a Sentry DSN, Telescope's own gate/auth). Follow that package's own documentation for its configuration step after `sk:install` finishes.
 
 ## 4. Build Frontend Assets
 

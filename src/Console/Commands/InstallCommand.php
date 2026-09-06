@@ -16,6 +16,7 @@ use Lvntr\StarterKit\Console\Commands\Concerns\ComparesPublishedStubs;
 use Lvntr\StarterKit\Console\Commands\Concerns\MirrorsAiSkills;
 use Lvntr\StarterKit\Console\Commands\Concerns\RefusesPackageSourceTree;
 use Lvntr\StarterKit\Console\Commands\Concerns\WritesFilesAtomically;
+use Lvntr\StarterKit\Console\Support\RecipeRegistry;
 use Lvntr\StarterKit\StarterKitServiceProvider;
 use Lvntr\StarterKit\Support\DocsLink;
 use Lvntr\StarterKit\Support\Encryption\DataEncrypterFactory;
@@ -29,6 +30,7 @@ use PhpParser\PrettyPrinter;
 use Symfony\Component\Process\Process;
 
 use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\password;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\text;
@@ -47,6 +49,7 @@ class InstallCommand extends Command
         {--dry-run : Print what would be written and exit without writing anything}
         {--without-ai-skill : Skip .claude/skills/ and .codex/skills/ AI skill files}
         {--without-eject : Keep User/Role runtime in vendor (skip default domain eject)}
+        {--modules=* : Optional packages (telescope, pulse, sentry) — left empty, prompted interactively in a TTY, skipped when non-interactive}
         {--resume : Resume a previously interrupted install, skipping already-completed steps}';
 
     protected $description = 'Install the Lvntr Starter Kit application skeleton (v13.5.0+: package runtime runs from vendor; User + Role are ejected into app/Domain on first install)';
@@ -67,6 +70,14 @@ class InstallCommand extends Command
      * half of an already-installed marker. See detectComposerLockMarkers().
      */
     private const PACKAGE_NAME = 'lvntr/laravel-starter-kit';
+
+    /**
+     * Label of the optional-module step. A constant because it is read twice —
+     * once to ask the checkpoint whether the step already finished (so a
+     * `--resume` does not re-prompt for a selection it already installed), and
+     * once by step() itself. Two literals that must match are a bug waiting.
+     */
+    private const RECIPE_STEP_LABEL = 'Installing optional modules';
 
     /**
      * Files that ONLY this kit publishes. A stock Laravel application — the
@@ -157,6 +168,17 @@ class InstallCommand extends Command
      * @var list<string>
      */
     private array $ejectedDomains = [];
+
+    /**
+     * Recipe keys (see RecipeRegistry) whose composer package AND every
+     * post-install command succeeded during this run. Drives the closing
+     * summary; a recipe whose package installed but whose post-install command
+     * failed deliberately stays out, so the summary never claims a module is
+     * ready when it is half-wired — the best-effort failure list reports it.
+     *
+     * @var list<string>
+     */
+    private array $installedRecipes = [];
 
     /**
      * Labels of the `step()` calls that have finished successfully. Loaded from
@@ -347,6 +369,18 @@ class InstallCommand extends Command
 
         $this->files = new Filesystem;
         $this->dryRun = (bool) $this->option('dry-run');
+
+        // A mistyped --modules value is caught HERE, before the first byte is
+        // written. Left to RecipeRegistry::get(), it would throw from inside the
+        // module step — after the whole scaffold was published — and take the
+        // run down over a typo the operator could have fixed in a second.
+        if (($unknown = $this->unknownRecipeKeys()) !== []) {
+            $this->components->error('Unknown --modules value(s): '.implode(', ', $unknown));
+            $this->line('  <fg=gray>Available modules: '.implode(', ', array_keys(RecipeRegistry::all())).'</>');
+            $this->newLine();
+
+            return self::FAILURE;
+        }
 
         // --adopt is a registry-repair command wearing the installer's name. It
         // shares nothing with the install path except the stub-hash semantics,
@@ -601,6 +635,30 @@ class InstallCommand extends Command
                 $this->files->makeDirectory($dir, 0755, true);
             }
 
+            // 5b. Optional observability modules (Telescope / Pulse / Sentry).
+            //
+            // Ordering is load-bearing: the `composer require` has to happen
+            // BEFORE the autoload dump (step 6) and the migration step (step 7),
+            // so a recipe package's own migrations are on disk and discovered by
+            // the migrate run this install performs — not left for the operator.
+            //
+            // Best-effort by design: composer needs the network and the module is
+            // optional, so a failure warns and the install carries on (same
+            // contract as the autoload dump right below).
+            //
+            // --dry-run never reaches here — it returns at the publish step
+            // above; renderDryRunPlan() reports the selection instead of running
+            // it. And on a --resume that already completed this step, the
+            // selection is not re-asked at all: prompting for a choice that will
+            // then be skipped is pure noise.
+            $recipes = $this->stepAlreadyCompleted(self::RECIPE_STEP_LABEL, (bool) $this->option('resume'), $this->completedSteps)
+                ? []
+                : $this->selectedRecipes();
+
+            if ($recipes !== []) {
+                $this->step(self::RECIPE_STEP_LABEL, fn (): bool => $this->installRecipes($recipes), mandatory: false);
+            }
+
             // 6. Regenerate autoload so published classes are available for migrations/seeders
             //
             // Best-effort on purpose: composer is not guaranteed to be on PATH of
@@ -790,6 +848,15 @@ class InstallCommand extends Command
             $this->line('  <fg=gray>To revert: delete the directories, remove the injected Event::listen lines</>');
             $this->line('  <fg=gray>from app/Providers/DomainServiceProvider.php, then run `composer dump-autoload`.</>');
             $this->line('  <fg=gray>To keep them in vendor next time: `php artisan sk:install --without-eject`.</>');
+        }
+
+        if ($this->installedRecipes !== []) {
+            $this->newLine();
+            $this->components->twoColumnDetail(
+                '<fg=green>Optional modules</>',
+                implode(', ', $this->installedRecipes),
+            );
+            $this->line('  <fg=gray>Review each package\'s own config/env before using it in production.</>');
         }
 
         // Non-fatal failures did not stop the install, so they are repeated here
@@ -1510,6 +1577,16 @@ class InstallCommand extends Command
         $this->components->twoColumnDetail('<fg=yellow>Would skip</>', count($this->skipped).' files (preserved or intentionally deleted)');
 
         $this->printPreservedFiles(dryRun: true);
+
+        // Only what --modules= named: a dry run must not open an interactive
+        // prompt, so the selection is never asked for here.
+        if (($recipes = $this->recipeKeysFromOption()) !== []) {
+            $this->newLine();
+            $this->components->twoColumnDetail(
+                '<fg=green>Would install optional modules</>',
+                implode(', ', $recipes),
+            );
+        }
 
         $this->newLine();
         $this->line('  <fg=gray>No .env change, no database configuration, no migration, no seeder,</>');
@@ -2626,6 +2703,197 @@ class InstallCommand extends Command
         }
 
         return ['composer'];
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // OPTIONAL MODULES (observability recipes)
+    // ══════════════════════════════════════════════════════════════════════
+
+    /**
+     * The recipe keys this run should install: whatever `--modules=` named, or
+     * an interactive selection when the flag was omitted.
+     *
+     * @return list<string>
+     */
+    private function selectedRecipes(): array
+    {
+        $fromOption = $this->recipeKeysFromOption();
+
+        return $fromOption !== [] ? $fromOption : $this->promptForRecipes();
+    }
+
+    /**
+     * Normalized `--modules=` values. Accepts both repeated flags
+     * (`--modules=telescope --modules=pulse`) and the comma-separated spelling
+     * (`--modules=telescope,pulse`) the docs advertise, because an array option
+     * hands the latter over as ONE untouched "telescope,pulse" string.
+     *
+     * Pure — no registry lookup, so an unknown key survives to be reported by
+     * unknownRecipeKeys() rather than throwing here.
+     *
+     * @return list<string>
+     */
+    private function recipeKeysFromOption(): array
+    {
+        $keys = [];
+
+        /** @var list<string> $values */
+        $values = (array) $this->option('modules');
+
+        foreach ($values as $value) {
+            foreach (explode(',', $value) as $key) {
+                $key = strtolower(trim($key));
+
+                if ($key !== '') {
+                    $keys[] = $key;
+                }
+            }
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    /**
+     * `--modules=` values that name no known recipe. Pure decision, unit
+     * testable in isolation; the caller fails the run on a non-empty result.
+     *
+     * @return list<string>
+     */
+    private function unknownRecipeKeys(): array
+    {
+        return array_values(array_diff(
+            $this->recipeKeysFromOption(),
+            array_keys(RecipeRegistry::all()),
+        ));
+    }
+
+    /**
+     * Ask which optional modules to install. Selecting none is a valid answer
+     * (`required: false`), so the prompt never traps an operator who only wanted
+     * the base kit.
+     *
+     * Returns [] without prompting when there is nobody to ask: a
+     * non-interactive input (Symfony flips that for --no-interaction / -n before
+     * the command runs) or no TTY on stdin (CI). The TTY test mirrors Laravel's
+     * own configurePrompts() — relying on laravel/prompts to fall back to the
+     * default would make an unattended install depend on library internals, and
+     * the version pinned here has no Prompt::fake().
+     *
+     * @return list<string>
+     */
+    private function promptForRecipes(): array
+    {
+        if (! $this->input->isInteractive() || ! defined('STDIN') || ! stream_isatty(STDIN)) {
+            return [];
+        }
+
+        $selected = multiselect(
+            label: 'Install optional monitoring/debugging modules?',
+            options: RecipeRegistry::labels(),
+            required: false,
+            hint: 'Select none to skip — any of these can be added later by hand.',
+        );
+
+        // multiselect() hands back the option KEYS, typed loosely as
+        // array<int|string, int|string>; the recipe keys they carry are strings.
+        return array_values(array_map(strval(...), $selected));
+    }
+
+    /**
+     * `composer require` each selected recipe, then run its post-install
+     * commands in order. Every recipe is attempted even when an earlier one
+     * failed: they are independent, and stopping at the first failure would
+     * silently drop modules the operator explicitly asked for.
+     *
+     * @param  list<string>  $keys
+     * @return bool Whether every recipe installed cleanly.
+     */
+    private function installRecipes(array $keys): bool
+    {
+        $composer = $this->findComposerBinary();
+        $failures = [];
+
+        foreach ($keys as $key) {
+            $recipe = RecipeRegistry::get($key);
+
+            if (! $this->runProcessStep($this->recipeRequireCommand($composer, $recipe), timeout: 180)) {
+                $failures[] = $key.' — '.($this->stepFailureDetail ?? '`composer require` failed.');
+
+                continue;
+            }
+
+            foreach ($recipe['post_install'] as $artisanCommand) {
+                if ($this->runProcessStep($this->recipeArtisanCommand($artisanCommand), timeout: 120)) {
+                    continue;
+                }
+
+                $failures[] = sprintf(
+                    '%s — the package was installed, but `php artisan %s` failed; run it by hand. %s',
+                    $key,
+                    $artisanCommand,
+                    $this->stepFailureDetail ?? '',
+                );
+
+                // The package is on disk but not wired, so it must not be
+                // reported as installed. Its remaining post-install commands
+                // would only fail on the same cause.
+                continue 2;
+            }
+
+            $this->installedRecipes[] = $key;
+        }
+
+        if ($failures !== []) {
+            $this->stepFailureDetail = implode(PHP_EOL.'  ', $failures);
+
+            return false;
+        }
+
+        $this->stepFailureDetail = null;
+
+        return true;
+    }
+
+    /**
+     * The composer invocation for one recipe. Pure — built here rather than
+     * inline so it can be asserted without a network call.
+     *
+     * @param  list<string>  $composer
+     * @param  array{composer: string, dev: bool, label: string, post_install: list<string>}  $recipe
+     * @return list<string>
+     */
+    private function recipeRequireCommand(array $composer, array $recipe): array
+    {
+        return array_values(array_filter([
+            ...$composer,
+            'require',
+            $recipe['dev'] ? '--dev' : null,
+            $recipe['composer'],
+            '--no-interaction',
+        ], fn (?string $part): bool => $part !== null));
+    }
+
+    /**
+     * A recipe's post-install Artisan command, as a CHILD php process.
+     *
+     * Not Artisan::call(): the package was installed seconds ago by the composer
+     * run above, so its service provider was never registered in THIS
+     * already-booted process and `telescope:install` does not exist here —
+     * an in-process call would always die with "command not found". A fresh
+     * process boots after composer's package discovery and finds it. Same shape
+     * as the wayfinder:generate step further down.
+     *
+     * --no-interaction is appended so an unattended install can never stall on a
+     * third-party package's prompt. Splitting on whitespace is safe because the
+     * strings come from RecipeRegistry's own constant, never from user input.
+     *
+     * @return list<string>
+     */
+    private function recipeArtisanCommand(string $command): array
+    {
+        $tokens = preg_split('/\s+/', trim($command)) ?: [];
+
+        return [PHP_BINARY, base_path('artisan'), ...$tokens, '--no-interaction'];
     }
 
     /**

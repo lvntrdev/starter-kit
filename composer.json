@@ -43,6 +43,11 @@
     "orchestra/testbench": "^11.0",
     "pestphp/pest": "^4.4"
   },
+  "suggest": {
+    "laravel/telescope": "Enables the optional sk:install --modules=telescope recipe (debug assistant).",
+    "laravel/pulse": "Enables the optional sk:install --modules=pulse recipe (application performance monitoring).",
+    "sentry/sentry-laravel": "Enables the optional sk:install --modules=sentry recipe (error tracking)."
+  },
   "autoload": {
     "psr-4": {
       "Lvntr\\StarterKit\\": "src/"

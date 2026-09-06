@@ -100,6 +100,7 @@ php artisan sk:install --no-interaction
 php artisan sk:install --without-ai-skill
 php artisan sk:install --without-eject
 php artisan sk:install --resume
+php artisan sk:install --modules=telescope,pulse
 ```
 
 - `--force` overwrites existing publishable files, **and** bypasses the already-installed safety stop described below. It is the opt-out for every preservation rule: a consumer-edited published file and a file the hash registry has no record of are both overwritten
@@ -109,6 +110,7 @@ php artisan sk:install --resume
 - `--without-ai-skill` skips publishing the Lvntr Starter Kit AI skills entirely — both the Claude Code copies (`.claude/skills/`) and their Codex mirror (`.codex/skills/`). Useful when the consumer uses neither Claude Code nor Codex with the kit's skill bundle
 - `--without-eject` skips the default `User` and `Role` domain eject on a first install; the runtime stays in vendor and resolves via `class_alias`. Omit this flag to have `app/Domain/User/` and `app/Domain/Role/` created automatically. See [install.md](./install.md) for the ownership trade-off.
 - `--resume` resumes a previously interrupted install, skipping steps already checkpointed as completed. See [install.md](./install.md) for the full resume workflow.
+- `--modules=` selects optional observability recipes to `composer require` and wire up (`telescope`, `pulse`, `sentry`; comma-separated or repeatable). Left empty, you are prompted interactively in a TTY and skipped entirely under `--no-interaction` or a non-interactive session. An unrecognized key fails fast before anything is written. See [Optional Observability Recipes](./install.md#optional-observability-recipes) in install.md for the full recipe table and behavior.
 
 **It is a first-install command, not a repair tool.** Before the banner is printed, a fail-closed detection pass looks for kit schema tables and install-only paths; if it finds any without a matching hash registry, the command **stops before writing a single byte** and points at `sk:update`, `sk:publish --tag=<area>` or `--adopt`. An existing `.env` is never overwritten, on a first install or a re-run: missing `.env.example` keys are appended and first-install-only keys are seeded only where absent, and no existing value is ever rewritten.
 

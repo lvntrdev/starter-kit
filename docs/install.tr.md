@@ -199,6 +199,7 @@ php artisan sk:install --no-interaction
 php artisan sk:install --without-ai-skill
 php artisan sk:install --without-eject
 php artisan sk:install --resume
+php artisan sk:install --modules=telescope,pulse
 ```
 
 - `--force` mevcut yayınlanabilir dosyaların üzerine yazar — düzenlediğiniz bir dosya ve kaydın hiç izlemediği bir dosya dâhil — ve "zaten kurulu" güvenlik durdurmasını atlar. `--force` çalıştırması artık ilk kurulum sayılmaz
@@ -208,6 +209,26 @@ php artisan sk:install --resume
 - `--without-ai-skill` Lvntr Starter Kit AI skill'lerinin yayınlanmasını tamamen atlar — hem Claude Code kopyaları (`.claude/skills/`) hem de Codex aynası (`.codex/skills/`). Kit'in skill bundle'ını ne Claude Code ne Codex ile kullanan consumer'lar için
 - `--without-eject` varsayılan `User` ve `Role` domain eject'ini atlar; runtime vendor'da kalır ve `class_alias` ile çözülür
 - `--resume` yarıda kalmış bir kurulumu kaldığı yerden devam ettirir: `storage/starter-kit/install-progress.json`'a checkpoint'lenmiş adımlar atlanır, çalışma başarısız olan adımdan devam eder. Önceden bir checkpoint yoksa uyarıyla birlikte tam bir kurulum çalıştırır.
+- `--modules=` kit ile birlikte kurulacak opsiyonel gözlemlenebilirlik paketlerini seçer (`telescope`, `pulse`, `sentry`; virgülle ayrılmış ya da tekrarlanan flag ile, örn. `--modules=telescope --modules=pulse`). Boş bırakılırsa, TTY'de interaktif olarak sorulur; interaktif olmayan bir çalışmada (`--no-interaction` ya da TTY yok) bu adım atlanır ve hiçbir opsiyonel modül kurulmaz. Aşağıdaki [Opsiyonel Gözlemlenebilirlik Recipe'leri](#opsiyonel-gözlemlenebilirlik-recipeleri) bölümüne bakın.
+
+### Opsiyonel Gözlemlenebilirlik Recipe'leri
+
+Kurulum sırasında `sk:install`, sizin için bir veya daha fazla opsiyonel izleme/hata ayıklama paketini `composer require` ile ekleyip devreye alabilir:
+
+| Anahtar | Paket | Post-install |
+|-----|---------|--------------|
+| `telescope` | `laravel/telescope` (dev bağımlılığı) | `telescope:install` çalıştırır |
+| `pulse` | `laravel/pulse` | yok |
+| `sentry` | `sentry/sentry-laravel` | `vendor:publish --tag=sentry-config` çalıştırır |
+
+Seçim iki şekilde yapılır:
+
+- **İnteraktif** — `--modules=` verilmediğinde ve terminal interaktifse, installer "Install optional monitoring/debugging modules?" sorusunu üç recipe'i çoklu-seçim olarak sunarak sorar; hiçbirini seçmemek de geçerli bir cevaptır.
+- **Flag** — recipe'leri interaktif olmadan seçmek için (örn. `--no-interaction` altında da dahil) `--modules=telescope,pulse,sentry` verin (ya da flag'i tekrarlayın). Tanınmayan bir anahtar, hiçbir şey yazılmadan önce hızlıca hata ile durur.
+
+Her recipe birbirinden bağımsız ve best-effort olarak denenir: bir recipe için `composer require` başarısızlığı ya da post-install komutunun başarısız olması kurulumu durdurmaz ya da diğerlerini engellemez. Kurulan ve post-install adımını sorunsuz tamamlayan bir recipe, kurulum özetinde "Optional modules" altında listelenir; kısmen başarısız olan bir recipe ise kalan adımı elle çalıştırmanız gerektiği notuyla başarısızlık listesinde raporlanır.
+
+Bu adım yalnızca paketi ekler ve kendi kurulum komutunu çalıştırır — paketi yapılandırmaz (örn. bir Sentry DSN'i, Telescope'un kendi gate/auth'u). `sk:install` bittikten sonraki yapılandırma adımı için o paketin kendi dokümantasyonunu izleyin.
 
 ## 4. Frontend Asset'lerini Derleyin
 
