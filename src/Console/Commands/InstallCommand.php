@@ -357,7 +357,7 @@ class InstallCommand extends Command
         }
 
         $this->newLine();
-        $this->line('  <fg=cyan;options=bold>Lvntr Starter Kit Installer (v13.6.x)</>');
+        $this->line('  <fg=cyan;options=bold>Lvntr Starter Kit Installer (v13.7.x)</>');
         $this->newLine();
         $this->line('  <fg=gray>Package runtime runs from vendor/lvntr/laravel-starter-kit.</>');
         $this->line('  <fg=gray>This command copies the application skeleton (auth, layout,</>');
@@ -382,6 +382,15 @@ class InstallCommand extends Command
             $this->newLine();
         }
 
+        // A checkpoint file alone is NOT "resuming" — stepAlreadyCompleted()
+        // (the actual step-skip logic) already requires --resume too, so a
+        // checkpoint left by an install that stalled out (e.g. an unreachable
+        // database, see installIncomplete below) and was never explicitly
+        // resumed would otherwise silently disable both guards below forever,
+        // on every ordinary re-run, while still republishing every file from
+        // scratch. Both concerns have to agree on what "resuming" means.
+        $resuming = $this->progressExisted && (bool) $this->option('resume');
+
         // Fail-closed. The hash registry was the ONLY thing separating a first
         // install from a re-run, and it lives under the git-ignored storage/
         // tree: a stateless deploy, a wiped storage/, or a fresh clone loses it.
@@ -395,7 +404,7 @@ class InstallCommand extends Command
         // command's OWN half-finished publish, and stopping there would strand
         // the operator in the middle of an install with no way forward.
         $noHashRegistry = $this->isFirstInstall();
-        $existingAppMarkers = $noHashRegistry && ! $this->progressExisted
+        $existingAppMarkers = $noHashRegistry && ! $resuming
             ? $this->detectExistingApp()
             : [];
 
@@ -407,6 +416,26 @@ class InstallCommand extends Command
             }
 
             $this->renderForcedOverExistingApp($existingAppMarkers);
+        }
+
+        // The hash registry existing (! $noHashRegistry) means this app really
+        // was installed before and this is not a resumed run — a genuine
+        // re-run, which republishes files. That is a legitimate repair path
+        // (a registry-repair is what --adopt is for; a full re-run is for
+        // pulling in first-install-only publishing this app never got), but an
+        // operator who fat-fingers `sk:install` on a working app should not
+        // have it silently start rewriting files. Ask first, unless they
+        // already opted in via --force. A --dry-run writes nothing at all
+        // (it stops before the first byte, below), so there is nothing to
+        // confirm — asking, or refusing under --no-interaction, would block a
+        // read-only preview for no reason.
+        if (! $noHashRegistry && ! $resuming) {
+            if ($this->option('force')) {
+                $this->components->warn('--force: skipping the already-installed confirmation.');
+                $this->newLine();
+            } elseif (! $this->dryRun && ! $this->confirmReinstall()) {
+                return self::FAILURE;
+            }
         }
 
         // 1. Publish stubs first so the kit's .env.example, package.json, and
@@ -1396,6 +1425,31 @@ class InstallCommand extends Command
         $this->line('  <fg=gray>this run is NOT treated as a first install: no default-domain eject and no</>');
         $this->line('  <fg=gray>first-install-only .env seeding.</>');
         $this->newLine();
+    }
+
+    /**
+     * The hash registry says this app was already installed. Ask before
+     * republishing over it — fail-closed under --no-interaction, since a
+     * silent "yes" here is exactly the accidental-run risk this guards.
+     */
+    private function confirmReinstall(): bool
+    {
+        $this->newLine();
+        $this->components->warn('This application is already installed — sk:install will republish files here.');
+        $this->newLine();
+        $this->line('  <fg=gray>Hash registry found at:</>');
+        $this->line('  <fg=gray>  '.$this->hashRegistryPath().'</>');
+        $this->line('  <fg=gray>Routine updates should use `php artisan sk:update` instead — it is the</>');
+        $this->line('  <fg=gray>hash-tracked path that refreshes stubs without clobbering your edits.</>');
+        $this->newLine();
+
+        if ($this->option('no-interaction')) {
+            $this->components->error('Refusing to re-install without confirmation. Pass --force to proceed non-interactively.');
+
+            return false;
+        }
+
+        return confirm('Continue and republish over this installed application?', default: false);
     }
 
     /**

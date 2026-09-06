@@ -332,6 +332,101 @@ it('lets --force through the stop while still refusing to touch .env', function 
 
 /*
 |--------------------------------------------------------------------------
+| Accidental re-run — an app the registry already confirms is installed
+|--------------------------------------------------------------------------
+*/
+
+it('refuses to re-run over a confirmed-installed app under --no-interaction, and writes nothing', function (): void {
+    // Not the "registry lost" stop above — this is the registry saying the
+    // app WAS installed, and the operator ran sk:install again without
+    // --force. Under --no-interaction there is no one to answer the prompt,
+    // so this must fail closed rather than default to "yes".
+    $dir = istBoot(istInstalledAppTree());
+    istInstall(['--adopt' => true]);
+    $before = istSnapshot($dir);
+
+    [$exit, $output] = istInstall(['--no-interaction' => true]);
+
+    expect($exit)->toBe(Command::FAILURE)
+        ->and($output)->toContain('already installed')
+        ->and($output)->toContain('sk:update')
+        ->and(istSnapshot($dir))->toBe($before);
+});
+
+it('still asks even with a stale checkpoint left by an old incomplete install', function (): void {
+    // THE actual regression report: an earlier install whose database was
+    // unreachable sets installIncomplete and never clears install-progress.json
+    // (see IncompleteInstallTest). Every ordinary re-run after that found a
+    // checkpoint on disk and treated itself as "resuming" even though --resume
+    // was never passed — silently skipping both the marker-stop above AND this
+    // confirmation, then republishing every file from scratch anyway (skipping
+    // completed steps genuinely requires --resume too, so nothing was actually
+    // resumed — just unguarded).
+    $dir = istBoot(istInstalledAppTree());
+    istInstall(['--adopt' => true]);
+    is_dir($dir.'/storage/starter-kit') || mkdir($dir.'/storage/starter-kit', 0700, true);
+    file_put_contents(
+        $dir.'/storage/starter-kit/install-progress.json',
+        json_encode(['completed' => ['Publishing application scaffolding']]),
+    );
+    $before = istSnapshot($dir);
+
+    [$exit, $output] = istInstall(['--no-interaction' => true]);
+
+    expect($exit)->toBe(Command::FAILURE)
+        ->and($output)->toContain('already installed')
+        ->and(istSnapshot($dir))->toBe($before);
+});
+
+it('lets --force skip the accidental-re-run confirmation', function (): void {
+    $dir = istBoot(istInstalledAppTree());
+    istInstall(['--adopt' => true]);
+    $envBefore = file_get_contents($dir.'/.env');
+
+    [$exit, $output] = istInstall(['--force' => true, '--dry-run' => true]);
+
+    expect($exit)->toBe(Command::SUCCESS)
+        ->and($output)->toContain('skipping the already-installed confirmation')
+        ->and(file_get_contents($dir.'/.env'))->toBe($envBefore);
+});
+
+it('exempts a read-only --dry-run from the accidental-re-run confirmation', function (): void {
+    // confirmReinstall() ran ahead of the $this->dryRun check, so a --dry-run
+    // preview over an already-installed app — which writes nothing — hit the
+    // same gate as a real re-run and refused outright under --no-interaction.
+    $dir = istBoot(istInstalledAppTree());
+    istInstall(['--adopt' => true]);
+    $before = istSnapshot($dir);
+
+    [$exit, $output] = istInstall(['--dry-run' => true, '--no-interaction' => true]);
+
+    expect($exit)->toBe(Command::SUCCESS)
+        ->and($output)->not->toContain('already installed')
+        ->and($output)->toContain('Dry run')
+        ->and(istSnapshot($dir))->toBe($before);
+});
+
+it('lets an explicit --resume through without asking, checkpoint and all', function (): void {
+    // The flip side of the stale-checkpoint regression above: a genuine
+    // `--resume` (checkpoint present AND the flag passed) must still sail
+    // through with no confirmation — that is the whole point of --resume.
+    $dir = istBoot(istInstalledAppTree());
+    istInstall(['--adopt' => true]);
+    is_dir($dir.'/storage/starter-kit') || mkdir($dir.'/storage/starter-kit', 0700, true);
+    file_put_contents(
+        $dir.'/storage/starter-kit/install-progress.json',
+        json_encode(['completed' => ['Publishing application scaffolding']]),
+    );
+
+    [$exit, $output] = istInstall(['--resume' => true, '--dry-run' => true]);
+
+    expect($exit)->toBe(Command::SUCCESS)
+        ->and($output)->not->toContain('already installed')
+        ->and($output)->toContain('Dry run');
+});
+
+/*
+|--------------------------------------------------------------------------
 | --adopt — the recovery path out of the stop
 |--------------------------------------------------------------------------
 */
