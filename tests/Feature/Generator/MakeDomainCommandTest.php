@@ -132,6 +132,51 @@ it('--with-test generates a Pest feature test file', function () {
     expect($content)->toContain('Order::factory()');
 });
 
+// ── --with-permissions ─────────────────────────────────────────────────────
+
+it('--with-permissions registers the resource in permission-resources.php', function () {
+    $configPath = config_path('permission-resources.php');
+    copy(dirname(__DIR__, 3).'/stubs/config/permission-resources.php', $configPath);
+
+    $args = array_merge(baseArgs('PermInvoice'), ['--with-permissions' => true]);
+
+    $this->artisan('make:sk-domain', $args)
+        ->expectsConfirmation('Proceed with this configuration?', 'yes')
+        ->assertSuccessful();
+
+    $content = file_get_contents($configPath);
+    expect($content)->toContain("'perm_invoices' => null, // all abilities");
+    expect($content)->toContain("'perm_invoices' => ['en' => 'Perm Invoices', 'tr' => 'Perm Invoices'], // TODO: translate to Turkish");
+});
+
+it('--with-permissions on a second run does not duplicate the entry', function () {
+    $configPath = config_path('permission-resources.php');
+    copy(dirname(__DIR__, 3).'/stubs/config/permission-resources.php', $configPath);
+
+    $args = array_merge(baseArgs('Coupon'), ['--with-permissions' => true]);
+
+    $this->artisan('make:sk-domain', $args)
+        ->expectsConfirmation('Proceed with this configuration?', 'yes')
+        ->assertSuccessful();
+
+    $this->artisan('make:sk-domain', $args)
+        ->expectsConfirmation('Proceed with this configuration?', 'yes')
+        ->assertSuccessful();
+
+    $content = file_get_contents($configPath);
+    expect(substr_count($content, "'coupons' => null, // all abilities"))->toBe(1);
+});
+
+it('--with-permissions skipped without crashing when permission-resources.php is absent', function () {
+    $args = array_merge(baseArgs('Ticket'), ['--with-permissions' => true]);
+
+    $this->artisan('make:sk-domain', $args)
+        ->expectsConfirmation('Proceed with this configuration?', 'yes')
+        ->assertSuccessful();
+
+    expect(file_exists(app_path('Models/Ticket.php')))->toBeTrue();
+});
+
 // ── --with= shorthand ──────────────────────────────────────────────────────
 
 it('--with= shorthand activates multiple opt-in flags', function () {

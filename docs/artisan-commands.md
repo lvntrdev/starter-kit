@@ -297,8 +297,9 @@ Opt-in flags (v2):
 | `--with-factory` | Factory |
 | `--with-seeder` | Seeder |
 | `--with-test` | Feature test |
+| `--with-permissions` | Registers the resource (all abilities) in `config/permission-resources.php`, plus an EN display name — TR label and role assignment are left for you to fill in |
 | `--with-relations` | Relation scaffold (use together with `--relations`) |
-| `--with=<policy,factory,seeder,test,relations>` | Bulk syntax — any combination of the opt-ins above in a single flag; individual `--with-*` flags are additive on top of it |
+| `--with=<policy,factory,seeder,test,permissions,relations>` | Bulk syntax — any combination of the opt-ins above in a single flag; individual `--with-*` flags are additive on top of it |
 | `--relations="belongsTo:User,hasMany:Comment,morphTo:commentable"` | Relation definitions for the scaffold. Supported types: `belongsTo`, `hasMany`, `morphTo`. Passing `--relations=` implies `--with-relations` |
 
 Use it when you want the package conventions for actions, DTOs, queries, requests, routes, and Vue screens.

@@ -44,6 +44,7 @@ class MakeDomainCommand extends Command
         {--with-factory : Generate a ModelFactory class (opt-in)}
         {--with-seeder : Generate a Seeder class (opt-in)}
         {--with-test : Generate a Pest feature test file (opt-in)}
+        {--with-permissions : Register the resource in config/permission-resources.php (opt-in)}
         {--with-relations : Interactively define Eloquent relations (opt-in)}
         {--relations= : Comma-separated relations, e.g. "belongsTo:User,hasMany:Comment,morphTo:commentable"}
         {--with= : Comma-separated shorthand for multiple opt-in flags (e.g. policy,factory,test,seeder,relations)}';
@@ -101,6 +102,8 @@ class MakeDomainCommand extends Command
     private bool $withSeeder = false;
 
     private bool $withTest = false;
+
+    private bool $withPermissions = false;
 
     private bool $withRelations = false;
 
@@ -229,6 +232,10 @@ class MakeDomainCommand extends Command
             $this->createTest();
         }
 
+        if ($this->withPermissions) {
+            $this->registerPermissions();
+        }
+
         if ($this->relations !== []) {
             $this->applyRelations();
         }
@@ -253,6 +260,11 @@ class MakeDomainCommand extends Command
 
         if ($this->withAdmin && $this->vueMode === 'none') {
             $this->line("   {$step}. Create Inertia pages: resources/js/pages/{$this->inertiaPagePath('')}");
+            $step++;
+        }
+
+        if ($this->withPermissions) {
+            $this->line("   {$step}. Translate the 'tr' label and assign '{$this->dnPSnake}' abilities to roles in config/permission-resources.php, then run: php artisan sk:seed-permissions");
         }
 
         return self::SUCCESS;
@@ -560,6 +572,7 @@ class MakeDomainCommand extends Command
             $this->withFactory ? 'factory' : null,
             $this->withSeeder ? 'seeder' : null,
             $this->withTest ? 'test' : null,
+            $this->withPermissions ? 'permissions' : null,
         ])->filter()->implode(', ');
 
         $relationsDisplay = $this->relations !== []
@@ -624,6 +637,7 @@ class MakeDomainCommand extends Command
                     'factory' => $this->withFactory = true,
                     'seeder' => $this->withSeeder = true,
                     'test' => $this->withTest = true,
+                    'permissions' => $this->withPermissions = true,
                     'relations' => $this->withRelations = true,
                     default => null,
                 };
@@ -645,6 +659,10 @@ class MakeDomainCommand extends Command
 
         if ($this->option('with-test')) {
             $this->withTest = true;
+        }
+
+        if ($this->option('with-permissions')) {
+            $this->withPermissions = true;
         }
 
         // --relations= (non-interactive) implies --with-relations
@@ -2627,6 +2645,75 @@ PHP;
     }
 
     /**
+     * Register the resource in config/permission-resources.php:
+     * the 'resources' abilities entry and a 'display_names.resources' label.
+     *
+     * Deliberately does not touch 'permission_groups' or 'role_permissions' —
+     * an ungrouped resource falls back to the 'other' group, and granting no
+     * role automatically is the safer default; the operator assigns both.
+     */
+    private function registerPermissions(): void
+    {
+        $path = config_path('permission-resources.php');
+
+        if (! file_exists($path)) {
+            $this->warn('  ⏭  config/permission-resources.php not found');
+
+            return;
+        }
+
+        $content = file_get_contents($path);
+
+        if (str_contains($content, "'{$this->dnPSnake}' =>")) {
+            $this->warn("  ⏭  '{$this->dnPSnake}' already registered in permission-resources.php");
+
+            return;
+        }
+
+        $label = Str::headline($this->dnPSnake);
+
+        // Insert into the 2nd occurrence of "'resources' => [" (display_names.resources)
+        // before the 1st (top-level resources), so the earlier offset stays valid.
+        $content = $this->insertAfterNthOccurrence(
+            $content,
+            "'resources' => [",
+            "            '{$this->dnPSnake}' => ['en' => '{$label}', 'tr' => '{$label}'], // TODO: translate to Turkish\n",
+            2,
+        );
+
+        $content = $this->insertAfterNthOccurrence(
+            $content,
+            "'resources' => [",
+            "        '{$this->dnPSnake}' => null, // all abilities\n",
+            1,
+        );
+
+        file_put_contents($path, $content);
+        $this->line("  ✓ Permissions: <info>config/permission-resources.php</info> ('{$this->dnPSnake}' registered, not yet assigned to a role)");
+    }
+
+    /**
+     * Insert $insert right after the line containing the Nth occurrence of $needle.
+     * No-op (returns $content unchanged) if fewer than $occurrence matches exist.
+     */
+    private function insertAfterNthOccurrence(string $content, string $needle, string $insert, int $occurrence): string
+    {
+        $pos = -1;
+
+        for ($i = 0; $i < $occurrence; $i++) {
+            $pos = strpos($content, $needle, $pos + 1);
+
+            if ($pos === false) {
+                return $content;
+            }
+        }
+
+        $lineEnd = strpos($content, "\n", $pos) + 1;
+
+        return substr($content, 0, $lineEnd).$insert.substr($content, $lineEnd);
+    }
+
+    /**
      * Apply relation methods to the generated model and (for belongsTo) add FK
      * columns to the migration file.
      */
@@ -2883,6 +2970,10 @@ PHP,
 
         if ($this->withTest) {
             $rows[] = ['Test', "tests/Feature/{$this->domainPath}Test.php"];
+        }
+
+        if ($this->withPermissions) {
+            $rows[] = ['Permissions', 'config/permission-resources.php (updated)'];
         }
 
         if ($this->relations !== []) {

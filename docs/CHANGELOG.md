@@ -22,6 +22,7 @@ Newly added features and improvements to the starter kit are listed here.
 
 
 - **Static analysis (Larastan/PHPStan, level 5) now runs against `src/` in CI**, alongside Pint. `phpstan.neon` scans `stubs/app` so the package's `App\*` references (the consumer-owned classes the kit assumes exist, e.g. `App\Models\User`) resolve without a full consumer app; `phpstan-baseline.neon` snapshots the pre-existing findings so the gate holds only new code to the bar. Run locally with `composer analyse`. The baseline has since been narrowed from 259 to 238 findings as fixable issues were triaged out of it.
+- **`make:sk-domain` gained a `--with-permissions` opt-in flag** (also selectable via `--with=permissions`). It registers the new domain's resource — all default abilities — in `config/permission-resources.php` along with an English display name; the Turkish label and role assignment are deliberately left for you to fill in, since neither can be inferred safely from the domain name alone. See [Artisan Commands](artisan-commands.md).
 
 ### Security
 

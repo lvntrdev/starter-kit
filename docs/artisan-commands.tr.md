@@ -297,8 +297,9 @@ Opt-in flag'ler (v2):
 | `--with-factory` | Factory |
 | `--with-seeder` | Seeder |
 | `--with-test` | Feature test |
+| `--with-permissions` | Kaynağı (tüm ability'lerle) `config/permission-resources.php`'ye kaydeder, EN görünen ad ekler — TR etiketi ve rol ataması elle tamamlanmalı |
 | `--with-relations` | İlişki scaffold'ı (`--relations` ile birlikte kullanılır) |
-| `--with=<policy,factory,seeder,test,relations>` | Toplu syntax — yukarıdaki opt-in'lerin herhangi bir kombinasyonu tek flag'de; tekil `--with-*` flag'leri buna eklemeli olarak uygulanır |
+| `--with=<policy,factory,seeder,test,permissions,relations>` | Toplu syntax — yukarıdaki opt-in'lerin herhangi bir kombinasyonu tek flag'de; tekil `--with-*` flag'leri buna eklemeli olarak uygulanır |
 | `--relations="belongsTo:User,hasMany:Comment,morphTo:commentable"` | Scaffold için ilişki tanımları. Desteklenen tipler: `belongsTo`, `hasMany`, `morphTo`. `--relations=` verilmesi `--with-relations`'ı zımnen içerir |
 
 Action, DTO, Query, Request, Route ve Vue ekranı gibi paket konvansiyonlarını hızlıca kurmak istediğinizde kullanın.

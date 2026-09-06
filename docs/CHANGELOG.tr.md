@@ -22,6 +22,7 @@ Starter kit'e yeni eklenen özellikler ve iyileştirmeler burada listelenir.
 
 
 - **CI'de artık `src/` üzerinde statik analiz (Larastan/PHPStan, level 5) çalışıyor**, Pint'in yanında. `phpstan.neon`, kitin `App\*` referanslarının (kitin var saydığı tüketici-sahipli sınıflar, örn. `App\Models\User`) tam bir tüketici uygulaması olmadan çözülebilmesi için `stubs/app`'ı tarıyor; `phpstan-baseline.neon` mevcut bulguları anlık görüntü olarak dondurarak gate'in yalnızca yeni kodu bu çıtaya tabi tutmasını sağlıyor. Yerelde `composer analyse` ile çalıştırılır. Baseline daha sonra, düzeltilebilir bulgular ayıklanarak 259'dan 238 bulguya daraltıldı.
+- **`make:sk-domain` bir `--with-permissions` opt-in flag'i kazandı** (`--with=permissions` ile de seçilebilir). Yeni domain'in kaynağını — tüm varsayılan ability'lerle — `config/permission-resources.php`'ye bir EN görünen adla birlikte kaydeder; TR etiketi ve rol ataması bilinçli olarak elle doldurulmaya bırakılmıştır, çünkü ikisi de yalnızca domain adından güvenle çıkarılamaz. Bkz. [artisan-commands.tr.md](artisan-commands.tr.md).
 
 ### Güvenlik
 
