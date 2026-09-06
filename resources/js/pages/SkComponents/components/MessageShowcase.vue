@@ -27,17 +27,15 @@
 </script>
 
 <template>
-    <div>
-        <div class="mb-5 flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <h2 class="text-[17px] font-semibold tracking-tight text-surface-800 dark:text-surface-100">{{ $t('sk-component.message.title') }}</h2>
-                <p class="mt-0.5 text-[13px] leading-relaxed text-surface-500 dark:text-surface-400">{{ $t('sk-component.message.subtitle') }}</p>
-            </div>
+    <SkCard>
+        <template #title>{{ $t('sk-component.message.title') }}</template>
+        <template #subtitle>{{ $t('sk-component.message.subtitle') }}</template>
+        <template #actions>
             <a href="https://primevue.org/message/" target="_blank" rel="noopener noreferrer">
                 <Button :label="$t('sk-component.docs')" icon="pi pi-book" outlined size="small" />
             </a>
-        </div>
-
+        </template>
+        <template #content>
         <Message severity="info" :closable="false" class="mb-6">
             <span class="text-[13.5px] leading-relaxed">{{ trans('sk-component.message.intro') }}</span>
         </Message>
@@ -151,5 +149,6 @@
                 </div>
             </SkCard>
         </div>
-    </div>
+        </template>
+    </SkCard>
 </template>
