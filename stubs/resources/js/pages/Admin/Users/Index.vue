@@ -112,6 +112,7 @@
 
     const tableBuilder = DB.table<User>()
         .route(users.dtApi.url())
+        .title('sk-menu.users')
         // .searchable(true)
         .sortable(true);
     // .isCard(false)

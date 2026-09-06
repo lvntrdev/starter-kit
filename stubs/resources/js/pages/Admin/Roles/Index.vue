@@ -115,7 +115,7 @@
 
     // ── SkDatatable ─────────────────────────────────────────────────────────────────
 
-    const tableBuilder = DB.table<Role>().route(roles.dtApi.url());
+    const tableBuilder = DB.table<Role>().route(roles.dtApi.url()).title('sk-menu.roles_permissions');
 
     // Create butonu yalnızca `aura` temasında datatable toolbar'ında görünür
     // (URL variant — Link olarak render edilir); diğer temalarda header'daki

@@ -83,6 +83,7 @@
 
     const tableConfig = DB.table<LogFileRow>()
         .route(logs.dtApi.url())
+        .title('sk-log.title')
         .idColumn(false)
         .addColumns(
             DB.column<LogFileRow>().key('name').label(trans('sk-log.filename')),
