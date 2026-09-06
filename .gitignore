@@ -22,6 +22,7 @@ composer.lock
 *.swp
 *.swo
 .DS_Store
+.cache_ggshield
 package-audit-notes/
 /package-promo
 
