@@ -40,3 +40,7 @@ package-audit-notes/
 /YAYIN-HAZIRLIK-DEGERLENDIRME.md
 /review-reports/
 graphify-out/
+
+# Playwright E2E run artifacts (tests/e2e) — regenerated per run, never shipped.
+/test-results/
+/playwright-report/

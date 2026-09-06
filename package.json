@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "lang:build": "node resources/js/lang/sk-lang-build.mjs",
-    "lint:lib": "stubs/node_modules/.bin/eslint --config stubs/eslint.config.js resources/js/components/Lvntr-Starter-Kit --quiet"
+    "lint:lib": "stubs/node_modules/.bin/eslint --config stubs/eslint.config.js resources/js/components/Lvntr-Starter-Kit --quiet",
+    "test:e2e": "playwright test --config=tests/e2e/playwright.config.ts"
   },
   "main": "resources/js/components/Lvntr-Starter-Kit/index.ts",
   "exports": {
@@ -34,5 +35,8 @@
     "starter-kit",
     "laravel"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
 }

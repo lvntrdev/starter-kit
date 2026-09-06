@@ -57,6 +57,7 @@ All documentation lives in this `docs/` directory. Each topic has an English fil
 | [artisan-commands.md](./artisan-commands.md) | Full command reference: `sk:install`, `sk:update`, `sk:eject`, `make:sk-domain`, and more |
 | [claude-skills.md](./claude-skills.md) | Three Claude Code skills that teach AI assistants the kit's conventions |
 | [project-documentation.md](./project-documentation.md) | High-level architecture map of the kit after installation |
+| [testing-e2e.md](./testing-e2e.md) | Playwright admin smoke suite — what it covers, how to run it locally, CI job |
 
 ---
 

@@ -45,6 +45,14 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
 
+        // ── Redirects ────────────────────────────────────────────────
+        // Fortify's own default post-login target is `config('fortify.home')` = `/home`,
+        // which this kit never registers (the real landing page is `/dashboard`) —
+        // without this, every fresh install's login redirects to a 404. Fortify::redirects()
+        // only *reads* this config (it isn't a setter), so the override goes here rather
+        // than through that helper.
+        config(['fortify.home' => '/dashboard']);
+
         // ── Inertia View Bindings ────────────────────────────────────
         Fortify::loginView(fn () => Inertia::render('Auth/Login', [
             'status' => session('status'),
