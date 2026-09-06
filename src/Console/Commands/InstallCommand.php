@@ -1865,10 +1865,20 @@ class InstallCommand extends Command
      * arrives as a side effect of re-running the installer. See
      * docs/encryption.md and docs/server-migration-runbook.md.
      *
+     * STARTER_KIT_CSP_NONCE is the same shape one layer down the stack: it
+     * swaps script-src `'unsafe-inline'` for a per-request nonce, and a browser
+     * stops honouring `'unsafe-inline'` the instant a nonce appears. A fresh
+     * project is safe because the `app.blade.php` published beside this .env
+     * carries `nonce="{{ Vite::cspNonce() }}"` on the kit's one inline script.
+     * An app that published its Blade before that attribute existed would lose
+     * the theme script with no error anywhere, so the key must never arrive by
+     * merge — it opts in after adding the attribute.
+     *
      * @var list<string>
      */
     private const FIRST_INSTALL_ONLY_ENV_KEYS = [
         'STARTER_KIT_ALLOW_UNRESOLVED_ROUTES',
+        'STARTER_KIT_CSP_NONCE',
         DataEncrypterFactory::PRIMARY_ENV_KEY,
         DataEncrypterFactory::PREVIOUS_ENV_KEY,
     ];

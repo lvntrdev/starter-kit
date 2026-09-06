@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Passport\AccessToken;
@@ -22,6 +23,28 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
+ * @property string $id
+ * @property string $first_name
+ * @property string $last_name
+ * @property string $email
+ * @property Carbon|null $email_verified_at
+ * @property string $password
+ * @property string|null $two_factor_secret
+ * @property string|null $two_factor_recovery_codes
+ * @property Carbon|null $two_factor_confirmed_at
+ * @property string|null $remember_token
+ * @property string $status
+ * @property Carbon|null $last_login_at
+ * @property string|null $last_login_ip
+ * @property Carbon|null $password_changed_at
+ * @property string|null $timezone
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
+ * @property-read string $full_name
+ * @property-read string $initials
+ * @property-read string|null $avatar_url
+ *
  * @method AccessToken|TransientToken|null token()
  */
 class User extends Authenticatable implements HasMedia, MustVerifyEmail, OAuthenticatable

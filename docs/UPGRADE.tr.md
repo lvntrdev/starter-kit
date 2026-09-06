@@ -254,6 +254,42 @@ Segment bazlı engelleme (yukarıdaki `name.html.pdf` durumu) `spatie/laravel-me
 
 `SettingService` artık `settings` altında çözülmüş değerleri cache'lemek yerine `settings:v2` altında ham (ciphertext) satırları cache'liyor; nedeni için `CHANGELOG.tr.md`'ye bakın. Herhangi bir deploy adımı gerekmiyor: eski `settings` anahtarı, yeni snapshot ilk kurulduğunda otomatik olarak düşürülüyor. Beklemek yerine kalıcı bir düz-metin snapshot'ı hemen düşürmek isterseniz `php artisan cache:forget settings`'i elle çalıştırmak zararsızdır.
 
+### `POST /api/v1/auth/login` artık kendi hesap-başına rate limitine sahip
+
+`stubs/routes/api/public-api.php`'deki `login` rotası `throttle:5,1`'den yeni bir isimli limiter'a taşındı: `api-login` (paketin kendisinde, `Lvntr\StarterKit\StarterKitServiceProvider`'de kayıtlı): `Limit::perMinute(5)->by('ip:...')` **artı** `Limit::perMinute(3)->by('email:...')`. Bu sürümden önce endpoint'in hiçbir hesap-başına tavanı yoktu — bir saldırgan tek bir hesap için denemelerini birçok IP'ye yayarak hiçbir şeye takılmıyordu. `register` ve `two-factor-challenge` değişmedi, hâlâ `throttle:5,1`: `register`'ın hesap var olmadan önce üzerine anahtarlanacak bir hesap kimliği yok, ve 2FA challenge tek kullanımlık ve kısa ömürlü sunucu-tarafından-verilen bir challenge id'sine anahtarlanmış durumda, dolayısıyla her ikisinde de saldırganın oynayabileceği tek eksen IP tavanı.
+
+**Bir eksen bilinçli olarak gevşedi.** İsimsiz bir `throttle:5,1` yalnızca alan adı ve IP üzerine anahtarlanır — rota bileşeni yoktur — dolayısıyla `login`, `register` ve `two-factor-challenge` daha önce IP başına **tek** bir 5/dakika kovasını paylaşıyordu. `login` artık kendi ad-alanlı kovasına sahip, yani üç endpoint birlikte IP başına dakikada 5 yerine 10 isteğe izin veriyor. Login rotasının kendisi IP başına 5/dakikada değişmedi (ve artık ek olarak e-posta başına 3/dakika ile sınırlı); `/api/v1` grubunun tamamı hâlâ kendi `throttle:api` 60/dakika sınırına tabi.
+
+`api-login`, web `login` limiter'ının yeniden kullanımı değil, kasıtlı olarak **ayrı** bir limiter: `auth.login_throttle` ayarı yalnızca Fortify'ın kendi rota kaydının okuduğu config değerini yeniden yazıyor, dolayısıyla hiçbir admin toggle'ı API'nin tavanını gevşetemez, ve API web limiter'ının daha gevşek 10/dakika-IP-başına sınırını miras almıyor.
+
+**Limiter'ın kendisi elle taşınmayı gerektirmiyor.** Kaydı paketin içinde, `Lvntr\StarterKit\StarterKitServiceProvider::configureRateLimiting()`'de yapılıyor; publish edilen `FortifyServiceProvider`'da değil — bilinçli olarak. `sk:update` publish edilmiş dosyaları *birbirinden bağımsız* yeniler; dolayısıyla provider'ını özelleştirmiş (hash uyuşmadığı için korunur) ama rota dosyasına dokunmamış (yenilenir) bir kurulumda, rota hiç kaydedilmemiş bir limiter'ı adıyla çağırır duruma düşerdi — Laravel buna `MissingRateLimiterException` ile yanıt verir, yani her API login isteği 500 döner. Limiter'ı vendor katmanından dağıtmak bu arıza biçimini ortadan kaldırıyor. Kendi `api-login` limiter'ınızı zaten eklediyseniz o kazanmaya devam eder: sizin provider'ınız paketinkinden sonra boot olur.
+
+**Elle taşınması gerekebilecek tek şey var.** `routes/api/public-api.php` publish edilmiş bir stub'dır ve dağıtılan hash ile eşleşmeyen diskteki bir kopya `sk:update` tarafından üzerine yazılmaz, atlanır. Bu dosyayı özelleştirdiyseniz `login` rotasının middleware'ini `throttle:5,1`'den `throttle:api-login`'e kendiniz değiştirin. Değiştirene kadar endpoint eski IP-yalnızca tavanını korur ve hesap-başına bir tavan kazanmaz — hata vermez, sadece olduğu gibi kalır.
+
+### Yeni `starter-kit.security.csp_nonce` bayrağı — opt-in, kör açılırsa publish edilmemiş bir Blade'i kırar
+
+Yeni bir config anahtarı, `starter-kit.security.csp_nonce` (env `STARTER_KIT_CSP_NONCE`), `SecurityHeaders` middleware'inin `script-src` direktifini `'unsafe-inline'`'dan yanıt render edilmeden önce `Vite::useCspNonce()` ile üretilen istek-başına bir `'nonce-<random>'`'a çeviriyor. Nonce mevcut olduğunda tarayıcı `'unsafe-inline'`'ı **tamamen görmezden gelmeye başlıyor** — bu, bayrağın gerçek bir açığı kapatmasını sağlayan şey (enjekte edilmiş bir inline `<script>` artık çalışmıyor) ama aynı zamanda dikkatsizce açmayı tehlikeli kılan şey de bu.
+
+**Kasıtlı olarak `false` varsayılıyor.** Kit tam olarak bir inline script gönderiyor — `resources/views/app.blade.php`'deki FOUC-önleyici tema script'i — ve bu script `nonce="{{ Vite::cspNonce() }}"` özniteliğini yalnız **yeni publish edilmiş** dosya sürümünde taşıyor. `app.blade.php`'si zaten publish edilmiş ve bu özniteliği barındırmayan bir uygulama, bayrak açıldığı an bu script'i sessizce kaybediyor: hata yok, konsolda göze çarpan bir engellenmiş istek yok, sadece her sayfa yüklemesinde yanlış temada açılan ve gözle görülür şekilde flaşlayan bir panel.
+
+**Kimin hangi değeri aldığı:** `sk:install`, `STARTER_KIT_CSP_NONCE=true`'yu yalnız **ilk kurulumda** `.env`'e ekliyor (`FIRST_INSTALL_ONLY_ENV_KEYS`), çünkü yepyeni bir projenin publish edilmiş Blade'i özniteliği zaten taşıyor. `sk:install`'i mevcut bir uygulamada yeniden çalıştırmak anahtarı eklemiyor, ve `sk:update` / `sk:upgrade` `.env`'e hiç yazmıyor — dolayısıyla mevcut hiçbir kurulum bir güncellemeyle çevrilmiyor. Hiçbir şey ayarlamayan bir uygulama `false`'ta kalıyor.
+
+**Mevcut bir kurulumda açmak için**, sırayı şu şekilde takip edin — ters çevrilirse uygulama iki adım arasında kırılır:
+
+1. Publish edilmiş `resources/views/app.blade.php`'nizdeki inline `<script>` etiketine `nonce="{{ Vite::cspNonce() }}"` ekleyin (hangi etiket olduğundan emin değilseniz `vendor/lvntr/laravel-starter-kit`'in stub'ıyla diff alın).
+2. `STARTER_KIT_CSP_NONCE=true`'yu ayarlayın (config publish ettiyseniz `starter-kit.security.csp_nonce => true`).
+
+Bayrak kapalıyken o script etiketindeki `nonce="..."` özniteliği boş render edilir ve etkisizdir — nonce kaynağı olmayan bir CSP hâlâ `'unsafe-inline'`'ı onaylıyor — dolayısıyla özniteliği önceden eklemek her zaman güvenlidir. `style-src 'unsafe-inline'` her iki durumda da etkilenmiyor; PrimeVue çalışma zamanında inline stiller yazıyor ve nonce'lanamıyor.
+
+### Daha önce evi olmayan sabit ops notları
+
+Daha önceki sürümlerde zaten gönderilmiş ama belgelenmiş bir yeri olmayan birkaç davranış var; bundan sonra bulunabilir olması için burada not ediyoruz:
+
+- **`STARTER_KIT_ALLOW_UNRESOLVED_ROUTES=false`** (config `starter-kit.permissions.allow_unresolved`), yukarıda "Çözümlenmemiş-rota fail-closed'ı mevcut bir kurulum için opt-in" altında anlatılan `CheckResourcePermission` için fail-closed ayarıdır. **Mevcut** bir kurulum için önce `php artisan sk:doctor --only=unresolved-routes` çalıştırıp hâlâ gerçek bir izin yerine bir uyarıyla çözülen her rotayı listeleyin, her birini düzeltin, sonra bayrağı çevirin. Yeni bir kurulum zaten `false` olarak gelir.
+- **Passport scope zorlaması opt-in'dir.** `config/starter-kit.php`'nin `passport.scopes` / `passport.default_scopes`'u bir katalog tanımlıyor, ama kitteki hiçbir şey sizin adınıza bir rotaya `middleware('scope:...')` eklemiyor — `default_scopes`'u boş bırakmak Passport'un örtük `*` scope'unu koruyor, dolayısıyla mevcut API istemcileri çalışmaya devam ediyor. Kısıtlamak istediğiniz her rotaya `scope:` middleware'ini kendiniz ekleyin.
+- **`?type=` alt-kaynak sorgu kapsamlandırması consumer'ın sorumluluğundadır.** `CheckResourcePermission`, bir `?type=` query parametresini tanıyor ve elde edilen `<resource>:<type>.<ability>` izni mevcutsa (örn. `/admin/users?type=student` → `users:student.read`), üst kaynağın izni yerine onu kontrol ediyor. Middleware yalnız çözdüğü izni kontrol ediyor — yanıtı aynı `type` değerine göre gerçekten **filtrelemek** controller'ınızın/query'nizin işi; middleware bunu sizin yerinize yapmıyor, ve izin kontrolü geçerken `?type=`'i görmezden gelen bir controller, bir rolün görmesine izin verilen şeyle endpoint'in döndürdüğü şey arasında bir uyumsuzluk yaratır.
+- **`EnsureUserIsActive` tasarım gereği fail-open'dır.** Yalnız `starter-kit.security.active_status_denied`'da (varsayılan `['inactive', 'banned']`) açıkça listelenen bir `status` değerini engelliyor; kimliği doğrulanmış kullanıcısı olmayan bir guard, çözülemeyen bir guard, `status` özniteliği olmayan bir kullanıcı modeli, string olmayan bir `status`, ya da deny-list'te olmayan herhangi bir değer değişmeden geçiyor. Açıkça listelemediğiniz bir status'u engellemesini beklemeyin.
+
 ## v13.6.8 → v13.6.9
 
 ### `CheckResourcePermission` artık staging/demo'da fail-closed (davranış değişikliği)

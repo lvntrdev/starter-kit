@@ -51,6 +51,11 @@ uses(DatabaseTestCase::class)->in('Feature/Shared');
 // User model/request/profile/shared-prop tests use the inline users table.
 uses(DatabaseTestCase::class)->in('Feature/User');
 
+// api/v1 auth flow: the shipped route file is driven over HTTP against a
+// UUID-keyed users table + oauth token tables the test file creates itself
+// (DatabaseTestCase's `users` shim is integer-keyed and has no `status`).
+uses(DatabaseTestCase::class)->in('Feature/Api');
+
 // Cross-page bulk selection scope/allow-list testleri: roles + pivot şeması
 // inline kurulur, users tablosu üzerinden DB gerekli.
 uses(DatabaseTestCase::class)->in('Feature/BulkSelection');

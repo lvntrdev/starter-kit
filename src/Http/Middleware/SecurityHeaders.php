@@ -4,10 +4,28 @@ namespace Lvntr\StarterKit\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Vite;
 use Symfony\Component\HttpFoundation\Response;
 
 class SecurityHeaders
 {
+    /**
+     * Nonce-mode default, used when the config key is absent.
+     *
+     * mergeConfigFrom merges TOP-LEVEL keys only. A `config/starter-kit.php`
+     * published before this release carries no `csp_nonce` key — either no
+     * `security` block at all (vendor block inherited whole) or a PARTIAL one
+     * that replaces the vendor array for every nested key. Both read null here
+     * and must land on the SAME value the shipped config file states, so this
+     * constant reproduces that literal exactly. Do not let the two drift.
+     *
+     * `false` is also the only safe default: a published `app.blade.php`
+     * without `nonce="{{ Vite::cspNonce() }}"` loses its inline theme script
+     * the moment a nonce enters script-src, because a browser drops
+     * `'unsafe-inline'` as soon as it sees one.
+     */
+    public const CSP_NONCE_DEFAULT = false;
+
     /**
      * Handle an incoming request and append security headers to the response.
      *
@@ -15,6 +33,16 @@ class SecurityHeaders
      */
     public function handle(Request $request, Closure $next): Response
     {
+        // The nonce must exist BEFORE the view renders — Blade prints it via
+        // Vite::cspNonce() while building the response. Generating it after
+        // $next() would still produce a valid header token, but the page would
+        // carry no matching attribute and every inline script would die
+        // silently. Whether the header is actually emitted is only knowable
+        // afterwards (local env, or a CSP another layer already set), so the
+        // nonce is minted eagerly: a nonce attribute with no matching policy
+        // is inert in every browser, the reverse is a broken page.
+        $nonce = $this->nonceEnabled() ? Vite::useCspNonce() : null;
+
         $response = $next($request);
 
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
@@ -27,7 +55,7 @@ class SecurityHeaders
         // that varies per developer, so a tight CSP there blocks normal
         // work without adding security value.
         if (! app()->environment('local') && ! $response->headers->has('Content-Security-Policy')) {
-            $response->headers->set('Content-Security-Policy', $this->csp());
+            $response->headers->set('Content-Security-Policy', $this->csp($nonce));
         }
 
         if ($request->secure()) {
@@ -47,8 +75,14 @@ class SecurityHeaders
      * make the browser block every cloud-hosted preview and download. Other
      * origins (e.g. remote images embedded in the welcome message) can be
      * allowed via `starter-kit.security.csp_extra_origins`.
+     *
+     * @param  string|null  $nonce  Per-request script nonce, or null when
+     *                              `starter-kit.security.csp_nonce` is off — in
+     *                              which case script-src keeps `'unsafe-inline'`
+     *                              and the policy is byte-for-byte the one every
+     *                              existing install already receives.
      */
-    private function csp(): string
+    private function csp(?string $nonce = null): string
     {
         $extra = array_values(array_filter(
             (array) config('starter-kit.security.csp_extra_origins', []),
@@ -57,6 +91,14 @@ class SecurityHeaders
 
         $origins = implode(' ', array_unique([...$this->storageOrigins(), ...$extra]));
         $suffix = $origins === '' ? '' : ' '.$origins;
+
+        // A nonce and 'unsafe-inline' are mutually exclusive by design: the
+        // browser ignores 'unsafe-inline' once a nonce is present, so leaving
+        // it in would only mislead a reader of the header. Turnstile is a
+        // remote src, unaffected by either — it must survive both branches.
+        $scriptSrc = $nonce === null
+            ? "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com"
+            : "script-src 'self' 'nonce-{$nonce}' https://challenges.cloudflare.com";
 
         return implode('; ', [
             "default-src 'self'",
@@ -67,11 +109,29 @@ class SecurityHeaders
             "img-src 'self' data: blob:{$suffix}",
             "media-src 'self' data: blob:{$suffix}",
             "font-src 'self' data:",
+            // style-src keeps 'unsafe-inline' in BOTH branches: PrimeVue writes
+            // element style attributes at runtime and Vue's own scoped styles
+            // land inline, neither of which a nonce can cover.
             "style-src 'self' 'unsafe-inline'",
-            "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+            $scriptSrc,
             "connect-src 'self' https://challenges.cloudflare.com{$suffix}",
             'frame-src https://challenges.cloudflare.com',
         ]);
+    }
+
+    /**
+     * Whether script-src runs in nonce mode. An absent key (stale published
+     * config) resolves to the documented default.
+     */
+    private function nonceEnabled(): bool
+    {
+        $configured = config('starter-kit.security.csp_nonce');
+
+        if ($configured === null) {
+            return self::CSP_NONCE_DEFAULT;
+        }
+
+        return (bool) $configured;
     }
 
     /**

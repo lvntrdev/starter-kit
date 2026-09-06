@@ -1,6 +1,7 @@
 <?php
 
 use Lvntr\StarterKit\Http\Middleware\CheckResourcePermission;
+use Lvntr\StarterKit\Http\Middleware\SecurityHeaders;
 
 return [
 
@@ -238,6 +239,39 @@ return [
     |
     |   'csp_extra_origins' => ['https://cdn.example.com'],
     |
+    | csp_nonce (SecurityHeaders middleware, env: STARTER_KIT_CSP_NONCE)
+    | ------------------------------------------------------------------
+    | Switches script-src from `'unsafe-inline'` to a per-request
+    | `'nonce-<random>'`, so an injected inline <script> no longer executes.
+    | The middleware generates the nonce through `Vite::useCspNonce()` BEFORE
+    | the response is rendered, and the view prints it on the one inline script
+    | the kit ships (the FOUC-killer theme script in `resources/views/
+    | app.blade.php`).
+    |
+    | OPT-IN, default false, ON PURPOSE — this is the one flag here whose
+    | stricter setting can break a working install. A browser IGNORES
+    | `'unsafe-inline'` the moment a nonce appears in script-src, so an app
+    | whose PUBLISHED `app.blade.php` predates the nonce attribute loses that
+    | theme script outright the second this flag flips: no error, no blocked
+    | request, just a panel that opens in the wrong theme and flashes on every
+    | load.
+    |
+    | WHO GETS WHICH VALUE — same mechanism as `permissions.allow_unresolved`
+    | above: `sk:install` seeds STARTER_KIT_CSP_NONCE=true into the `.env` of a
+    | NEW project (whose freshly published Blade carries the attribute) through
+    | its FIRST_INSTALL_ONLY_ENV_KEYS list. Re-running `sk:install` on an
+    | installed app skips the key, and `sk:update` / `sk:upgrade` never write
+    | `.env` at all, so no existing install is flipped by an update. An app that
+    | sets nothing lands on SecurityHeaders::CSP_NONCE_DEFAULT, which is false.
+    |
+    | Turning it on by hand is a two-step change: put
+    | `nonce="{{ Vite::cspNonce() }}"` on that script tag in your published
+    | `resources/views/app.blade.php` first, then set the env var. With the flag
+    | off that attribute renders empty and is inert — a policy carrying no
+    | nonce-source still honours 'unsafe-inline'. `style-src 'unsafe-inline'` is
+    | unaffected either way — PrimeVue writes inline styles at runtime and
+    | cannot be nonce'd.
+    |
     | Active-account enforcement (EnsureUserIsActive middleware)
     | ----------------------------------------------------------
     | The login path already refuses a non-active account, but it cannot reach
@@ -275,14 +309,17 @@ return [
     | block is inherited whole; but a file that carries a PARTIAL `security`
     | array replaces the vendor one for every nested key. The middleware
     | therefore falls back to class constants that reproduce these literals
-    | exactly (EnsureUserIsActive::ENFORCE_DEFAULT / ::DENIED_DEFAULT /
-    | ::GUARDS_DEFAULT), so both populations resolve the same values. Keep the
-    | two in sync — same discipline as the `encryption` block below.
+    | exactly (SecurityHeaders::CSP_NONCE_DEFAULT, EnsureUserIsActive::
+    | ENFORCE_DEFAULT / ::DENIED_DEFAULT / ::GUARDS_DEFAULT), so both
+    | populations resolve the same values. Keep the two in sync — same
+    | discipline as the `encryption` block below.
     |
     */
 
     'security' => [
         'csp_extra_origins' => [],
+
+        'csp_nonce' => (bool) env('STARTER_KIT_CSP_NONCE', SecurityHeaders::CSP_NONCE_DEFAULT),
 
         'enforce_active_status' => true,
 

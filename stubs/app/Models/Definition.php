@@ -4,8 +4,25 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Lvntr\StarterKit\Domain\Shared\Services\DefinitionService;
 
+/**
+ * @property int $id
+ * @property string $key
+ * @property string $value
+ * @property string $label
+ * @property string|null $explanation
+ * @property string|null $severity
+ * @property string|null $icon
+ * @property bool $is_active
+ * @property int $order
+ * @property bool $visibility
+ * @property string $lang
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
+ */
 class Definition extends Model
 {
     use SoftDeletes;

@@ -254,6 +254,42 @@ Per-segment blocking (the `name.html.pdf` case above) ships in `spatie/laravel-m
 
 `SettingService` now caches raw (ciphertext) rows under `settings:v2` instead of caching decrypted values under `settings`; see `CHANGELOG.md` for why. No deploy step is required: the old `settings` key is dropped automatically the first time the new snapshot is built. Running `php artisan cache:forget settings` by hand is harmless if you'd rather drop a lingering plaintext snapshot immediately instead of waiting for it to be replaced.
 
+### `POST /api/v1/auth/login` now has its own per-account rate limiter
+
+`stubs/routes/api/public-api.php`'s `login` route moves from `throttle:5,1` to a new named limiter, `api-login` (registered by the package itself, in `Lvntr\StarterKit\StarterKitServiceProvider`): `Limit::perMinute(5)->by('ip:...')` **plus** `Limit::perMinute(3)->by('email:...')`. Before this release the endpoint had no per-account cap at all — an attacker spreading login attempts for one account across many IPs never tripped anything. `register` and `two-factor-challenge` are unchanged, still `throttle:5,1`: `register` has no account identity to key on before the account exists, and the 2FA challenge is single-use and keyed to a short-lived server-issued challenge id, so an IP cap is the only axis an attacker can move on either route.
+
+**One axis got looser, deliberately.** An unnamed `throttle:5,1` keys on the domain and IP only — no route component — so `login`, `register` and `two-factor-challenge` previously shared a **single** 5/min bucket per IP. `login` now has its own namespaced bucket, so the three endpoints together allow 10 requests a minute per IP instead of 5. The login route itself is unchanged at 5/min per IP (and now additionally capped at 3/min per email); the whole `/api/v1` group is still bounded by its own `throttle:api` 60/min.
+
+`api-login` is a **separate** limiter from the web `login` one on purpose, not a reuse: the `auth.login_throttle` setting rewrites only the config value Fortify's own route registration reads, so no admin toggle can relax the API's ceiling, and the API does not inherit the web limiter's looser 10/min-per-IP allowance.
+
+**The limiter itself needs no hand-porting.** It is registered by the package, in `Lvntr\StarterKit\StarterKitServiceProvider::configureRateLimiting()`, and not in the published `FortifyServiceProvider` — deliberately. `sk:update` refreshes published files *independently of one another*, so a consumer with a customised provider (preserved on a hash mismatch) and an untouched route file (refreshed) would otherwise be left with a route naming a limiter nobody declared; Laravel answers that with `MissingRateLimiterException`, i.e. a 500 on every API login. Shipping it from vendor removes that failure mode. If you had already added an `api-login` limiter of your own, it still wins: your provider boots after the package's.
+
+**One thing may still need hand-porting.** `routes/api/public-api.php` is a published stub, and an on-disk copy that no longer matches the shipped hash is skipped, not overwritten, by `sk:update`. If you customised it, change the `login` route's middleware from `throttle:5,1` to `throttle:api-login` yourself. Until you do, the endpoint keeps its old IP-only ceiling and gains no per-account cap — it will not error, it simply stays as it was.
+
+### New `starter-kit.security.csp_nonce` flag — opt-in, breaks an unpublished-Blade upgrade if turned on blind
+
+A new config key, `starter-kit.security.csp_nonce` (env `STARTER_KIT_CSP_NONCE`), switches the `SecurityHeaders` middleware's `script-src` directive from `'unsafe-inline'` to a per-request `'nonce-<random>'`, generated through `Vite::useCspNonce()` before the response renders. With a nonce present, a browser **stops honouring `'unsafe-inline'` entirely** — this is what makes the flag close a real gap (an injected inline `<script>` no longer executes) but also what makes it dangerous to flip carelessly.
+
+**Defaults to `false` on purpose.** The kit ships exactly one inline script — the FOUC-killer theme script in `resources/views/app.blade.php` — and it only carries the `nonce="{{ Vite::cspNonce() }}"` attribute in the **freshly published** version of that file. An app whose already-published `app.blade.php` predates the attribute loses that script silently the instant the flag turns on: no error, no blocked request in the console worth noticing at a glance, just a panel that opens in the wrong theme and visibly flashes on every page load.
+
+**Who gets which value:** `sk:install` seeds `STARTER_KIT_CSP_NONCE=true` into `.env` for a **first install only** (`FIRST_INSTALL_ONLY_ENV_KEYS`), because a brand-new project's published Blade already carries the attribute. Re-running `sk:install` on an existing app does not add the key, and `sk:update` / `sk:upgrade` never write `.env` at all — so no existing install is flipped by an update. An app that sets nothing stays on `false`.
+
+**To turn it on for an existing install**, do it in this order — reversed, the app breaks between the two steps:
+
+1. Add `nonce="{{ Vite::cspNonce() }}"` to the inline `<script>` tag in your published `resources/views/app.blade.php` (diff against `vendor/lvntr/laravel-starter-kit`'s stub to find the exact tag if you're not sure which one).
+2. Set `STARTER_KIT_CSP_NONCE=true` (or `starter-kit.security.csp_nonce => true` if you publish config).
+
+With the flag off, the `nonce="..."` attribute on that script tag renders empty and is inert — a CSP with no nonce-source still honours `'unsafe-inline'` — so adding the attribute ahead of time is always safe. `style-src 'unsafe-inline'` is unaffected either way; PrimeVue writes inline styles at runtime and cannot be nonce'd.
+
+### Standing ops notes with no prior home
+
+A few behaviors already shipped in earlier releases had no documented home; noting them here so they're discoverable going forward:
+
+- **`STARTER_KIT_ALLOW_UNRESOLVED_ROUTES=false`** (config `starter-kit.permissions.allow_unresolved`) is the fail-closed setting for `CheckResourcePermission` described above under "Unresolved-route fail-closed is opt-in." For an **existing** install, run `php artisan sk:doctor --only=unresolved-routes` first to list every route that still resolves on a warning rather than a real permission, fix each one, then flip the flag. A fresh install already ships with it set to `false`.
+- **Passport scope enforcement is opt-in.** `config/starter-kit.php`'s `passport.scopes` / `passport.default_scopes` define a catalog, but nothing in the kit attaches `middleware('scope:...')` to a route on your behalf — leaving `default_scopes` empty preserves Passport's implicit `*` scope so existing API clients keep working. Add the `scope:` middleware yourself to any route you want to restrict.
+- **`?type=` sub-resource query scoping is the consumer's responsibility.** `CheckResourcePermission` recognizes a `?type=` query parameter and, when the resulting `<resource>:<type>.<ability>` permission exists (e.g. `/admin/users?type=student` → `users:student.read`), checks that instead of the parent resource's permission. The middleware only checks whichever permission it resolves to — it is up to your controller/query to actually **filter** the response by that same `type` value; the middleware does not do it for you, and a controller that ignores `?type=` while the permission check passes on it creates a mismatch between what a role is allowed to see and what the endpoint returns.
+- **`EnsureUserIsActive` is fail-open by design.** It only ever blocks a `status` value explicitly on `starter-kit.security.active_status_denied` (default `['inactive', 'banned']`); a guard with no authenticated user, an unresolvable guard, a user model with no `status` attribute, a non-string `status`, or any value not on the deny-list all pass through untouched. Do not rely on it to block a status you haven't explicitly listed.
+
 ## v13.6.8 → v13.6.9
 
 ### `CheckResourcePermission` is now fail-closed on staging/demo (behavior change)

@@ -20,16 +20,28 @@
             onMounted handlers re-apply the SAME value, so this script is
             idempotent — it sets the final state and mounting never flips it.
 
-            CSP note: this is an inline <script> and depends on the current policy
-            including 'unsafe-inline' in script-src. If the app later moves to a
-            nonce-based CSP (out of scope here), this tag MUST receive that nonce.
+            CSP note: this is the ONE inline <script> the kit ships, so it is the
+            one thing standing between the panel and a script-src without
+            'unsafe-inline'. `starter-kit.security.csp_nonce` (env
+            STARTER_KIT_CSP_NONCE) governs that switch: with the flag ON the
+            SecurityHeaders middleware mints a per-request nonce before this view
+            renders and puts 'nonce-<random>' in script-src instead of
+            'unsafe-inline'; the attribute below is what makes this tag survive it.
+
+            While the flag is OFF the attribute is INERT, not harmful: Vite has no
+            nonce, so it prints `nonce=""`, and a policy that carries no
+            nonce-source keeps honouring 'unsafe-inline' regardless of what the
+            element declares. Do NOT delete the attribute to "clean up" a
+            flag-off install — removing it is exactly what makes the theme script
+            vanish silently (wrong theme, FOUC, no console error) the day the flag
+            is turned on.
         --}}
         @php
             $skAppearance = data_get($page ?? [], 'props.appearance', []);
             $skDarkDefault = (bool) data_get($skAppearance, 'dark_mode_default', false);
             $skTheme = is_string(data_get($skAppearance, 'theme')) ? data_get($skAppearance, 'theme') : 'main';
         @endphp
-        <script>
+        <script nonce="{{ Vite::cspNonce() }}">
             (function () {
                 try {
                     var el = document.documentElement;

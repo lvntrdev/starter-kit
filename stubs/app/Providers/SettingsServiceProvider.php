@@ -88,9 +88,12 @@ class SettingsServiceProvider extends ServiceProvider
         // key stays non-null so Fortify keeps both throttle layers wired.
         //
         // Note the asymmetry: this key only governs the WEB (Fortify) login.
-        // The API auth routes carry a hardcoded `throttle:5,1` middleware
-        // (stubs/routes/api/public-api.php) that this setting never touches —
-        // the API stays throttled regardless of this toggle.
+        // The swap below rewrites the config value Fortify reads when it
+        // registers its own routes, and nothing else. The API login route
+        // names its dedicated `api-login` limiter literally and the remaining
+        // public auth routes carry a plain `throttle:5,1`
+        // (stubs/routes/api/public-api.php), so the API keeps its full
+        // per-IP + per-account limits regardless of this toggle.
         if (($auth['login_throttle'] ?? '1') === '0') {
             config(['fortify.limiters.login' => 'login-relaxed']);
         }

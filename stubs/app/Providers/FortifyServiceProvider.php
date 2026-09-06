@@ -157,11 +157,23 @@ class FortifyServiceProvider extends ServiceProvider
         // generous 30/min-per-IP cap: light enough to barely touch a legitimate
         // user who fat-fingers a password, tight enough to stop a machine
         // hammering thousands of guesses per minute. Kept intentionally looser
-        // than the API auth routes' fixed `throttle:5,1`
-        // (stubs/routes/api/public-api.php), which this setting never relaxes.
+        // than the API login route's own 'api-login' limiter (registered in the
+        // package provider — see the note below), which this setting never
+        // relaxes.
         RateLimiter::for('login-relaxed', function (Request $request) {
             return Limit::perMinute(30)->by('ip:'.(string) $request->ip());
         });
+
+        // NOTE: the 'api-login' limiter that POST /api/v1/auth/login uses is
+        // NOT declared here. It ships from the package
+        // (Lvntr\StarterKit\StarterKitServiceProvider::configureRateLimiting)
+        // so that it can never go missing: this provider and
+        // routes/api/public-api.php are both published stubs and `sk:update`
+        // refreshes them independently, so a customised copy of this file plus
+        // a refreshed route file would otherwise leave the route naming a
+        // limiter nobody registered — a 500 on every API login. To change its
+        // numbers, re-declare RateLimiter::for('api-login', ...) here; this
+        // provider boots after the package's and wins.
 
         RateLimiter::for('two-factor', function (Request $request) {
             return Limit::perMinute(5)->by($request->session()->get('login.id'));

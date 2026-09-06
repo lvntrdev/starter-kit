@@ -3,8 +3,23 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 
+/**
+ * @property int $id
+ * @property string $code
+ * @property string $name
+ * @property string $native_name
+ * @property string $direction
+ * @property string|null $flag
+ * @property bool $is_active
+ * @property bool $is_default
+ * @property string|null $fallback_code
+ * @property int $sort_order
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ */
 class ContentLanguage extends Model
 {
     /**

@@ -11,6 +11,7 @@ use Spatie\Permission\Models\Role as SpatieRole;
  * @property array<string, string>|null $display_name
  * @property string|null $group
  * @property string|null $color
+ * @property int $sort_order
  * @property array<int, string>|null $seeded_permissions
  */
 class Role extends SpatieRole

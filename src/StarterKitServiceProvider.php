@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Illuminate\Translation\FileLoader;
 use Inertia\Inertia;
 use Laravel\Fortify\Fortify;
@@ -1268,6 +1269,65 @@ class StarterKitServiceProvider extends ServiceProvider
     {
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Per-account limiter for POST /api/v1/auth/login
+        // (stubs/routes/api/public-api.php).
+        //
+        // It lives HERE, in the vendor layer, and not in the published
+        // FortifyServiceProvider, because the route file that names it is a
+        // published stub too and `sk:update` refreshes published files
+        // INDEPENDENTLY of one another: a consumer who had customised their
+        // provider (preserved on a hash mismatch) but not their route file
+        // (refreshed, hash matched) would end up with a route naming a limiter
+        // nobody registered, and Laravel answers that with a
+        // MissingRateLimiterException — a 500 on every API login. A limiter
+        // shipped from vendor cannot go missing. A consumer who wants different
+        // numbers still overrides it by re-declaring the same name in their own
+        // provider, which boots after this one.
+        //
+        // A SEPARATE limiter from the web 'login' one, not a reuse, for two
+        // reasons:
+        //
+        //   1. It can never be relaxed. The login-throttle setting rewrites
+        //      config('fortify.limiters.login'), which only Fortify's own route
+        //      registration reads; the API route names this limiter literally,
+        //      so no admin toggle reaches it.
+        //   2. It preserves the endpoint's historical 5/min-per-IP ceiling. The
+        //      web 'login' limiter allows 10/min per IP — reusing it would have
+        //      doubled what a single IP may spend on the API.
+        //
+        // The per-email limit is the actual fix: until it existed, an attacker
+        // spreading attempts for one account across many IPs hit no per-account
+        // cap on the API at all. A separate email+IP limit like the web
+        // limiter's would be dead weight here — it can never trip before the
+        // 5/min IP limit does.
+        //
+        // Keyed on the literal 'email' field, deliberately NOT
+        // Fortify::username(): the API login contract is fixed to `email`
+        // (App\Http\Requests\Api\Auth\LoginRequest, App\Domain\Auth\DTOs\LoginDTO),
+        // so a consumer who repoints fortify.username at another column would
+        // otherwise collapse every API attempt into one empty-email bucket and
+        // lock the endpoint out for everyone at 3 requests a minute.
+        RateLimiter::for('api-login', function (Request $request) {
+            // The body is unvalidated here — the limiter runs BEFORE
+            // LoginRequest. A non-string `email` (an array, an object) must not
+            // reach a string cast: that raises "Array to string conversion",
+            // which the error handler turns into a 500 on a payload that used
+            // to answer 422. A missing or non-string value gets no per-email
+            // limit at all rather than sharing one global empty-email bucket
+            // that anyone could hold at 429; such a request is rejected by
+            // validation moments later anyway.
+            $raw = $request->input('email');
+            $email = is_string($raw) ? Str::transliterate(Str::lower($raw)) : '';
+
+            $limits = [Limit::perMinute(5)->by('ip:'.(string) $request->ip())];
+
+            if ($email !== '') {
+                $limits[] = Limit::perMinute(3)->by('email:'.$email);
+            }
+
+            return $limits;
         });
     }
 
