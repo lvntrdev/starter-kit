@@ -26,13 +26,17 @@ class GroupedPermissionsQuery
             }
         }
 
-        // Group permissions by resource
+        // Group permissions by resource. Split on the LAST dot, not the first:
+        // most permissions are "resource.ability" (one dot), but a custom
+        // permission like "system.health.view" has two — the resource is
+        // "system.health", the ability is only the final segment.
         $byResource = Permission::all()
             ->pluck('name')
-            ->groupBy(fn (string $name) => str_contains($name, '.')
-                ? explode('.', $name, 2)[0]
-                : '_general'
-            );
+            ->groupBy(function (string $name) {
+                $pos = strrpos($name, '.');
+
+                return $pos === false ? '_general' : substr($name, 0, $pos);
+            });
 
         // Distribute resources into permission groups
         $result = [];

@@ -31,6 +31,11 @@ return [
         'settings' => 'Ayarlar',
         'api-routes' => 'API Rotaları',
         'api-docs' => 'API Dokümanları',
+        'files' => 'Dosyalar',
+        'api-clients' => 'API İstemcileri',
+        'api-tokens' => 'API Tokenleri',
+        'dashboard' => 'Panel',
+        'system.health' => 'Sistem Sağlığı',
     ],
 
     'abilities' => [
@@ -40,5 +45,6 @@ return [
         'delete' => 'Sil',
         'import' => 'İçe Aktar',
         'export' => 'Dışa Aktar',
+        'view' => 'Görüntüle',
     ],
 ];

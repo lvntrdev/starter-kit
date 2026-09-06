@@ -31,6 +31,11 @@ return [
         'settings' => 'Settings',
         'api-routes' => 'API Routes',
         'api-docs' => 'API Docs',
+        'files' => 'Files',
+        'api-clients' => 'API Clients',
+        'api-tokens' => 'API Tokens',
+        'dashboard' => 'Dashboard',
+        'system.health' => 'System Health',
     ],
 
     'abilities' => [
@@ -40,5 +45,6 @@ return [
         'delete' => 'Delete',
         'import' => 'Import',
         'export' => 'Export',
+        'view' => 'View',
     ],
 ];

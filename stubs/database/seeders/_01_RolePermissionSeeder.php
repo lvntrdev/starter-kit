@@ -141,9 +141,12 @@ class _01_RolePermissionSeeder extends Seeder
         foreach ($customPermissions as $permissionName) {
             $permission = Permission::findOrCreate($permissionName, 'web');
 
-            $parts = explode('.', $permissionName, 2);
-            $resourceKey = $parts[0];
-            $abilityKey = $parts[1] ?? $permissionName;
+            // Split on the LAST dot: most custom permissions are "resource.ability"
+            // (one dot), but "system.health.view" has two — the resource is
+            // "system.health", the ability is only the final segment.
+            $pos = strrpos($permissionName, '.');
+            $resourceKey = $pos === false ? $permissionName : substr($permissionName, 0, $pos);
+            $abilityKey = $pos === false ? $permissionName : substr($permissionName, $pos + 1);
 
             $displayName = [];
             foreach ($abilityDisplayNames[$abilityKey] ?? [] as $locale => $abilityLabel) {

@@ -7,10 +7,11 @@
     import SkCard from '@lvntr/components/ui/SkCard.vue';
     import SkForm from '@lvntr/components/FormBuilder/SkForm.vue';
     import { FB } from '@lvntr/components/FormBuilder/core';
+    import { TB } from '@lvntr/components/TabBuilder/core';
     import { usePageHeader } from '@/composables/usePageHeader';
 
-    // Aura + geri-butonlu sayfa: başlık topbar'da; ilk kart geri butonunu
-    // kendi aksiyon alanında gösterir (kart başlığı kendi değerinde kalır).
+    // Aura + geri-butonlu sayfa: başlık topbar'da; geri butonu sekmelerin
+    // üstünde kendi başlıksız kartında gösterilir (bkz. template).
     const pageHeader = usePageHeader();
 
     interface PermissionGroup {
@@ -94,6 +95,27 @@
         )
         .build();
 
+    // İzinler ilk, temel bilgiler ikinci sekme.
+    const activeTab = ref('permissions');
+
+    const tabConfig = TB.tabs()
+        .vertical()
+        .addTabs(
+            TB.item()
+                .key('permissions')
+                .label('sk-role.permissions')
+                .description('sk-role.permissions_description')
+                .icon('pi pi-shield')
+                .iconColor('indigo'),
+            TB.item()
+                .key('basic_info')
+                .label('sk-role.basic_info')
+                .description('sk-role.basic_info_description')
+                .icon('pi pi-id-card')
+                .iconColor('blue'),
+        )
+        .build();
+
     // Flatten all permissions across all groups for global operations
     const allPermissionsFlat = computed(() => {
         const all: string[] = [];
@@ -116,6 +138,19 @@
         return map;
     });
 
+    // Vertical SkTabs mounts only the active panel — a validation error on the
+    // inactive tab's fields would otherwise render nowhere and fail silently.
+    function focusErroredTab(errors: Record<string, string>) {
+        const hasBasicInfoError = Object.keys(errors).some(
+            (key) => key === 'name' || key === 'color' || key.startsWith('display_name'),
+        );
+        if (hasBasicInfoError) {
+            activeTab.value = 'basic_info';
+        } else if (errors.permissions) {
+            activeTab.value = 'permissions';
+        }
+    }
+
     function submit() {
         form.name = basics.value.name as string;
         form.display_name = basics.value.display_name as Record<string, string>;
@@ -124,10 +159,12 @@
         if (isEdit.value) {
             form.put(adminRoles.update.url({ id: props.role!.id! }), {
                 onSuccess: () => emit('success'),
+                onError: focusErroredTab,
             });
         } else {
             form.post(adminRoles.store.url(), {
                 onSuccess: () => emit('success'),
+                onError: focusErroredTab,
             });
         }
     }
@@ -172,8 +209,11 @@
     }
 
     function abilityFromPermission(permission: string): string {
+        // Split on the LAST dot: most permissions are "resource.ability" (one
+        // dot), but "system.health.view" has two — the ability is only the
+        // final segment.
         const parts = permission.split('.');
-        return parts.length > 1 ? parts[1] : parts[0];
+        return parts[parts.length - 1];
     }
 
     // Collect all unique abilities across all resources (for table columns)
@@ -192,13 +232,13 @@
     }
 
     function translateResource(resource: string): string {
-        const key = `admin.roles.resources.${resource}`;
+        const key = `sk-role.resources.${resource}`;
         const translated = trans(key);
         return translated !== key ? translated : resource.charAt(0).toUpperCase() + resource.slice(1);
     }
 
     function translateAbility(ability: string): string {
-        const key = `admin.roles.abilities.${ability}`;
+        const key = `sk-role.abilities.${ability}`;
         const translated = trans(key);
         return translated !== key ? translated : ability.charAt(0).toUpperCase() + ability.slice(1);
     }
@@ -282,14 +322,13 @@
     class="space-y-6"
     @submit.prevent="submit"
   >
+    <!-- Aura + header-in-card: sayfanın geri butonu, hangi sekme aktif olursa
+         olsun sabit kalsın diye sekmelerin ÜSTÜNDE, tek başına duruyor. -->
     <SkCard
-      :title="trans('sk-role.basic_info')"
-      :subtitle="trans('sk-role.basic_info_description')"
+      v-if="pageHeader.active"
+      flush
     >
-      <template
-        v-if="pageHeader.active"
-        #actions
-      >
+      <template #actions>
         <Button
           icon="pi pi-arrow-left"
           :label="trans('sk-button.back')"
@@ -298,215 +337,224 @@
           @click="pageHeader.goBack"
         />
       </template>
-      <template #content>
-        <SkForm
-          v-model="basics"
-          :config="basicsConfig"
-          :errors="form.errors as Record<string, string>"
-        />
-      </template>
     </SkCard>
 
-    <SkCard
-      :title="trans('sk-role.permissions')"
-      :subtitle="trans('sk-role.permissions_description')"
-      flush
+    <SkTabs
+      v-model="activeTab"
+      :config="tabConfig"
     >
-      <template #title-end>
-        <span class="text-xs font-medium text-surface-400 dark:text-surface-500 whitespace-nowrap">
-          {{
-            trans('sk-role.permission_count', {
-              selected: String(form.permissions.length),
-              total: String(allPermissionsFlat.length),
-            })
-          }}
-        </span>
-      </template>
-      <template #content>
-        <!-- Permissions Table -->
-        <div v-if="hasPermissions">
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead>
-                <tr class="bg-surface-50 dark:bg-surface-800/60">
-                  <th
-                    class="px-4 py-3 text-left align-bottom text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 min-w-40"
-                  >
-                    {{ trans('sk-role.resource') }}
-                  </th>
-                  <th class="px-2 py-3 text-center min-w-15">
-                    <div class="flex flex-col items-center gap-1.5">
-                      <span
-                        class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500"
-                      >
-                        {{ trans('sk-common.all') }}
-                      </span>
-                      <Checkbox
-                        :model-value="
-                          form.permissions.length === allPermissionsFlat.length &&
-                            allPermissionsFlat.length > 0
-                        "
-                        :binary="true"
-                        :indeterminate="
-                          form.permissions.length > 0 &&
-                            form.permissions.length < allPermissionsFlat.length
-                        "
-                        :disabled="!canGrantAll && allPermissionsFlat.every((p) => !canGrant(p))"
-                        @update:model-value="
-                          () => {
-                            const grantable = allPermissionsFlat.filter(canGrant);
-                            const allChecked = grantable.every((p) =>
-                              form.permissions.includes(p),
-                            );
-                            if (allChecked) {
-                              form.permissions = form.permissions.filter(
-                                (p) => !grantable.includes(p),
-                              );
-                            } else {
-                              const toAdd = grantable.filter(
-                                (p) => !form.permissions.includes(p),
-                              );
-                              form.permissions.push(...toAdd);
-                            }
-                          }
-                        "
-                      />
-                    </div>
-                  </th>
-                  <th
-                    v-for="ability in allAbilities"
-                    :key="ability"
-                    class="px-2 py-3 text-center min-w-20"
-                  >
-                    <div class="flex flex-col items-center gap-1.5">
-                      <span
-                        class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500"
-                      >
-                        {{ translateAbility(ability) }}
-                      </span>
-                      <Checkbox
-                        :model-value="isAbilityColumnAllChecked(ability)"
-                        :binary="true"
-                        :indeterminate="isAbilityColumnPartiallyChecked(ability)"
-                        :disabled="
-                          !canGrantAll &&
-                            Object.keys(allResourcePermissions)
-                              .filter((r) => hasPermission(r, ability))
-                              .every((r) => !canGrant(`${r}.${ability}`))
-                        "
-                        @update:model-value="toggleAbilityColumn(ability)"
-                      />
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <template
-                  v-for="(group, groupKey) in permissionsByGroup"
-                  :key="groupKey"
-                >
-                  <!-- Group Header Row -->
-                  <tr class="border-t border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-800/40">
-                    <td
-                      class="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400"
-                    >
-                      {{ group.label }}
-                    </td>
-                    <td class="px-2 py-2 text-center">
-                      <Checkbox
-                        :model-value="isGroupAllChecked(groupKey)"
-                        :binary="true"
-                        :indeterminate="isGroupPartiallyChecked(groupKey)"
-                        :disabled="
-                          !canGrantAll &&
-                            Object.values(group.resources)
-                              .flat()
-                              .every((p) => !canGrant(p))
-                        "
-                        @update:model-value="toggleGroup(groupKey)"
-                      />
-                    </td>
-                    <td
-                      v-for="ability in allAbilities"
-                      :key="ability"
-                    />
-                  </tr>
-                  <!-- Resource Rows -->
-                  <tr
-                    v-for="(permissions, resource) in group.resources"
-                    :key="resource"
-                    class="border-t border-surface-200 dark:border-surface-700 hover:bg-surface-50/50 dark:hover:bg-surface-800/30"
-                  >
-                    <td class="px-4 py-2.5 pl-8 font-medium text-surface-800 dark:text-surface-200">
-                      {{ translateResource(resource) }}
-                    </td>
-                    <td class="px-2 py-2.5 text-center">
-                      <Checkbox
-                        :model-value="isResourceAllChecked(resource)"
-                        :binary="true"
-                        :indeterminate="isResourcePartiallyChecked(resource)"
-                        :disabled="
-                          !canGrantAll && permissions.every((p: string) => !canGrant(p))
-                        "
-                        @update:model-value="toggleResource(resource)"
-                      />
-                    </td>
-                    <td
-                      v-for="ability in allAbilities"
-                      :key="ability"
-                      class="px-2 py-2.5 text-center"
-                    >
-                      <Checkbox
-                        v-if="hasPermission(resource, ability)"
-                        :model-value="isChecked(`${resource}.${ability}`)"
-                        :binary="true"
-                        :disabled="!canGrant(`${resource}.${ability}`)"
-                        @update:model-value="togglePermission(`${resource}.${ability}`)"
-                      />
-                      <span
-                        v-else
-                        class="text-surface-300 dark:text-surface-700"
-                      >—</span>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-
-          <small
-            v-if="form.errors.permissions"
-            class="text-red-500 mt-1 block px-6 pb-2"
-          >
-            {{ form.errors.permissions }}
-          </small>
-        </div>
-
-        <Message
-          v-else
-          severity="info"
-          :closable="false"
-          class="m-6"
+      <template #permissions>
+        <SkCard
+          :title="trans('sk-role.permissions')"
+          :subtitle="trans('sk-role.permissions_description')"
+          flush
         >
-          {{ trans('sk-role.no_permissions_available') }}
-        </Message>
+          <template #title-end>
+            <span class="text-xs font-medium text-surface-400 dark:text-surface-500 whitespace-nowrap">
+              {{
+                trans('sk-role.permission_count', {
+                  selected: String(form.permissions.length),
+                  total: String(allPermissionsFlat.length),
+                })
+              }}
+            </span>
+          </template>
+          <template #content>
+            <!-- Permissions Table -->
+            <div v-if="hasPermissions">
+              <div class="overflow-x-auto">
+                <table class="w-full">
+                  <thead>
+                    <tr class="bg-surface-50 dark:bg-surface-800/60">
+                      <th
+                        class="px-4 py-3 text-left align-bottom text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 min-w-40"
+                      >
+                        {{ trans('sk-role.resource') }}
+                      </th>
+                      <th class="px-2 py-3 text-center min-w-15">
+                        <div class="flex flex-col items-center gap-1.5">
+                          <span
+                            class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500"
+                          >
+                            {{ trans('sk-common.all') }}
+                          </span>
+                          <Checkbox
+                            :model-value="
+                              form.permissions.length === allPermissionsFlat.length &&
+                                allPermissionsFlat.length > 0
+                            "
+                            :binary="true"
+                            :indeterminate="
+                              form.permissions.length > 0 &&
+                                form.permissions.length < allPermissionsFlat.length
+                            "
+                            :disabled="!canGrantAll && allPermissionsFlat.every((p) => !canGrant(p))"
+                            @update:model-value="
+                              () => {
+                                const grantable = allPermissionsFlat.filter(canGrant);
+                                const allChecked = grantable.every((p) =>
+                                  form.permissions.includes(p),
+                                );
+                                if (allChecked) {
+                                  form.permissions = form.permissions.filter(
+                                    (p) => !grantable.includes(p),
+                                  );
+                                } else {
+                                  const toAdd = grantable.filter(
+                                    (p) => !form.permissions.includes(p),
+                                  );
+                                  form.permissions.push(...toAdd);
+                                }
+                              }
+                            "
+                          />
+                        </div>
+                      </th>
+                      <th
+                        v-for="ability in allAbilities"
+                        :key="ability"
+                        class="px-2 py-3 text-center min-w-20"
+                      >
+                        <div class="flex flex-col items-center gap-1.5">
+                          <span
+                            class="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500"
+                          >
+                            {{ translateAbility(ability) }}
+                          </span>
+                          <Checkbox
+                            :model-value="isAbilityColumnAllChecked(ability)"
+                            :binary="true"
+                            :indeterminate="isAbilityColumnPartiallyChecked(ability)"
+                            :disabled="
+                              !canGrantAll &&
+                                Object.keys(allResourcePermissions)
+                                  .filter((r) => hasPermission(r, ability))
+                                  .every((r) => !canGrant(`${r}.${ability}`))
+                            "
+                            @update:model-value="toggleAbilityColumn(ability)"
+                          />
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template
+                      v-for="(group, groupKey) in permissionsByGroup"
+                      :key="groupKey"
+                    >
+                      <!-- Group Header Row -->
+                      <tr class="border-t border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-800/40">
+                        <td
+                          class="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400"
+                        >
+                          {{ group.label }}
+                        </td>
+                        <td class="px-2 py-2 text-center">
+                          <Checkbox
+                            :model-value="isGroupAllChecked(groupKey)"
+                            :binary="true"
+                            :indeterminate="isGroupPartiallyChecked(groupKey)"
+                            :disabled="
+                              !canGrantAll &&
+                                Object.values(group.resources)
+                                  .flat()
+                                  .every((p) => !canGrant(p))
+                            "
+                            @update:model-value="toggleGroup(groupKey)"
+                          />
+                        </td>
+                        <td
+                          v-for="ability in allAbilities"
+                          :key="ability"
+                        />
+                      </tr>
+                      <!-- Resource Rows -->
+                      <tr
+                        v-for="(permissions, resource) in group.resources"
+                        :key="resource"
+                        class="border-t border-surface-200 dark:border-surface-700 hover:bg-surface-50/50 dark:hover:bg-surface-800/30"
+                      >
+                        <td class="px-4 py-2.5 pl-8 font-medium text-surface-800 dark:text-surface-200">
+                          {{ translateResource(resource) }}
+                        </td>
+                        <td class="px-2 py-2.5 text-center">
+                          <Checkbox
+                            :model-value="isResourceAllChecked(resource)"
+                            :binary="true"
+                            :indeterminate="isResourcePartiallyChecked(resource)"
+                            :disabled="
+                              !canGrantAll && permissions.every((p: string) => !canGrant(p))
+                            "
+                            @update:model-value="toggleResource(resource)"
+                          />
+                        </td>
+                        <td
+                          v-for="ability in allAbilities"
+                          :key="ability"
+                          class="px-2 py-2.5 text-center"
+                        >
+                          <Checkbox
+                            v-if="hasPermission(resource, ability)"
+                            :model-value="isChecked(`${resource}.${ability}`)"
+                            :binary="true"
+                            :disabled="!canGrant(`${resource}.${ability}`)"
+                            @update:model-value="togglePermission(`${resource}.${ability}`)"
+                          />
+                          <span
+                            v-else
+                            class="text-surface-300 dark:text-surface-700"
+                          >—</span>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+
+              <small
+                v-if="form.errors.permissions"
+                class="text-red-500 mt-1 block px-6 pb-2"
+              >
+                {{ form.errors.permissions }}
+              </small>
+            </div>
+
+            <Message
+              v-else
+              severity="info"
+              :closable="false"
+              class="m-6"
+            >
+              {{ trans('sk-role.no_permissions_available') }}
+            </Message>
+          </template>
+        </SkCard>
       </template>
-      <template #footer>
-        <span class="sk-card__foot-hint">
-          {{
-            trans('sk-role.permission_count_selected', {
-              selected: String(form.permissions.length),
-              total: String(allPermissionsFlat.length),
-            })
-          }}
-        </span>
-        <Button
-          type="submit"
-          :label="isEdit ? trans('sk-button.update') : trans('sk-button.save')"
-          icon="pi pi-save"
-          :loading="form.processing"
-        />
+
+      <template #basic_info>
+        <SkCard
+          :title="trans('sk-role.basic_info')"
+          :subtitle="trans('sk-role.basic_info_description')"
+        >
+          <template #content>
+            <SkForm
+              v-model="basics"
+              :config="basicsConfig"
+              :errors="form.errors as Record<string, string>"
+            />
+          </template>
+        </SkCard>
       </template>
-    </SkCard>
+    </SkTabs>
+
+    <!-- İki sekmenin de tek ortak kaydet aksiyonu — sekme değişse de sabit kalır. -->
+    <div class="flex justify-end">
+      <Button
+        type="submit"
+        :label="isEdit ? trans('sk-button.update') : trans('sk-button.save')"
+        icon="pi pi-save"
+        :loading="form.processing"
+      />
+    </div>
   </form>
 </template>

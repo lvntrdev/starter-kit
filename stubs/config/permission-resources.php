@@ -186,6 +186,8 @@ return [
         'groups' => [
             'users' => ['en' => 'User Management', 'tr' => 'Kullanıcı Yönetimi'],
             'system' => ['en' => 'System', 'tr' => 'Sistem'],
+            'developer' => ['en' => 'Developer', 'tr' => 'Geliştirici'],
+            'api' => ['en' => 'API', 'tr' => 'API'],
             'other' => ['en' => 'Other', 'tr' => 'Diğer'],
         ],
 
@@ -219,6 +221,7 @@ return [
             'delete' => ['en' => 'Delete', 'tr' => 'Silme'],
             'import' => ['en' => 'Import', 'tr' => 'İçe Aktarma'],
             'export' => ['en' => 'Export', 'tr' => 'Dışa Aktarma'],
+            'view' => ['en' => 'View', 'tr' => 'Görüntüleme'],
         ],
 
     ],
