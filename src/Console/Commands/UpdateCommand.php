@@ -534,7 +534,7 @@ class UpdateCommand extends Command
         $this->files = new Filesystem;
 
         $this->newLine();
-        $this->line('  <fg=cyan;options=bold>Lvntr Starter Kit Updater (v13.6.x)</>');
+        $this->line('  <fg=cyan;options=bold>Lvntr Starter Kit Updater (v13.7.x)</>');
         $this->newLine();
         $this->line('  <fg=gray>v13.5.0+: package runtime runs from vendor/lvntr/laravel-starter-kit.</>');
         $this->line('  <fg=gray>composer update is enough; runtime files are not copied to your app.</>');
