@@ -22,8 +22,12 @@ readonly class FileItemDTO extends BaseDTO
         public int $size,
         public ?string $folderId,
         public string $url,
-        public ?string $publicUrl,
         public ?string $createdAt,
+        // Appended LAST, with a default, on purpose: this DTO is public API and
+        // a consumer may construct it positionally. Slotting a new parameter in
+        // front of $createdAt would break every existing call at composer-update
+        // time, named arguments included.
+        public ?string $publicUrl = null,
     ) {}
 
     /**

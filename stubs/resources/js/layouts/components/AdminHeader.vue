@@ -18,15 +18,33 @@
         isDark: boolean;
         accent: AccentColor;
         sidebarStyle: SidebarStyle;
+        /**
+         * Back-compat bridge, not part of the current contract. The aura page
+         * header now lives inside the content card, so AdminLayout no longer
+         * passes these. They stay because `sk:update` refreshes this file and
+         * AdminLayout.vue independently: an app that customised the layout keeps
+         * the old one, which still feeds the page title into the topbar, and
+         * dropping the props here would blank the heading on those screens.
+         * Safe to delete once your own AdminLayout.vue no longer binds them.
+         */
+        pageTitle?: string;
+        pageSubtitle?: string;
+        showBack?: boolean;
     }
 
-    defineProps<Props>();
+    withDefaults(defineProps<Props>(), {
+        pageTitle: '',
+        pageSubtitle: '',
+        showBack: false,
+    });
 
     const emit = defineEmits<{
         toggleSidebar: [];
         toggleDark: [];
         setAccent: [color: AccentColor];
         setSidebarStyle: [style: SidebarStyle];
+        /** Back-compat, paired with `showBack` — see the props above. */
+        back: [];
     }>();
 
     const page = usePage();
@@ -167,6 +185,34 @@
         v-if="isDebug"
         class="admin-header__tag admin-header__tag--debug"
       > Debug Mode </span>
+
+      <!-- Back-compat: a customised AdminLayout.vue still routes the aura page
+           title and its back affordance through the topbar. Nothing binds these
+           props by default. -->
+      <span
+        v-if="pageTitle || showBack"
+        class="admin-header__divider"
+      />
+      <button
+        v-if="showBack"
+        type="button"
+        class="admin-header__btn admin-header__back"
+        :title="$t('sk-button.back')"
+        :aria-label="$t('sk-button.back')"
+        @click="emit('back')"
+      >
+        <i class="pi pi-arrow-left" />
+      </button>
+      <div
+        v-if="pageTitle"
+        class="admin-header__page"
+      >
+        <span class="admin-header__page-title">{{ pageTitle }}</span>
+        <span
+          v-if="pageSubtitle"
+          class="admin-header__page-subtitle"
+        >{{ pageSubtitle }}</span>
+      </div>
     </div>
 
     <div class="admin-header__right">

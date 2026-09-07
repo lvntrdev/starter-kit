@@ -225,10 +225,12 @@ During installation `sk:install` can `composer require` and wire up one or more 
 
 | Key | Package | Post-install |
 |-----|---------|--------------|
-| `telescope` | `laravel/telescope` (dev dependency) | runs `telescope:install` |
-| `pulse` | `laravel/pulse` | none |
+| `telescope` | `laravel/telescope` | runs `telescope:install` |
+| `pulse` | `laravel/pulse` | runs `vendor:publish --tag=pulse-migrations` |
 | `horizon` | `laravel/horizon` | runs `horizon:install` |
 | `sentry` | `sentry/sentry-laravel` | runs `vendor:publish --tag=sentry-config` |
+
+Telescope is required as a **regular** dependency, not a dev one: `telescope:install` registers `App\Providers\TelescopeServiceProvider`, which extends Telescope's own provider, in `bootstrap/providers.php` — a production deploy running `composer install --no-dev` would boot into a missing parent class. Telescope's generated provider already filters recording down to exceptions and failed jobs outside `local`. If you want a genuinely local-only install instead, follow [Telescope's local-only instructions](https://laravel.com/docs/13.x/telescope#local-only-installation) by hand after the fact.
 
 Selection works two ways:
 

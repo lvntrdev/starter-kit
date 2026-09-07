@@ -116,6 +116,29 @@ describe('SkCard — page-header hosting', () => {
         expect(cards[1].find('.page-header').exists()).toBe(true);
     });
 
+    it('still draws the header on a card whose head is fully overridden', async () => {
+        // `#header` replaces the structured head, so the inline region that carries
+        // the back button and page actions is never rendered there. The card must
+        // fall back to its own header row instead of swallowing them.
+        const wrapper = mount(
+            defineComponent({
+                setup() {
+                    const candidates = ref<symbol[]>([]);
+                    provide(SK_PAGE_HEADER_KEY, { candidates, enabled: ref(true), render: header });
+                    return () =>
+                        h(SkCard, { title: 'Sayfa' }, {
+                            header: () => h('div', { class: 'custom-head' }, 'custom'),
+                            default: () => 'body',
+                        });
+                },
+            }),
+        );
+        await nextTick();
+
+        expect(wrapper.find('.custom-head').exists()).toBe(true);
+        expect(wrapper.find('.page-header').exists()).toBe(true);
+    });
+
     it('releases the claim when the hosting card unmounts', async () => {
         const { wrapper, candidates } = host(true, [card()]);
         await nextTick();

@@ -20,6 +20,14 @@ Bu dosya büyük sürümler arası geçiş rehberidir. Her sürüm kendi bölüm
 
 `Lvntr\StarterKit\Traits\HasMediaCollections::getMediaForForm()` (avatar ve diğer forma bağlı media için kullanılır) hâlâ doğrudan `Media::getUrl()` çağırıyor ve bu turda **kasıtlı olarak değiştirilmedi** — ayrı, daha dar bir yüzey (bir listeleme değil, bağlı bir form field'ı) ve aynı ham-URL desenini taşıyor; burada ele alınmadı.
 
+### Aura sayfa başlığı içerik kartına taşındı — `AdminLayout.vue` ve `AdminHeader.vue` birlikte göç eder
+
+**Etkilenenler:** aura temasında `stubs/resources/js/layouts/AdminLayout.vue` dosyasını özelleştirmiş kurulumlar. **Etkilenmeyenler:** main teması ya da iki layout dosyasına da dokunmamış uygulamalar.
+
+Aura; sayfa başlığını, alt başlığını ve geri butonunu topbar'da göstermesi için `AdminHeader`'a devrediyordu. Başlık artık içerik kartının kendi head'inde çiziliyor; paketle gelen `AdminLayout.vue` `pageTitle`/`pageSubtitle`/`showBack` prop'larını bağlamıyor ve `back` olayını dinlemiyor. `sk:update` her yayımlanmış dosyayı kendi hash'iyle izlediği için, yalnız layout'u düzenlemiş bir uygulama düzenlediği kopyayı korur ve yeni header'ı yine de alır — bu birleşimde eski layout, artık hiçbir yerde render edilmeyen bir başlık ve geri butonu gönderiyor olurdu.
+
+Bu nedenle `AdminHeader.vue` üç prop'u da kabul etmeye, `back` olayını yaymaya ve değerler verildiğinde topbar başlık bloğunu ve geri butonunu çizmeye devam ediyor. Varsayılan olarak bunları hiçbir şey bağlamaz, dolayısıyla temiz kurulum etkilenmez. (`showBack`/`back` hiçbir etiketli sürümde yer almadı — yalnız iki 13.7.0 geliştirme commit'i arasında vardı — bu nedenle köprünün bu yarısı yalnız sürüm etiketinden değil `main`'den kurulmuş uygulamaları ilgilendirir.) Layout'u özelleştirdiyseniz ya yeni sayfa başlığı bağlantısını paketle gelen `AdminLayout.vue` dosyasından alın (`php artisan sk:update --dry-run` ile karşılaştırın) ya da prop'ları bağlamayı sürdürün — ikisi de bir sayfa başlığı çizer, yalnız farklı yerlerde. Köprü yalnız geriye uyumluluk içindir ve ileriki bir majör sürümde kaldırılacaktır.
+
 ### `stubs/package.json`'dan iki `@tiptap/*` paketi kaldırıldı
 
 `@tiptap/extension-task-item` ve `@tiptap/extension-task-list`, stub'ın doğrudan bağımlılıklarından kaldırıldı — hiçbiri kitin kendi kodunda (`EditorInput.vue` ya da başka bir yerde) import edilmiyor. Kendi kodunuz bunlardan birini doğrudan import ediyorsa (özel bir rich-text extension'ı, editörün üzerine kurulmuş bir task-list özelliği) kendi uygulamanızın `package.json`'ına geri ekleyin; `sk:update`/`composer update`/`npm install` artık bunları sizin için, transitively bile, çekmiyor.

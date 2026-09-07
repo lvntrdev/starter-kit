@@ -25,6 +25,7 @@
     import FileManagerSidebar from './components/FileManagerSidebar.vue';
     import FolderTree from './components/FolderTree.vue';
     import { useFileManager } from './composables/useFileManager';
+    import { usePageHeaderHost } from '../ui/usePageHeaderHost';
     import { folderPaletteAt, paletteForMime } from './palette';
     import type {
         FileItem,
@@ -54,6 +55,18 @@
     const page = usePage();
     const effectiveEnableTrash = computed(
         () => props.enableTrash ?? page.props.fileManagerSettings?.enable_trash ?? true,
+    );
+
+    // ── Page-header hosting ───────────────────────────────────
+    // The file manager is its own surface — it renders no `SkCard`, so nothing on
+    // the page claimed the layout's header and aura fell back to drawing it as a
+    // bare strip above the manager, the one place the theme never puts it. It is
+    // claimed here instead and drawn at the top of the sidebar, above the upload
+    // button. Themes that render the header in place (`main`) provide no host
+    // context at all, so this is inert there.
+    const { hostedPageHeader } = usePageHeaderHost(
+        () => true,
+        () => false,
     );
 
     const toast = useToast();
@@ -1239,7 +1252,14 @@
                 @select-folder="onSelectSidebarFolder"
                 @new-folder="openNewFolder"
                 @upload="triggerUpload"
-            />
+            >
+                <template
+                    v-if="hostedPageHeader"
+                    #header
+                >
+                    <component :is="hostedPageHeader" />
+                </template>
+            </FileManagerSidebar>
 
             <!-- İçerik paneli: breadcrumb başlığı + araç çubuğu + gövde -->
             <div

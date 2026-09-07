@@ -20,6 +20,14 @@ This file is the cross-major-version migration guide. Every release gets its own
 
 `Lvntr\StarterKit\Traits\HasMediaCollections::getMediaForForm()` (used for avatar and other form-attached media) still calls `Media::getUrl()` directly and is **deliberately unchanged in this wave** — it is a separate, narrower surface (a bound form field, not a public listing) and carries the same raw-URL pattern; not addressed here.
 
+### The aura page header moved into the content card — `AdminLayout.vue` and `AdminHeader.vue` migrate together
+
+**Affects:** installs on the aura theme that customised `stubs/resources/js/layouts/AdminLayout.vue`. **Not affected:** the main theme, or an app that left both layout files untouched.
+
+Aura used to hand the page title, subtitle and back button to `AdminHeader` for display in the topbar; the header is now drawn inside the content card's own head, and the shipped `AdminLayout.vue` no longer binds `pageTitle`/`pageSubtitle`/`showBack` or listens for `back`. `sk:update` tracks each published file by its own hash, so an app that edited only the layout keeps its edited copy and still receives the new header — a pairing that would leave the old layout feeding a title and a back button nothing renders any more.
+
+`AdminHeader.vue` therefore still accepts all three props, still emits `back`, and still renders the topbar title block and back button when they are set. Nothing binds them by default, so a fresh install is unaffected. (`showBack`/`back` never appeared in a tagged release — they existed only between two 13.7.0 development commits — so this half of the bridge matters only to an app installed from `main` rather than from a version tag.) If you customised the layout, either take the new page-header wiring from the shipped `AdminLayout.vue` (compare it with `php artisan sk:update --dry-run`) or keep binding the props — both render a page title, just in different places. The bridge is back-compat only and will be removed in a later major.
+
 ### Two `@tiptap/*` packages removed from `stubs/package.json`
 
 `@tiptap/extension-task-item` and `@tiptap/extension-task-list` were removed from the stub's direct dependencies — neither is imported anywhere in the kit's own code (`EditorInput.vue` or elsewhere). If your own code imports either of these directly (a custom rich-text extension, a task-list feature built on top of the editor), add them back to your own app's `package.json`; `sk:update`/`composer update`/`npm install` no longer pull them in for you, even transitively.

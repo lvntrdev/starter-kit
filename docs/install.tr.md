@@ -225,10 +225,12 @@ Kurulum sırasında `sk:install`, sizin için bir veya daha fazla opsiyonel izle
 
 | Anahtar | Paket | Post-install |
 |-----|---------|--------------|
-| `telescope` | `laravel/telescope` (dev bağımlılığı) | `telescope:install` çalıştırır |
-| `pulse` | `laravel/pulse` | yok |
+| `telescope` | `laravel/telescope` | `telescope:install` çalıştırır |
+| `pulse` | `laravel/pulse` | `vendor:publish --tag=pulse-migrations` çalıştırır |
 | `horizon` | `laravel/horizon` | `horizon:install` çalıştırır |
 | `sentry` | `sentry/sentry-laravel` | `vendor:publish --tag=sentry-config` çalıştırır |
+
+Telescope bilinçli olarak **dev değil, normal** bağımlılık olarak kurulur: `telescope:install`, Telescope'un kendi provider'ından türeyen `App\Providers\TelescopeServiceProvider` sınıfını `bootstrap/providers.php` dosyasına kaydeder — `composer install --no-dev` ile çıkılan bir üretim deploy'unda üst sınıf bulunamaz ve uygulama açılmaz. Telescope'un ürettiği provider zaten `local` dışında kaydı yalnız exception ve başarısız job'larla sınırlar. Gerçekten yalnız-yerel bir kurulum istiyorsanız, kurulumdan sonra [Telescope'un local-only yönergesini](https://laravel.com/docs/13.x/telescope#local-only-installation) elle uygulayın.
 
 Seçim iki şekilde yapılır:
 

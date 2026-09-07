@@ -23,14 +23,23 @@ html[data-sk-theme='aura'] .sk-card__actions .admin-page-header {
     @apply mb-0;
 }
 
+/* File manager: the header is drawn at the top of the 232px sidebar rail, above
+   the upload button, so it stacks instead of laying its title and actions out on
+   one row — there is no width for that here. */
+html[data-sk-theme='aura'] .fm-sidebar__page-header .admin-page-header {
+    @apply mb-0 w-full flex-col items-start gap-2;
+}
+
 html[data-sk-theme='aura'] .sk-card__head--page .admin-page-header__heading,
-html[data-sk-theme='aura'] .sk-dt-toolbar__page-header .admin-page-header__heading {
+html[data-sk-theme='aura'] .sk-dt-toolbar__page-header .admin-page-header__heading,
+html[data-sk-theme='aura'] .fm-sidebar__page-header .admin-page-header__heading {
     @apply text-base font-semibold;
     letter-spacing: -0.01em;
 }
 
 html[data-sk-theme='aura'] .sk-card__head--page .admin-page-header__subtitle,
-html[data-sk-theme='aura'] .sk-dt-toolbar__page-header .admin-page-header__subtitle {
+html[data-sk-theme='aura'] .sk-dt-toolbar__page-header .admin-page-header__subtitle,
+html[data-sk-theme='aura'] .fm-sidebar__page-header .admin-page-header__subtitle {
     @apply mt-1 text-[13px] leading-normal;
     color: var(--sk-aura-text-soft);
 }

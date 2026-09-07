@@ -19,20 +19,28 @@ it('returns every recipe keyed by its identifier', function () {
     expect($recipes)->toHaveKeys(['telescope', 'pulse', 'horizon', 'sentry']);
 });
 
-it('defines the telescope recipe with a dev-only composer package and install step', function () {
+it('defines the telescope recipe as a production dependency with its install step', function () {
     $recipe = RecipeRegistry::get('telescope');
 
+    // Not --dev: telescope:install registers a provider that extends Telescope's
+    // own, so a `composer install --no-dev` deploy would boot into a missing class.
     expect($recipe['composer'])->toBe('laravel/telescope')
-        ->and($recipe['dev'])->toBeTrue()
+        ->and($recipe['dev'])->toBeFalse()
         ->and($recipe['post_install'])->toBe(['telescope:install']);
 });
 
-it('defines the pulse recipe as a production dependency with no post-install step', function () {
+it('defines the pulse recipe as a production dependency that publishes its migrations', function () {
     $recipe = RecipeRegistry::get('pulse');
 
     expect($recipe['composer'])->toBe('laravel/pulse')
         ->and($recipe['dev'])->toBeFalse()
-        ->and($recipe['post_install'])->toBe([]);
+        ->and($recipe['post_install'])->toBe(['vendor:publish --tag=pulse-migrations']);
+});
+
+it('requires no recipe to be installed as a dev-only dependency', function () {
+    // A dev-only package whose post-install writes into bootstrap/providers.php
+    // breaks a production `composer install --no-dev`. Keep the catalog honest.
+    expect(array_column(RecipeRegistry::all(), 'dev'))->each->toBeFalse();
 });
 
 it('defines the horizon recipe as a production dependency with its install step', function () {

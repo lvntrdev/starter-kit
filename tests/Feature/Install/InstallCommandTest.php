@@ -79,10 +79,11 @@ it('skips the interactive prompt entirely under --no-interaction', function () {
 it('builds the composer require command for a dev-only recipe with --dev appended', function () {
     [$command] = icrCommand();
 
-    $recipe = RecipeRegistry::get('telescope');
+    // Synthetic: no shipped recipe is dev-only any more, but the flag branch stays.
+    $recipe = ['composer' => 'vendor/dev-tool', 'dev' => true, 'label' => 'Dev tool', 'post_install' => []];
 
     expect(iciInvoke($command, 'recipeRequireCommand', [['composer'], $recipe]))
-        ->toBe(['composer', 'require', '--dev', 'laravel/telescope', '--no-interaction']);
+        ->toBe(['composer', 'require', '--dev', 'vendor/dev-tool', '--no-interaction']);
 });
 
 it('builds the composer require command for a production recipe without --dev', function () {

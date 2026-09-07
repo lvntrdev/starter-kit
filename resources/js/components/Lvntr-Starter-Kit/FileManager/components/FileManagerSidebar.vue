@@ -73,6 +73,15 @@
     <aside
         class="fm-sidebar flex h-full flex-col gap-1 overflow-y-auto rounded-[5px] border border-surface-200 bg-surface-0 p-3 dark:border-surface-700 dark:bg-surface-900"
     >
+        <!-- Sayfa başlığı — yalnız kart-içi header barındıran temalarda (aura) dolu
+             gelir; başka temalarda layout başlığı kendi yerinde çizer, slot boştur. -->
+        <div
+            v-if="$slots.header"
+            class="fm-sidebar__page-header mb-3 shrink-0 border-b border-surface-200 pb-2 dark:border-surface-700"
+        >
+            <slot name="header" />
+        </div>
+
         <!-- Yükleme butonu — favoriler/çöp sanal görünümlerinde hedef klasör yok, devre dışı -->
         <button
             type="button"

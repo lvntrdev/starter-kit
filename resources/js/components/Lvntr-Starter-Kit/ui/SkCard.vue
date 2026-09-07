@@ -70,7 +70,15 @@
     // A hosting card that has a title of its own keeps it and takes the page header
     // INTO that same head row (back button + page actions only) — a page heading
     // stacked above the card's own heading reads as a duplicated title.
-    const hostsPageHeaderInline = computed(() => hostsPageHeader.value && hasTitle.value);
+    //
+    // Never inline under a full `#header` override, though: that branch replaces the
+    // structured head entirely, so the inline region is never rendered and the page's
+    // back button and `#page-actions` would vanish from the screen with no fallback
+    // (the layout stays silent while a card is still claiming the header). Such a card
+    // draws the header in its own row above the override instead.
+    const hostsPageHeaderInline = computed(
+        () => hostsPageHeader.value && hasTitle.value && !hasHeader.value,
+    );
 
     // Head becomes a flex row only when there is a right-hand region to lay out.
     const isRowHead = computed(() => hasActions.value || hostsPageHeaderInline.value);

@@ -128,6 +128,32 @@ html[data-sk-theme='aura'] .admin-header__tag--debug {
     color: #ffffff;
 }
 
+/* Back button in the topbar — back-compat only, same story as the page title
+   block below: it follows that title and sits immediately to its LEFT. Reuses the
+   header icon-button skin; the negative margin tightens it against the title group
+   (which carries its own `ml-1`) so the pair reads as one unit. */
+html[data-sk-theme='aura'] .admin-header__back {
+    @apply -mr-1 shrink-0;
+}
+
+/* Page title in the topbar — back-compat only. The current AdminLayout draws the
+   page header inside the content card and binds no `pageTitle`; a customised
+   layout kept from an older release still does, and these rules keep that screen
+   readable after `sk:update` refreshes AdminHeader.vue on its own. */
+html[data-sk-theme='aura'] .admin-header__page {
+    @apply ml-1 flex flex-col justify-center;
+}
+
+html[data-sk-theme='aura'] .admin-header__page-title {
+    @apply text-[15px] font-semibold leading-tight;
+    color: var(--admin-header-text);
+}
+
+html[data-sk-theme='aura'] .admin-header__page-subtitle {
+    @apply text-xs leading-tight;
+    color: var(--sk-aura-text-soft);
+}
+
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    DARK-MODE RE-ASSERTS
    ─────────────────────────────────────────────────────────────────
