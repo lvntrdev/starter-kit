@@ -2,7 +2,7 @@
 
 Kit composable'ları artık pakete dahil edilmiştir ve varsayılan olarak doğrudan vendor kütüphanesinden çalışır — tüketici uygulamasına kopyalanmaları gerekmez. Uygulama genelindeki importlar daha önce olduğu gibi `@/composables/<name>` (veya yalnızca `@/composables` barrel'ı) üzerinden yapılır; Vite `customResolver` ve buna eşlik eden tsconfig path girişi bu yolları **önce local, sonra vendor** olarak çözer: tüketicinin `resources/js/composables/` dizininde bir dosya varsa o kullanılır, yoksa vendor kopyası otomatik devreye girer.
 
-**`useAdminMenu`** ve **`usePageHeader`**, stub olarak gönderilmeye devam eden tek composable'lardır (`resources/js/composables/useAdminMenu.ts`, `resources/js/composables/usePageHeader.ts`). `useAdminMenu`, tüketicinin ürettiği `@/routes/*` dosyalarına bağımlıdır ve projeye özgü menü tanımını barındırır; bu nedenle düzenlenebilir olarak kalmalıdır. `usePageHeader`, `AdminLayout.vue`'nun (kendisi de bir stub) sağladığı ve `UserForm.vue` gibi form sayfalarının tükettiği page-header context'ini tanımlar; bu nedenle layout ile birlikte düzenlenebilir bir stub olarak gönderilir. `@/composables/index.ts` barrel'ı da stub olarak kalmaya devam eder.
+**`useAdminMenu`**, stub olarak gönderilmeye devam eden tek composable'dır (`resources/js/composables/useAdminMenu.ts`). Tüketicinin ürettiği `@/routes/*` dosyalarına bağımlıdır ve projeye özgü menü tanımını barındırır; bu nedenle düzenlenebilir olarak kalmalıdır. `@/composables/index.ts` barrel'ı da stub olarak kalmaya devam eder.
 
 ### Composer üzerinden composable güncellemeleri
 
@@ -38,7 +38,6 @@ Bu değişiklikten önce oluşturulan projelerde tüm composable'lar `resources/
 - responsive sidebar durumu için `useSidebar`
 - URL ile senkron sekme durumu için `useUrlTab`
 - admin navigasyonu üretmek için `useAdminMenu` ve `useMenuBuilder`
-- `AdminLayout` ile form sayfaları arasında paylaşılan geri-butonlu page-header context'i için `usePageHeader`
 
 ## Temel İstek ve Dialog Yardımcıları
 
@@ -179,13 +178,6 @@ Inertia shared props'taki admin geneli `appearance.theme` değerine göre, `data
 Inertia shared props içindeki flash verisini reactive olarak sunar.
 
 Bu projede flash mesajlar composable içinde değil, `AdminLayout.vue` içinde toast olarak gösterilir.
-
-### usePageHeader()
-
-`AdminLayout.vue`'nun sağladığı ve geri-butonlu form sayfalarının (örn. `UserForm.vue`, `RoleForm.vue`) başlık/alt başlığı ayrı bir page-header yerine ilk kartın içinde göstermek için okuduğu page-header injection context'ini sunar. `useAdminMenu` ile birlikte düzenlenebilir bir stub olarak gönderilir — yukarıdaki nota bakın.
-
-- `active` — yalnızca Aura teması, geri butonu ve sayfanın `header-in-card` opt-in'i aynı anda sağlandığında `true`; aksi halde inject edilen varsayılan pasiftir
-- `title`, `subtitle`, `goBack()` — opt-in yapılmış bir form sayfasının ilk kartı tarafından tüketilir
 
 ## Definition Yardımcıları
 

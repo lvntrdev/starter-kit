@@ -2,6 +2,7 @@
     import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
     import { router } from '@inertiajs/vue3';
     import { trans } from 'laravel-vue-i18n';
+    import SkCard from '@lvntr/components/ui/SkCard.vue';
     import {
         ACCENT_COLORS,
         ACCENT_SWATCH,
@@ -116,18 +117,14 @@
 </script>
 
 <template>
-    <!-- Single card: header · grouped rows (label left / content right) · footer -->
-    <section class="overflow-hidden rounded-md border border-surface-200 bg-surface-0 dark:border-surface-700 dark:bg-surface-900">
-        <!-- Card header -->
-        <header class="border-b border-surface-200 px-6 py-[18px] dark:border-surface-700">
-            <h2 class="text-base font-semibold tracking-tight text-surface-900 dark:text-surface-100">
-                {{ $t('sk-setting.appearance.title') }}
-            </h2>
-            <p class="mt-1 text-[13px] text-surface-500 dark:text-surface-400">
-                {{ $t('sk-setting.appearance.subtitle') }}
-            </p>
-        </header>
-
+    <!-- Single card: header · grouped rows (label left / content right) · footer.
+         SkCard rather than a hand-rolled surface so aura can host the page header
+         in its head like every other admin screen (see `ui/pageHeader.ts`). -->
+    <SkCard
+        flush
+        :title="$t('sk-setting.appearance.title')"
+        :subtitle="$t('sk-setting.appearance.subtitle')"
+    >
         <!-- Card body: settings groups, divided -->
         <div class="divide-y divide-surface-200 px-6 dark:divide-surface-700">
             <!-- ── Logo ─────────────────────────────────────────────────── -->
@@ -412,7 +409,7 @@
         </div>
 
         <!-- Card footer: unsaved hint + save -->
-        <footer class="flex items-center gap-2.5 border-t border-surface-200 px-6 py-[15px] dark:border-surface-700">
+        <template #footer>
             <small v-if="isDirty" class="mr-auto flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
                 <i class="pi pi-exclamation-circle text-xs" />
                 {{ $t('sk-setting.appearance.unsaved') }}
@@ -426,6 +423,6 @@
                 :disabled="!isDirty"
                 @click="save"
             />
-        </footer>
-    </section>
+        </template>
+    </SkCard>
 </template>

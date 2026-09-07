@@ -10,6 +10,7 @@
     } from './core';
     import { useActiveTab } from './core/useActiveTab';
     import SkCard from '../ui/SkCard.vue';
+    import { SkPageHeaderRegion } from '../ui/pageHeader';
 
     interface Props {
         config: TabBuilderConfig;
@@ -246,7 +247,11 @@
                 <slot name="sidebar-header" />
             </div>
 
-            <SkCard class="sk-vtab-card">
+            <!-- Navigation chrome, not page content — never hosts the page header. -->
+            <SkCard
+                class="sk-vtab-card"
+                :host-page-header="false"
+            >
                 <template #content>
                     <nav class="sk-vtab-nav" role="tablist" aria-orientation="vertical" @keydown="onNavKeydown">
                         <button
@@ -319,8 +324,16 @@
                     the current panel; 'all' mounts every one and hides the inactive
                     ones with v-show, which is what keeps their state alive.
                 -->
-                <SkCard
+                <!--
+                    An inactive 'all'-mode panel stays mounted (v-show), so its cards
+                    would keep claiming the layout's page header after a tab switch —
+                    the region flag hands the claim to the visible panel instead.
+                -->
+                <SkPageHeaderRegion
                     v-if="panelMode === 'all' || isActive(tab.key)"
+                    :active="isActive(tab.key)"
+                >
+                <SkCard
                     v-show="isActive(tab.key)"
                     :transparent="!tabIsCard(tab)"
                     :flush="!tabIsCard(tab)"
@@ -347,6 +360,7 @@
                         </div>
                     </template>
                 </SkCard>
+                </SkPageHeaderRegion>
             </template>
         </div>
     </div>
@@ -360,18 +374,32 @@
         v-else
         :value="activeTab"
         :lazy="panelMode === 'active'"
+        class="sk-tabs"
         :class="config.cssClass"
         @update:value="activeTab = $event as string"
     >
-        <TabList>
-            <Tab v-for="tab in visibleTabs" :key="tab.key" :value="tab.key" :disabled="isDisabled(tab)">
-                <i v-if="tab.icon" :class="tab.icon" class="sk-vtab__icon" aria-hidden="true" />
-                {{ $t(tab.label) }}
-            </Tab>
-        </TabList>
+        <!--
+            The strip lives in a card of its own so it reads as the screen's header:
+            the hosted page header (heading + subtitle + page actions) sits in the
+            card head, the card's divider runs under it, and the tab row follows in
+            the flush body. It is the first card to register, so it — not a card
+            inside a panel — is the one that hosts the page header.
+        -->
+        <SkCard class="sk-tabs-card" :flush="true">
+            <template #content>
+                <TabList>
+                    <Tab v-for="tab in visibleTabs" :key="tab.key" :value="tab.key" :disabled="isDisabled(tab)">
+                        <i v-if="tab.icon" :class="tab.icon" class="sk-tabs__icon" aria-hidden="true" />
+                        {{ $t(tab.label) }}
+                    </Tab>
+                </TabList>
+            </template>
+        </SkCard>
 
         <TabPanels>
             <TabPanel v-for="tab in visibleTabs" :key="tab.key" :value="tab.key">
+                <!-- Same reason as the vertical panel: PrimeVue keeps inactive panels mounted. -->
+                <SkPageHeaderRegion :active="isActive(tab.key)">
                 <SkCard :transparent="!tabIsCard(tab)" :flush="!tabIsCard(tab)">
                     <template v-if="tab.cardTitle ?? config.cardTitle" #title>
                         {{ $t(tab.cardTitle ?? config.cardTitle!) }}
@@ -385,6 +413,7 @@
                         </div>
                     </template>
                 </SkCard>
+                </SkPageHeaderRegion>
             </TabPanel>
         </TabPanels>
     </Tabs>

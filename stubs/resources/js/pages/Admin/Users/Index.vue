@@ -3,7 +3,6 @@
     import { useConfirm } from '@/composables/useConfirm';
     import { useDialog } from '@/composables/useDialog';
     import { useRefreshBus } from '@/composables/useRefreshBus';
-    import { useTheme } from '@/composables/useTheme';
     import { useDatatableSelection } from '@/composables/useDatatableSelection';
     import AdminLayout from '@/layouts/AdminLayout.vue';
     import type { User } from '@/types';
@@ -26,7 +25,6 @@
     const dialog = useDialog();
     const bus = useRefreshBus();
     const { can } = useCan();
-    const { theme } = useTheme();
 
     const REFRESH_KEY = 'users-table';
 
@@ -110,21 +108,12 @@
 
     // ── SkDatatable ─────────────────────────────────────────────────────────────────
 
-    const tableBuilder = DB.table<User>()
+    const tableConfig = DB.table<User>()
         .route(users.dtApi.url())
-        .title('sk-menu.users')
         // .searchable(true)
-        .sortable(true);
-    // .isCard(false)
-    // .pagination(true)
-
-    // Create butonu yalnızca `aura` temasında datatable toolbar'ında görünür;
-    // diğer temalarda header page-action butonu (template'te) kullanılır.
-    if (theme.value === 'aura' && can('users.create')) {
-        tableBuilder.create({ onClick: openCreateDialog, label: 'sk-user.create' });
-    }
-
-    const tableConfig = tableBuilder
+        .sortable(true)
+        // .isCard(false)
+        // .pagination(true)
         .addColumns(
             DB.column<User>().label('sk-common.full_name').key('full_name'),
             DB.column<User>().key('email'),
@@ -186,7 +175,7 @@
     :subtitle="$t('sk-user.subtitle')"
   >
     <template
-      v-if="can('users.create') && theme !== 'aura'"
+      v-if="can('users.create')"
       #page-actions
     >
       <Button

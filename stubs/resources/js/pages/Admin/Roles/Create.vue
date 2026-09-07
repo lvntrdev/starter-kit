@@ -21,7 +21,6 @@
   <AdminLayout
     :title="trans('sk-role.create')"
     :back-url="true"
-    :header-in-card="true"
   >
     <RoleForm
       :permissions-by-group="permissionsByGroup"

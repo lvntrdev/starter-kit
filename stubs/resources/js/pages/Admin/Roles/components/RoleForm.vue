@@ -8,11 +8,6 @@
     import SkForm from '@lvntr/components/FormBuilder/SkForm.vue';
     import { FB } from '@lvntr/components/FormBuilder/core';
     import { TB } from '@lvntr/components/TabBuilder/core';
-    import { usePageHeader } from '@/composables/usePageHeader';
-
-    // Aura + geri-butonlu sayfa: başlık topbar'da; geri butonu sekmelerin
-    // üstünde kendi başlıksız kartında gösterilir (bkz. template).
-    const pageHeader = usePageHeader();
 
     interface PermissionGroup {
         label: string;
@@ -322,23 +317,6 @@
     class="space-y-6"
     @submit.prevent="submit"
   >
-    <!-- Aura + header-in-card: sayfanın geri butonu, hangi sekme aktif olursa
-         olsun sabit kalsın diye sekmelerin ÜSTÜNDE, tek başına duruyor. -->
-    <SkCard
-      v-if="pageHeader.active"
-      flush
-    >
-      <template #actions>
-        <Button
-          icon="pi pi-arrow-left"
-          :label="trans('sk-button.back')"
-          severity="secondary"
-          variant="outlined"
-          @click="pageHeader.goBack"
-        />
-      </template>
-    </SkCard>
-
     <SkTabs
       v-model="activeTab"
       :config="tabConfig"

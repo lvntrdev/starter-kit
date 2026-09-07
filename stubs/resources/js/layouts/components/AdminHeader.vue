@@ -18,25 +18,15 @@
         isDark: boolean;
         accent: AccentColor;
         sidebarStyle: SidebarStyle;
-        /** Aura: başlık/alt başlık topbar'da gösterilir. Boş string → gösterilmez. */
-        pageTitle?: string;
-        pageSubtitle?: string;
-        /** Aura: geri butonu topbar'da, başlığın hemen solunda durur. */
-        showBack?: boolean;
     }
 
-    withDefaults(defineProps<Props>(), {
-        pageTitle: '',
-        pageSubtitle: '',
-        showBack: false,
-    });
+    defineProps<Props>();
 
     const emit = defineEmits<{
         toggleSidebar: [];
         toggleDark: [];
         setAccent: [color: AccentColor];
         setSidebarStyle: [style: SidebarStyle];
-        back: [];
     }>();
 
     const page = usePage();
@@ -177,32 +167,6 @@
         v-if="isDebug"
         class="admin-header__tag admin-header__tag--debug"
       > Debug Mode </span>
-
-      <!-- Aura: sayfa başlığı topbar'da; geri butonu başlığın hemen solunda -->
-      <span
-        v-if="pageTitle || showBack"
-        class="admin-header__divider"
-      />
-      <button
-        v-if="showBack"
-        type="button"
-        class="admin-header__btn admin-header__back"
-        :title="$t('sk-button.back')"
-        :aria-label="$t('sk-button.back')"
-        @click="emit('back')"
-      >
-        <i class="pi pi-arrow-left" />
-      </button>
-      <div
-        v-if="pageTitle"
-        class="admin-header__page"
-      >
-        <span class="admin-header__page-title">{{ pageTitle }}</span>
-        <span
-          v-if="pageSubtitle"
-          class="admin-header__page-subtitle"
-        >{{ pageSubtitle }}</span>
-      </div>
     </div>
 
     <div class="admin-header__right">

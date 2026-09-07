@@ -1,0 +1,36 @@
+/**
+ * Aura — the page header lives INSIDE the content card's head.
+ *
+ * `AdminLayout` hands its one `AdminPageHeader` to the first `SkCard` registered as
+ * a host (see `ui/pageHeader.ts`), which draws it in a head row of its own
+ * (`.sk-card__head--page`) directly above the card's title row, so the card keeps
+ * its own title and actions. The card head already supplies
+ * the surface, padding and divider — aura only has to strip the strip: no bottom
+ * margin, and card-scale typography instead of `main`'s 2xl page heading.
+ *
+ * RUNTIME CONTRACT: every selector is scoped with `html[data-sk-theme='aura']` so
+ * the rules stay dormant until useTheme flips the attribute, and the attribute
+ * ancestor outspecifies the always-loaded `main` counterpart.
+ */
+
+html[data-sk-theme='aura'] .sk-card__head--page .admin-page-header {
+    @apply mb-0 w-full gap-3.5;
+}
+
+/* Card with a title of its own: the header keeps only its back button and page
+   actions and sits in the card's own head row, next to that title. */
+html[data-sk-theme='aura'] .sk-card__actions .admin-page-header {
+    @apply mb-0;
+}
+
+html[data-sk-theme='aura'] .sk-card__head--page .admin-page-header__heading,
+html[data-sk-theme='aura'] .sk-dt-toolbar__page-header .admin-page-header__heading {
+    @apply text-base font-semibold;
+    letter-spacing: -0.01em;
+}
+
+html[data-sk-theme='aura'] .sk-card__head--page .admin-page-header__subtitle,
+html[data-sk-theme='aura'] .sk-dt-toolbar__page-header .admin-page-header__subtitle {
+    @apply mt-1 text-[13px] leading-normal;
+    color: var(--sk-aura-text-soft);
+}

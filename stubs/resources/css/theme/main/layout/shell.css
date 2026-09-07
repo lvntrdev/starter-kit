@@ -34,6 +34,22 @@
     @apply w-full flex-1 min-h-0 overflow-y-auto p-6 flex flex-col;
 }
 
+/* The scrollport is a flex column, so its children are shrinkable flex items —
+   and a child that clips its own overflow (`.sk-card` is `overflow: hidden`)
+   resolves the automatic minimum size to 0. A form card taller than the viewport
+   was therefore squeezed down to the leftover height and cut its own content off,
+   leaving the scrollport with nothing to scroll. Pinning the automatic minimum to
+   the content's own height restores page scrolling.
+
+   Scoped to the card rather than to every child on purpose: theme CSS is imported
+   UNLAYERED (see `app.css`), so it outranks Tailwind's layered utilities whatever
+   their specificity — `.admin-content > *` would have overridden the `min-h-0` on
+   a root that deliberately fills the viewport (the file manager shell) and turned
+   its inner scroll into a page scroll. */
+.admin-content > .sk-card {
+    min-height: min-content;
+}
+
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    VUE TRANSITIONS
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */

@@ -1,5 +1,6 @@
 <script setup lang="ts">
     import { computed, useAttrs, useSlots } from 'vue';
+    import { usePageHeaderHost } from './usePageHeaderHost';
 
     defineOptions({ name: 'SkCard', inheritAttrs: false });
 
@@ -25,6 +26,13 @@
          * their own internal spacing.
          */
         flush?: boolean;
+        /**
+         * Allow this card to host the page header (title / subtitle / back button /
+         * page actions) in themes that put it inside the content card. The first
+         * eligible card on the page wins. Set false for a card that must never
+         * absorb it — a dialog body, a nested inner card.
+         */
+        hostPageHeader?: boolean;
     }
 
     const props = withDefaults(defineProps<Props>(), {
@@ -33,10 +41,20 @@
         transparent: false,
         divider: true,
         flush: false,
+        hostPageHeader: true,
     });
 
     const slots = useSlots();
     const attrs = useAttrs();
+
+    // ── Page-header hosting ───────────────────────────────────
+    // The layout provides the host context only in themes that want the page
+    // header inside the content card; everywhere else the composable finds no
+    // context and keeps this card exactly as it was.
+    const { hostsPageHeader, hostedPageHeader } = usePageHeaderHost(
+        () => props.hostPageHeader && !props.transparent,
+        () => hasTitle.value,
+    );
 
     // ── Head visibility ─────────────────────────────────────────────────
     const hasTitle = computed(() => !!props.title || !!slots.title);
@@ -49,8 +67,13 @@
         () => hasHeader.value || hasTitle.value || hasSubtitle.value || hasActions.value,
     );
 
+    // A hosting card that has a title of its own keeps it and takes the page header
+    // INTO that same head row (back button + page actions only) — a page heading
+    // stacked above the card's own heading reads as a duplicated title.
+    const hostsPageHeaderInline = computed(() => hostsPageHeader.value && hasTitle.value);
+
     // Head becomes a flex row only when there is a right-hand region to lay out.
-    const isRowHead = computed(() => hasActions.value);
+    const isRowHead = computed(() => hasActions.value || hostsPageHeaderInline.value);
 
     // ── Foot visibility ─────────────────────────────────────────────────
     const hasFoot = computed(() => !!slots.footer);
@@ -61,6 +84,15 @@
         if (props.transparent) classes.push('sk-card--transparent');
         if (props.flush) classes.push('sk-card--flush');
         if (attrs.class) classes.push(attrs.class);
+        return classes;
+    });
+
+    // The hosted page header gets a head row of its OWN, above the card's title
+    // row — sharing that row would let a full-width header push the card's title
+    // and actions out of the card.
+    const pageHeaderClass = computed(() => {
+        const classes: unknown[] = ['sk-card__head', 'sk-card__head--page'];
+        if (props.divider) classes.push('sk-card__head--divider');
         return classes;
     });
 
@@ -75,6 +107,16 @@
 
 <template>
     <div :class="rootClass">
+        <!-- ── Hosted page header ────────────────────────────────────── -->
+        <!-- The layout's own page header, drawn here in themes that host it -->
+        <div
+            v-if="hostsPageHeader && !hostsPageHeaderInline"
+            :class="pageHeaderClass"
+            data-sk-page-header
+        >
+            <component :is="hostedPageHeader" />
+        </div>
+
         <!-- ── Head ──────────────────────────────────────────────────── -->
         <div v-if="hasHead" :class="headClass">
             <!-- Full custom head override -->
@@ -82,7 +124,10 @@
 
             <!-- Structured head: title / subtitle group (+ optional actions) -->
             <template v-else>
-                <div class="sk-card__head-main">
+                <div
+                    v-if="hasTitle || hasSubtitle"
+                    class="sk-card__head-main"
+                >
                     <div v-if="hasTitle" class="sk-card__title">
                         <slot name="title">{{ title }}</slot>
                     </div>
@@ -90,7 +135,15 @@
                         <slot name="subtitle">{{ subtitle }}</slot>
                     </div>
                 </div>
-                <div v-if="hasActions" class="sk-card__actions">
+                <div
+                    v-if="hasActions || hostsPageHeaderInline"
+                    class="sk-card__actions"
+                    :data-sk-page-header="hostsPageHeaderInline ? '' : undefined"
+                >
+                    <component
+                        :is="hostedPageHeader"
+                        v-if="hostsPageHeaderInline"
+                    />
                     <slot name="actions">
                         <slot name="title-end" />
                     </slot>

@@ -4,7 +4,6 @@
     import { useCan } from '@/composables/useCan';
     import { useConfirm } from '@/composables/useConfirm';
     import { useRefreshBus } from '@/composables/useRefreshBus';
-    import { useTheme } from '@/composables/useTheme';
     import { useDatatableSelection } from '@/composables/useDatatableSelection';
     import AdminLayout from '@/layouts/AdminLayout.vue';
     import roles from '@/routes/roles';
@@ -35,7 +34,6 @@
     const { confirmDelete, confirmAction } = useConfirm();
     const bus = useRefreshBus();
     const { can } = useCan();
-    const { theme } = useTheme();
 
     const REFRESH_KEY = 'roles-table';
 
@@ -115,16 +113,8 @@
 
     // ── SkDatatable ─────────────────────────────────────────────────────────────────
 
-    const tableBuilder = DB.table<Role>().route(roles.dtApi.url()).title('sk-menu.roles_permissions');
-
-    // Create butonu yalnızca `aura` temasında datatable toolbar'ında görünür
-    // (URL variant — Link olarak render edilir); diğer temalarda header'daki
-    // page-action Link butonu kullanılır.
-    if (theme.value === 'aura' && can('roles.create')) {
-        tableBuilder.create({ url: roles.create.url(), label: 'sk-role.create', icon: 'pi pi-plus' });
-    }
-
-    const tableConfig = tableBuilder
+    const tableConfig = DB.table<Role>()
+        .route(roles.dtApi.url())
         .addColumns(
             DB.column<Role>().key('name').tag('value').tagSeverityKey('color').tagSoft(),
             DB.column<Role>()
@@ -201,7 +191,7 @@
       #page-actions
     >
       <Button
-        v-if="isSystemAdmin && theme !== 'aura'"
+        v-if="isSystemAdmin"
         :label="$t('sk-role.sync_permissions')"
         icon="pi pi-sync"
         severity="secondary"
@@ -210,7 +200,7 @@
         @click="syncPermissions"
       />
       <Link
-        v-if="can('roles.create') && theme !== 'aura'"
+        v-if="can('roles.create')"
         :href="roles.create.url()"
       >
         <Button
@@ -226,21 +216,6 @@
       :selection="selection"
       @load="onTableLoad"
     >
-      <!-- İzin senkronizasyon butonu aura temasında datatable toolbar'ında (slot) -->
-      <template
-        v-if="isSystemAdmin && theme === 'aura'"
-        #toolbar-start
-      >
-        <Button
-          :label="$t('sk-role.sync_permissions')"
-          icon="pi pi-sync"
-          severity="secondary"
-          outlined
-          :loading="syncing"
-          @click="syncPermissions"
-        />
-      </template>
-
       <!-- Floating bulk bar actions — the bar (count label + clear) is built into SkDatatable -->
       <template #bulk-actions>
         <Button

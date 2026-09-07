@@ -4,8 +4,8 @@
     import { useAppearanceDefaults } from '@/composables/useAppearanceDefaults';
     import { useDarkMode } from '@/composables/useDarkMode';
     import { useTheme } from '@/composables/useTheme';
-    import { PAGE_HEADER_KEY } from '@/composables/usePageHeader';
     import { useFlash } from '@/composables/useFlash';
+    import { SK_PAGE_HEADER_KEY } from '@lvntr/components/ui/pageHeader';
     import AppShell from '@/layouts/AppShell.vue';
     import AdminFooter from '@/layouts/components/AdminFooter.vue';
     import AdminHeader from '@/layouts/components/AdminHeader.vue';
@@ -22,70 +22,69 @@
         title?: string;
         subtitle?: string;
         backUrl?: string | boolean;
-        /**
-         * Aura: geri-butonlu sayfalarda başlığı ayrı page-header yerine içeriğin
-         * ilk kartının başlığına gömer (sayfa `usePageHeader()` ile tüketir).
-         */
-        headerInCard?: boolean;
     }
 
     const props = withDefaults(defineProps<Props>(), {
         title: '',
         subtitle: '',
         backUrl: false,
-        headerInCard: false,
     });
 
     const { isDark, toggleDark } = useDarkMode();
     const { accent, setAccent, sidebarStyle, setSidebarStyle } = useAccentColor();
     const { applyFavicon } = useAppearanceDefaults();
     const { theme } = useTheme();
-
-    // Aura, başlığı üst bara (topbar) taşır; diğer temalarda klasik
-    // AdminPageHeader bloğu içerir kalır.
-    const isAura = computed(() => theme.value === 'aura');
-    const hasBack = computed(() => props.backUrl !== false && props.backUrl !== '');
-
-    // Aura'da başlık HER sayfada topbar'da durur (geri butonu olsun olmasın).
-    const showTitleInTopbar = computed(() => isAura.value && !!props.title);
-    // Aura + geri butonu VAR + başlık topbar'da → geri butonu da topbar'a, başlığın
-    // hemen SOLUNA gider. Aura'nın varsayılan geri-butonu konumu budur.
-    const backInTopbar = computed(() => showTitleInTopbar.value && hasBack.value);
-    // Aura + geri butonu VAR + sayfa opt-in → ilk kart geri butonunu host eder
-    // (başlık topbar'da; kart kendi başlığını korur). Topbar geri butonunu
-    // host ettiğinde devre dışı kalır — tek bir geri afordansı kalsın.
-    const titleInCard = computed(
-        () => isAura.value && hasBack.value && props.headerInCard && !backInTopbar.value,
-    );
     const slots = useSlots();
-    const hasPageActions = computed(() => !!slots['page-actions']);
-    // AdminPageHeader bloğu: non-aura'da her zaman; aura'da yalnızca geri butonu
-    // varken VE karta gömülmüyorken gösterilir. Geri butonu topbar'a taşındığında
-    // blok yalnızca sayfa aksiyonları için ayakta kalır (aksiyon yoksa hiç çizilmez).
-    const showPageHeader = computed(() => {
-        if (!isAura.value) return true;
-        if (!hasBack.value) return false;
-        if (props.headerInCard) return false;
-        return !backInTopbar.value || hasPageActions.value;
-    });
 
-    function goBack() {
-        if (props.backUrl === true) {
-            window.history.back();
-        } else if (typeof props.backUrl === 'string') {
-            router.visit(props.backUrl);
-        }
+    // Page header placement is a THEME decision, never a page decision:
+    //   main  → the header renders in place, as a strip above the content.
+    //   aura  → the first content card (the datatable card, the form card, an active
+    //           tab's card) draws it in its own head, so the page never shows a
+    //           second title block. `SkCard` claims it; see `ui/pageHeader.ts`.
+    // Pages stay theme-agnostic — they always pass `title`/`subtitle`/`back-url` and
+    // fill `#page-actions`, whichever theme is active.
+    const hostPageHeaderInCard = computed(() => theme.value === 'aura');
+    const pageHeaderCandidates = ref<symbol[]>([]);
+
+    // ONE definition of the header, rendered either here or by the hosting card.
+    // A hosting card that already carries its own title asks for `hideTitle`, so the
+    // header contributes only the back button and the page actions to that card head.
+    function renderPageHeader(options: { hideTitle?: boolean } = {}) {
+        const bare = options.hideTitle === true;
+
+        return h(
+            AdminPageHeader,
+            {
+                title: bare ? '' : props.title,
+                subtitle: bare ? '' : props.subtitle,
+                backUrl: props.backUrl,
+            },
+            // Passed only when the page fills it: an always-present slot function
+            // makes AdminPageHeader render its (empty) wrapper, which then eats a
+            // flex gap in whatever head or toolbar hosts the header.
+            slots['page-actions'] ? { actions: () => slots['page-actions']!() } : undefined,
+        );
     }
 
-    // İlk-kart tüketicileri için sağla: aura geri-butonlu form sayfalarında
-    // `active` true olur → kart, geri butonunu kendi aksiyon alanında gösterir
-    // (başlık topbar'da kaldığı için kart başlığını ezmez).
-    provide(PAGE_HEADER_KEY, reactive({
-        active: titleInCard,
-        title: computed(() => props.title),
-        subtitle: computed(() => props.subtitle),
-        goBack,
-    }));
+    provide(SK_PAGE_HEADER_KEY, {
+        candidates: pageHeaderCandidates,
+        enabled: hostPageHeaderInCard,
+        render: renderPageHeader,
+    });
+
+    // In a hosting theme the layout draws nothing until it knows no card wants the
+    // header: cards register during the content's own first render, so rendering
+    // eagerly would double the header for a frame. A page with no card at all gets
+    // it back in place right after mount.
+    const pageHeaderMounted = ref(false);
+    onMounted(() => {
+        pageHeaderMounted.value = true;
+    });
+    const renderPageHeaderInPlace = computed(() => {
+        if (!hostPageHeaderInCard.value) return true;
+        return pageHeaderMounted.value && pageHeaderCandidates.value.length === 0;
+    });
+
     const { flash } = useFlash();
     const toast = useToast();
 
@@ -159,10 +158,6 @@
         :is-dark="isDark"
         :accent="accent"
         :sidebar-style="sidebarStyle"
-        :page-title="showTitleInTopbar ? title : ''"
-        :page-subtitle="showTitleInTopbar ? subtitle : ''"
-        :show-back="backInTopbar"
-        @back="goBack"
         @toggle-sidebar="toggle"
         @toggle-dark="toggleDark"
         @set-accent="setAccent"
@@ -171,17 +166,10 @@
     </template>
 
     <!-- Content -->
-    <AdminPageHeader
-      v-if="showPageHeader"
-      :title="title"
-      :subtitle="subtitle"
-      :back-url="backInTopbar ? false : backUrl"
-      :hide-title="showTitleInTopbar"
-    >
-      <template #actions>
-        <slot name="page-actions" />
-      </template>
-    </AdminPageHeader>
+    <component
+      :is="renderPageHeader"
+      v-if="renderPageHeaderInPlace"
+    />
 
     <slot />
 

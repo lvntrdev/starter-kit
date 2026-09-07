@@ -79,8 +79,8 @@
     const tableBuilder = DB.table<ContentLanguage>()
         .route(adminSettings.contentLanguages.dt.url())
         .isCard(true)
-        .cardTitle('sk-content-languages.title')
-        .cardSubtitle('sk-content-languages.subtitle')
+        .title('sk-content-languages.title')
+        .subtitle('sk-content-languages.subtitle')
         .searchable(true)
         .sortable(true)
         .addColumns(

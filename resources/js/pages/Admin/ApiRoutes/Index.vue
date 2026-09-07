@@ -6,11 +6,11 @@
     import { useApi } from '@/composables/useApi';
     import { useCan } from '@/composables/useCan';
     import { useDialog } from '@/composables/useDialog';
-    import { useTheme } from '@/composables/useTheme';
     import apiRoutes from '@/routes/api-routes';
     import { useToast } from 'primevue/usetoast';
     import ApiIntegrationsDialog from './components/ApiIntegrationsDialog.vue';
     import ApiRoutesActions from './components/ApiRoutesActions.vue';
+    import SkCard from '@lvntr/components/ui/SkCard.vue';
 
     interface RouteItem {
         method: string;
@@ -43,12 +43,6 @@
     const toast = useToast();
     const dialog = useDialog();
     const { can } = useCan();
-    const { theme } = useTheme();
-
-    // Aura, sayfa başlığını topbar'a taşıyıp AdminPageHeader bloğunu gizlediği
-    // için aksiyonlar (#page-actions) bağlamsız kalır; bu sayfada içerik-içi bir
-    // header kartı render edip aksiyonları onun içine alıyoruz.
-    const isAura = computed(() => theme.value === 'aura');
 
     const regenerating = ref(false);
     const syncingPostman = ref(false);
@@ -245,41 +239,9 @@
             />
         </template>
 
-        <!-- Aura: AdminPageHeader gizli olduğundan başlık+aksiyonlar için
-             içerik-içi header kartı (diğer temalarda AdminPageHeader gösterir). -->
-        <div
-            v-if="isAura"
-            class="mb-4 flex flex-wrap items-center gap-4 rounded border border-surface-200 bg-surface-0 px-5 py-4 dark:border-surface-700 dark:bg-surface-900"
-        >
-            <span
-                class="inline-grid size-11 shrink-0 place-items-center rounded-lg bg-surface-100 text-[var(--p-primary-color)] dark:bg-surface-800"
-            >
-                <i class="pi pi-share-alt text-lg" />
-            </span>
-            <div class="min-w-0">
-                <h1 class="text-base font-semibold text-surface-900 dark:text-surface-0">
-                    {{ $t('sk-api-route.title') }}
-                </h1>
-                <p class="text-[13px] text-surface-500 dark:text-surface-400">
-                    {{ $t('sk-api-route.subtitle') }}
-                </p>
-            </div>
-            <div class="ml-auto">
-                <ApiRoutesActions
-                    :regenerating="regenerating"
-                    :syncing-postman="syncingPostman"
-                    :syncing-apidog="syncingApidog"
-                    @settings="openIntegrations"
-                    @regenerate="regenerateDocs"
-                    @sync-postman="syncPostman"
-                    @sync-apidog="syncApidog"
-                />
-            </div>
-        </div>
-
-        <div
-            class="overflow-hidden rounded border border-surface-200 bg-surface-0 dark:border-surface-700 dark:bg-surface-900"
-        >
+        <!-- SkCard rather than a hand-rolled surface: aura hosts the page header in
+             the first card's head, so every admin screen keeps it in the same place. -->
+        <SkCard flush>
             <!-- Tab bar -->
             <div class="flex gap-0.5 border-b border-surface-200 dark:border-surface-700">
                 <button
@@ -425,6 +387,6 @@
                     </p>
                 </div>
             </div>
-        </div>
+        </SkCard>
     </AdminLayout>
 </template>

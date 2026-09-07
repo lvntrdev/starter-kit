@@ -46,7 +46,7 @@ routes/
 resources/
 ├── js/
 │   ├── components/Lvntr-Starter-Kit/   # ONLY exists if sk:publish ran (local copy wins)
-│   ├── composables/                    # index.ts + useAdminMenu (+ usePageHeader) local;
+│   ├── composables/                    # index.ts + useAdminMenu local;
 │   │                                   # the 15 kit composables resolve local-first → vendor
 │   ├── layouts/{AppShell,AdminLayout}.vue
 │   ├── pages/Admin/**                  # your Vue pages

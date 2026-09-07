@@ -5,17 +5,10 @@
     import { FB } from '@lvntr/components/FormBuilder/core';
     import SkForm from '@lvntr/components/FormBuilder/SkForm.vue';
     import { trans } from 'laravel-vue-i18n';
-    import { Button } from 'primevue';
-    import { usePageHeader } from '@/composables/usePageHeader';
-
-    // Aura + geri-butonlu sayfa: başlık topbar'da; form kartı geri butonunu
-    // kendi başlık alanında (#title-end) gösterir.
-    const pageHeader = usePageHeader();
 
     interface Props {
         userId?: string | null;
         inDialog?: boolean;
-        showBack?: boolean;
         roleOptions?: { label: string; value: string }[];
         timezones?: string[];
     }
@@ -23,7 +16,6 @@
     const props = withDefaults(defineProps<Props>(), {
         userId: null,
         inDialog: false,
-        showBack: false,
         roleOptions: () => [],
         timezones: () => [],
     });
@@ -106,19 +98,6 @@
       :config="formConfig"
       @success="emit('success')"
       @cancel="emit('cancel')"
-    >
-      <template
-        v-if="pageHeader.active"
-        #title-end
-      >
-        <Button
-          icon="pi pi-arrow-left"
-          :label="$t('sk-button.back')"
-          severity="secondary"
-          variant="outlined"
-          @click="pageHeader.goBack"
-        />
-      </template>
-    </SkForm>
+    />
   </div>
 </template>

@@ -332,8 +332,79 @@
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   HORIZONTAL TAB STRIP
+
+   The strip is a card of its own: the page header sits in the card head, the
+   card's divider runs under it, and the tab row follows in the flush body.
+   Tabs themselves are flat text + icon — no chip, no box — with the primary
+   active bar as the only indicator, so the row reads as a continuation of the
+   head rather than a control of its own.
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* Flush body: the tab row supplies the card's horizontal padding itself, so a
+   long strip scrolls edge to edge instead of clipping inside a padded box. */
+.sk-tabs-card > .sk-card__body {
+    @apply px-6;
+}
+
+.sk-tabs-card .p-tablist {
+    @apply border-0 bg-transparent;
+}
+
+.sk-tabs-card .p-tablist-tab-list {
+    @apply gap-7 border-0 bg-transparent;
+}
+
+.sk-tabs-card .p-tab {
+    @apply m-0 inline-flex items-center gap-2 rounded-none border-0 bg-transparent px-0 py-3 text-[13.5px] font-medium;
+    color: var(--p-surface-500);
+}
+
+.sk-tabs-card .p-tab:hover {
+    background: transparent;
+    color: var(--p-surface-900);
+}
+
+.sk-tabs-card .p-tab-active,
+.sk-tabs-card .p-tab-active:hover {
+    background: transparent;
+    color: var(--p-primary-color);
+}
+
+.sk-tabs-card .p-tab:disabled {
+    @apply cursor-not-allowed opacity-50;
+}
+
+/* 2px indicator, flush with the bottom of the row. */
+.sk-tabs-card .p-tablist-active-bar {
+    @apply h-0.5 rounded-t-sm;
+    background: var(--p-primary-color);
+}
+
+.sk-tabs__icon {
+    @apply text-[15px] leading-none;
+}
+
+/* `:not(.p-tab-active)` keeps these off the active tab: `:root.dark` outranks the
+   `.p-tab-active` rules above, so without it the selected tab lost the primary
+   color and read exactly like an unselected one. */
+:root.dark .sk-tabs-card .p-tab:not(.p-tab-active) {
+    color: var(--p-surface-400);
+}
+
+:root.dark .sk-tabs-card .p-tab:not(.p-tab-active):hover {
+    color: var(--p-surface-0);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    HORIZONTAL TAB PANEL
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* PrimeVue's own panel surface is dropped — the panel's SkCard, or the page
+   behind a transparent one, provides it. */
+.sk-tabs > .p-tabpanels {
+    @apply bg-transparent p-0;
+}
 
 .sk-tabs__panel {
     @apply pt-4;

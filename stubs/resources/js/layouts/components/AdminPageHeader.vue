@@ -5,21 +5,15 @@
         title?: string;
         subtitle?: string;
         backUrl?: string | boolean;
-        /**
-         * Aura: başlık topbar'da gösterildiğinde bu blok başlığı tekrarlamasın —
-         * yalnızca geri butonu + aksiyonlar kalır.
-         */
-        hideTitle?: boolean;
     }
 
     const props = withDefaults(defineProps<Props>(), {
         title: '',
         subtitle: '',
         backUrl: false,
-        hideTitle: false,
     });
 
-    const showTitle = computed(() => !!props.title && !props.hideTitle);
+    const showTitle = computed(() => !!props.title);
 
     const resolvedBackUrl = computed(() => {
         if (props.backUrl === true) {

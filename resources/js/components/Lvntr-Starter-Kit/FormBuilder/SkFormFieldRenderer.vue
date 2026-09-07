@@ -279,6 +279,7 @@
         v-else-if="field.type === 'section'"
         :transparent="sectionIsTransparent(field as SectionFieldConfig)"
         :class="['sk-fb__section', field.cssClass]"
+        :host-page-header="false"
     >
         <template v-if="sectionTitle(field as SectionFieldConfig)" #title>
             <SkIcon

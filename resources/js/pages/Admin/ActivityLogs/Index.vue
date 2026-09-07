@@ -80,7 +80,6 @@
 
     const tableConfig = DB.table<ActivityLog>()
         .route(activityLogs.dtApi.url())
-        .title('sk-activity-log.title')
         .addColumns(
             DB.column<ActivityLog>()
                 .label(trans('sk-activity-log.event'))

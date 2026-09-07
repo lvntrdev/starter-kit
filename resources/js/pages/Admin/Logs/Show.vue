@@ -8,9 +8,7 @@
     import AdminLayout from '@/layouts/AdminLayout.vue';
     import { useApi } from '@/composables/useApi';
     import logs from '@/routes/logs';
-
-    // Aura: başlık ve geri butonu topbar'da (AdminLayout `back-url`'ü oraya
-    // taşır) — bu sayfa ayrı bir geri afordansı çizmez.
+    import SkCard from '@lvntr/components/ui/SkCard.vue';
 
     interface LogFileMeta {
         name: string;
@@ -215,12 +213,12 @@
 <template>
     <Head :title="file.name" />
 
-    <AdminLayout :title="file.name" :subtitle="$t('sk-log.subtitle')" :back-url="logs.index.url()" :header-in-card="true">
+    <AdminLayout :title="file.name" :subtitle="$t('sk-log.subtitle')" :back-url="logs.index.url()">
         <div class="flex flex-col gap-4">
-            <!-- File header bar -->
-            <div
-                class="flex items-center gap-3.5 rounded border border-surface-200 bg-surface-0 px-4 py-3.5 dark:border-surface-700 dark:bg-surface-900"
-            >
+            <!-- File header bar. SkCard rather than a hand-rolled surface: aura hosts
+                 the page header in the first card's head (see `ui/pageHeader.ts`). -->
+            <SkCard flush>
+                <div class="flex items-center gap-3.5 px-4 py-3.5">
                 <span
                     class="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-md bg-[color-mix(in_srgb,var(--p-primary-color)_11%,transparent)] text-[18px] text-[var(--p-primary-color)]"
                 >
@@ -263,16 +261,17 @@
                     </div>
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
-                    <Button
-                        :label="$t('sk-button.refresh')"
-                        icon="pi pi-refresh"
-                        severity="secondary"
-                        text
-                        :loading="loading"
-                        @click="applyFilters"
-                    />
+                        <Button
+                            :label="$t('sk-button.refresh')"
+                            icon="pi pi-refresh"
+                            severity="secondary"
+                            text
+                            :loading="loading"
+                            @click="applyFilters"
+                        />
+                    </div>
                 </div>
-            </div>
+            </SkCard>
 
             <!-- Filter card -->
             <div

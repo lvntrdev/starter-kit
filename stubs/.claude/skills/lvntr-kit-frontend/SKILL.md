@@ -178,47 +178,44 @@ The slot name must match `tab.key` exactly. The active tab is synchronized to th
 
 ---
 
-## §3.5 — Back button (Aura) — a standalone box is FORBIDDEN
+## §3.5 — Page title and back button — `AdminLayout` owns them
 
-Under the Aura theme the page title lives in the **topbar**; a boxed **"← Back"** button sitting in
-its own block above the content **does not exist and is not added**. On a detail/edit page the back
-button **always** lives in the first card's title-right (action) slot:
+`AdminLayout` defines exactly ONE page header per page — `title`, `subtitle`, the back button
+(from `:back-url="..."`) and whatever the page puts in `#page-actions`. WHERE it is drawn is a theme
+decision, never a page decision:
 
-- **Tab / form page** → `SkForm`/`SkCard` `#title-end` (right of the form/card title).
-- **Datatable page** → right of the datatable/card title (`#title-end`).
-- **Plain page** → wrap the content in an `SkCard`; the back button goes in that card's `#title-end`.
+- `main` → the layout draws it in place: the strip above the content.
+- `aura` → the FIRST `SkCard` that claims it draws it, in a head row of its own above the card's
+  title — the datatable card, the form card, the active tab's card.
 
-**Mechanism:** the page passes `AdminLayout` both `:back-url="..."` **and** `:header-in-card="true"`
-→ under Aura `showPageHeader` turns off (no standalone box is rendered) and the `usePageHeader()`
-context becomes `active: true`.
+`SkCard` owns the claim (`ui/pageHeader.ts`): first eligible card wins, the claim is released on
+unmount, and a transparent wrapper or a dialog body never claims. Chrome cards opt out with
+`:host-page-header="false"` — the vertical-`SkTabs` navigation card, `AvatarUpload`, a FormBuilder
+section — so the header lands on the real content card. Pass the same prop to keep any other card
+out of the running.
 
-**⚠ Inject context — the part that actually bites:** `usePageHeader()` reads `AdminLayout`'s
-`provide`. Vue inject only flows **down**, so the `provide` reaches only AdminLayout's
-**descendants**. The page itself — the component that renders the `AdminLayout` element, e.g.
-`Account/Show.vue` — is AdminLayout's **ANCESTOR**: calling `usePageHeader()` in its own `setup`
-returns **INACTIVE** (`active` stays false, no button appears, and nothing throws). So the back
-button must be consumed by a **child component living inside AdminLayout's slot**:
+Therefore, in a page component:
 
-- Tab/card content is a separate component (e.g. `ProductForm.vue`, `LoginMethodsTab.vue`) → that
-  component calls `usePageHeader()` and renders `#title-end` in its own card.
-- Content is inline on the page (e.g. `Account/Show.vue`'s tabs) → use the shared
-  **`@/components/HeaderBackButton.vue`**; being a descendant, its inject resolves correctly:
+- **Never** draw your own back button, page heading or header card.
+- **Never** branch on `theme === 'aura'` to move a title or an action somewhere else.
+- Put page-level actions (create, sync, ...) in `#page-actions`, not in the datatable toolbar, and
+  leave `DB.table().title()` unset — the page header already carries the title, so setting it
+  prints the heading twice.
+- A page that renders no `SkCard` at all simply keeps the header in place under every theme.
 
 ```vue
-<!-- page (Account/Show.vue) — do NOT call usePageHeader in SETUP -->
-<AdminLayout :title="title" :subtitle="..." :back-url="index.url()" :header-in-card="true">
-  <SkCard :title="$t('...')">
-    <template #title-end><HeaderBackButton /></template>
-    <!-- content -->
-  </SkCard>
+<AdminLayout :title="$t('sk-user.title')" :back-url="users.index.url()">
+  <template #page-actions>
+    <Button :label="$t('sk-user.create')" @click="openCreateDialog" />
+  </template>
+
+  <SkDatatable :config="tableConfig" />
 </AdminLayout>
 ```
 
-On `SkTabs` pages the back button sits in the active tab's card (vertical layout mounts only the
-active tab and unmounts it on switch; horizontal layout keeps every panel mounted and toggles
-visibility instead). Omit `:header-in-card="true"` and Aura prints the standalone "← Back" box —
-which is exactly what this rule forbids. Reference: `Product/Edit.vue` (component tabs),
-`Account/Show.vue` (inline tab + `HeaderBackButton`).
+**Removed in 13.7.0:** `AdminLayout`'s `header-in-card` prop and the `usePageHeader()` composable.
+Pages that rendered a `#title-end` back button off `pageHeader.active` must drop it — the layout
+draws the button now.
 
 ---
 
@@ -227,8 +224,8 @@ which is exactly what this rule forbids. Reference: `Product/Edit.vue` (componen
 The kit composables **run from the vendor package** and resolve local-first:
 `@/composables/<name>` uses a local copy when present (published via
 `php artisan sk:publish --tag=composables` or customized) and otherwise falls
-back to the vendor copy. Only `useAdminMenu` (menu definition) and
-`usePageHeader` ship as editable app stubs.
+back to the vendor copy. Only `useAdminMenu` (menu definition) ships as an
+editable app stub.
 
 | Composable | Short description |
 |---|---|

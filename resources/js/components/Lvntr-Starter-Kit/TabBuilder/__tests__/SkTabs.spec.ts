@@ -1022,7 +1022,7 @@ describe('SkTabs — vertical ARIA', () => {
         const config = TB.tabs().addTabs(TB.item().key('general').icon('pi pi-user')).build();
         const wrapper = mountTabs(config);
 
-        expect(wrapper.get('.sk-vtab__icon').attributes('aria-hidden')).toBe('true');
+        expect(wrapper.get('.sk-tabs__icon').attributes('aria-hidden')).toBe('true');
     });
 
     it('marks a disabled tab aria-disabled and leaves the others without it', () => {

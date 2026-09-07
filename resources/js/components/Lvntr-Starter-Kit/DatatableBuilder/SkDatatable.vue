@@ -20,6 +20,7 @@
     import Ripple from 'primevue/ripple';
     import Tooltip from 'primevue/tooltip';
     import SkCard from '../ui/SkCard.vue';
+    import { usePageHeaderHost } from '../ui/usePageHeaderHost';
 
     // Explicit binding so the template's `v-tooltip` / `v-ripple` compile to a
     // direct reference rather than a dynamic `resolveDirective(...)` call —
@@ -1220,10 +1221,24 @@
     //                Başlık padding'i SkCard head'inden gelir.
     // isCard false → şeffaf sarmalayıcı (yüzey yok), içerik kenara-yaslı → transparent + flush.
     const isCardSurface = computed(() => props.config.isCard);
+
+    // ── Page-header hosting ────────────────────────────────────────────────────────
+    // The toolbar IS this screen's header, so a card-surfaced table takes the layout's
+    // page header into that toolbar rather than letting the wrapping card stack it as
+    // a separate head strip above. With a toolbar title of its own the header keeps
+    // only its back button and page actions; without one it draws the whole thing —
+    // heading, subtitle, back button, page actions — as the toolbar's head row.
+    const { hostsPageHeader, hostedPageHeader } = usePageHeaderHost(
+        () => props.config.isCard,
+        () => !!props.config.title,
+    );
+
+    // Toolbar head row: the table's own title, or the page header standing in for it.
+    const hasToolbarHead = computed(() => !!props.config.title || !!props.config.subtitle || hostsPageHeader.value);
 </script>
 
 <template>
-    <SkCard :transparent="!isCardSurface" :flush="true">
+    <SkCard :transparent="!isCardSurface" :flush="true" :host-page-header="!hostsPageHeader">
         <template v-if="config.cardTitle" #title>
             {{ $t(config.cardTitle) }}
         </template>
@@ -1237,20 +1252,86 @@
                     config.searchable ||
                     config.filters.length > 0 ||
                     config.createButton ||
-                    config.title ||
-                    config.subtitle ||
+                    hasToolbarHead ||
                     showColumnToggle ||
                     $slots.toolbar ||
                     $slots['toolbar-start']
                 "
                 class="sk-dt-toolbar"
-                :class="{ 'no-padding': !config.isCard, 'sk-dt-toolbar--titled': !!config.title }"
+                :class="{ 'no-padding': !config.isCard, 'sk-dt-toolbar--titled': hasToolbarHead }"
             >
-                <!-- Left: optional title / subtitle block (before the search input) -->
-                <div v-if="config.title || config.subtitle" class="sk-dt-toolbar__head">
-                    <div v-if="config.title" class="sk-dt-toolbar__title">{{ $t(config.title) }}</div>
+                <!-- Left: the table's own heading block (before the search input) -->
+                <div v-if="config.title" class="sk-dt-toolbar__head">
+                    <div class="sk-dt-toolbar__title">{{ $t(config.title) }}</div>
                     <div v-if="config.subtitle" class="sk-dt-toolbar__subtitle">{{ $t(config.subtitle) }}</div>
                 </div>
+
+                <!-- No title of its own: the hosted layout page header IS the head row.
+                     Branching on the title rather than on the whole heading block is
+                     deliberate — a table with only a subtitle still hosts the header,
+                     and the earlier `title || subtitle` branch swallowed it. -->
+                <div v-else-if="hostsPageHeader" class="sk-dt-toolbar__page-header">
+                    <component :is="hostedPageHeader" />
+                    <div v-if="config.subtitle" class="sk-dt-toolbar__subtitle">{{ $t(config.subtitle) }}</div>
+                </div>
+
+                <!-- Neither a title nor a host: the subtitle stands on its own. -->
+                <div v-else-if="config.subtitle" class="sk-dt-toolbar__head">
+                    <div class="sk-dt-toolbar__subtitle">{{ $t(config.subtitle) }}</div>
+                </div>
+
+                <!-- Create / Custom actions -->
+                <div
+                    v-if="config.createButton || $slots.toolbar || $slots['toolbar-start'] || (hostsPageHeader && !!config.title)"
+                    class="sk-dt-toolbar__actions"
+                >
+                    <!-- Custom slot — rendered before (to the left of) the create button -->
+                    <slot name="toolbar-start" />
+
+                    <!-- Create: link button -->
+                    <Link v-if="config.createButton?.url" :href="config.createButton.url">
+                        <Button
+                            :label="$t(config.createButton.label ?? 'sk-button.create')"
+                            :icon="config.createButton.icon ?? 'pi pi-plus'"
+                            :severity="config.createButton.severity ?? 'success'"
+                            :size="config.createButton.size"
+                            :variant="config.createButton.variant"
+                            :rounded="config.createButton.rounded"
+                            :raised="config.createButton.raised"
+                            :text="config.createButton.text"
+                            :outlined="config.createButton.outlined"
+                        />
+                    </Link>
+
+                    <!-- Create: dialog/action button -->
+                    <Button
+                        v-else-if="config.createButton?.onClick"
+                        :label="$t(config.createButton.label ?? 'sk-button.create')"
+                        :icon="config.createButton.icon ?? 'pi pi-plus'"
+                        :severity="config.createButton.severity ?? 'success'"
+                        :size="config.createButton.size"
+                        :variant="config.createButton.variant"
+                        :rounded="config.createButton.rounded"
+                        :raised="config.createButton.raised"
+                        :text="config.createButton.text"
+                        :outlined="config.createButton.outlined"
+                        @click="config.createButton.onClick()"
+                    />
+
+                    <!-- Custom toolbar slot -->
+                    <slot name="toolbar" />
+
+                    <!-- Layout page header (back button + page actions) when this
+                         toolbar's own title stands in for the page heading -->
+                    <component
+                        :is="hostedPageHeader"
+                        v-if="hostsPageHeader && config.title"
+                    />
+                </div>
+
+                <!-- Titled toolbar: the head row ends here so search + filters wrap
+                     onto their own line below (flex line break, sm+ only). -->
+                <div v-if="hasToolbarHead" class="sk-dt-toolbar__break" />
 
                 <!-- Left: Search (hidden on mobile, shown on sm+) — gray compact box per design -->
                 <div v-if="config.searchable" class="sk-dt-search sk-dt-toolbar__search">
@@ -1431,51 +1512,13 @@
                     </button>
 
                     <span
-                        v-if="showColumnToggle && (config.createButton || $slots.toolbar || $slots['toolbar-start'])"
+                        v-if="
+                            !hasToolbarHead &&
+                            showColumnToggle &&
+                            (config.createButton || $slots.toolbar || $slots['toolbar-start'])
+                        "
                         class="sk-dt-toolbar__divider"
                     />
-
-                    <!-- Create / Custom actions -->
-                    <div
-                        v-if="config.createButton || $slots.toolbar || $slots['toolbar-start']"
-                        class="sk-dt-toolbar__actions"
-                    >
-                        <!-- Custom slot — rendered before (to the left of) the create button -->
-                        <slot name="toolbar-start" />
-
-                        <!-- Create: link button -->
-                        <Link v-if="config.createButton?.url" :href="config.createButton.url">
-                            <Button
-                                :label="$t(config.createButton.label ?? 'sk-button.create')"
-                                :icon="config.createButton.icon ?? 'pi pi-plus'"
-                                :severity="config.createButton.severity ?? 'success'"
-                                :size="config.createButton.size"
-                                :variant="config.createButton.variant"
-                                :rounded="config.createButton.rounded"
-                                :raised="config.createButton.raised"
-                                :text="config.createButton.text"
-                                :outlined="config.createButton.outlined"
-                            />
-                        </Link>
-
-                        <!-- Create: dialog/action button -->
-                        <Button
-                            v-else-if="config.createButton?.onClick"
-                            :label="$t(config.createButton.label ?? 'sk-button.create')"
-                            :icon="config.createButton.icon ?? 'pi pi-plus'"
-                            :severity="config.createButton.severity ?? 'success'"
-                            :size="config.createButton.size"
-                            :variant="config.createButton.variant"
-                            :rounded="config.createButton.rounded"
-                            :raised="config.createButton.raised"
-                            :text="config.createButton.text"
-                            :outlined="config.createButton.outlined"
-                            @click="config.createButton.onClick()"
-                        />
-
-                        <!-- Custom toolbar slot -->
-                        <slot name="toolbar" />
-                    </div>
                 </div>
             </div>
             <!-- END :: TOOLBAR -->

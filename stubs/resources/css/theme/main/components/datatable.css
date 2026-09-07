@@ -30,26 +30,45 @@
     @apply flex flex-col justify-center shrink-0 sm:pr-4 sm:mr-1 sm:border-r sm:border-slate-200 sm:dark:border-slate-700;
 }
 
-/* When a title is present, the heading is pushed to the far left and every
-   other toolbar item (search + inline filters + the popover/columns group)
-   clusters on the right. The heading's mr-auto is the *only* auto margin in
-   this mode — the right group's own ml-auto is cancelled so the free space
-   isn't split between them (which would leave the search box stuck mid-row).
-   The heading's right divider is dropped since the search box no longer sits
-   next to the title. */
-/* A titled toolbar doubles as the card head, so its padding matches
-   .sk-card__head (px-6 py-[18px]) — title/search row reads identically to a
-   plain SkCard heading. */
+/* A titled toolbar splits into two rows (sm+):
+     row 1 — heading on the left, create button / toolbar slots on the right;
+             padding matches .sk-card__head (18px 24px) so it reads as the
+             card's own head strip; row 2 shares the same px-6 so the search
+             box lines up under the heading.
+     row 2 — search, inline filter pills and the filter/columns group, pushed
+             onto their own line by .sk-dt-toolbar__break.
+   Row gap is owned by the break element (sm:gap-y-0) so the wrap costs exactly
+   one spacing step, not two container gaps. The heading's right divider is
+   dropped since the search box no longer sits next to the title. */
 .sk-dt-toolbar--titled {
-    @apply px-6 py-[18px];
+    @apply px-6 pt-[18px] pb-2.5 sm:gap-y-0;
 }
 
 .sk-dt-toolbar--titled .sk-dt-toolbar__head {
     @apply sm:mr-auto sm:pr-0 sm:border-r-0;
 }
 
-.sk-dt-toolbar--titled .sk-dt-toolbar__right {
-    @apply sm:ml-0;
+/* A table with no title of its own hosts the layout's page header instead, and it
+   takes the head row's place (see ui/pageHeader.ts). Typography is scaled to the
+   card-head size by the hosting theme; only the slot itself lives here. */
+.sk-dt-toolbar__page-header {
+    @apply min-w-0 sm:mr-auto sm:flex-1;
+}
+
+.sk-dt-toolbar__page-header .admin-page-header {
+    @apply mb-0 w-full gap-3.5;
+}
+
+/* Zero-height flex item that forces the following items onto a new flex line
+   and carries the divider under the head row. Its basis is the toolbar's
+   content width PLUS both px-6 paddings, which the negative inline margins then
+   pull back over — the line spans the card edge to edge exactly like
+   .sk-card__head--divider (a plain basis-full would come up 24px short on the
+   right, since a negative margin shifts the box instead of widening it).
+   Mobile stacks already (flex-col), so it only exists on sm+. */
+.sk-dt-toolbar__break {
+    @apply hidden basis-full sm:block sm:h-0 sm:basis-[calc(100%+3rem)] sm:-mx-6 sm:mt-[18px] sm:mb-3.5;
+    @apply sm:border-t sm:border-slate-200 sm:dark:border-slate-700;
 }
 
 /* Title/subtitle typography mirrors SkCard head (.sk-card__title /
@@ -322,6 +341,12 @@
 
 .sk-dt-toolbar__actions {
     @apply flex items-center gap-2;
+}
+
+/* Untitled single-row toolbar: actions stay the last item on the row, even
+   though they are no longer nested inside .sk-dt-toolbar__right. */
+.sk-dt-toolbar:not(.sk-dt-toolbar--titled) .sk-dt-toolbar__actions {
+    @apply order-1;
 }
 
 /* Action buttons (export slot / create) — same 38px row as search/pills/filter/columns */

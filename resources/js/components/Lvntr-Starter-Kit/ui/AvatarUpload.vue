@@ -132,7 +132,11 @@
 </script>
 
 <template>
-    <SkCard :transparent="!isCard">
+    <!-- Avatar chrome above the form, not the page content card. -->
+    <SkCard
+        :transparent="!isCard"
+        :host-page-header="false"
+    >
         <template #content>
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center">
                 <!-- Avatar -->
