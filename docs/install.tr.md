@@ -167,6 +167,14 @@ Yıkıcı seçenek, aşağıdakilerden herhangi biri geçerliyse **tamamen sunul
 
 Seçenek **sunulduğunda**, seçilmesi hâlinde bağlantı ve veritabanı adı yazdırılır ve sizden veritabanı adını (veya `fresh` kelimesini) **yazmanız** istenir. Baştaki ve sondaki boşluk affedilir; başka hiçbir şey affedilmez. Boş satır, `y`, `yes` veya başka herhangi bir cevap, hiçbir şey düşürmeden ek yapıcı `migrate` yoluna döner — bilinçli olarak `Atla`'ya değil; o, hiç kurulmamış bir şema üzerinde seeder'lara devam ederdi.
 
+#### Mevcut `users` tablosu uyumsuz olduğunda
+
+Kit `users` tablosunu uuid (`char(36)`) ile anahtarlar ve bir kullanıcıyı işaret eden her kit tablosu buna uygun bir uuid kolonu tanımlar. **Kit kurulmadan önce** stock bir Laravel uygulamasında `php artisan migrate` çalıştırmak, `users` tablosunu `bigIncrements` id ile yaratır — üstelik stock Laravel'in users migration'ını, *kit'in yayınladığı dosya adının aynısıyla* (`0001_01_01_000000_create_users_table.php`) deftere kaydeder. Bu yüzden kit'in kendi uuid sürümü hiç çalışmaz ve `users`'a giren ilk foreign key çıplak bir `SQLSTATE[HY000] ... 3780` ile ölür.
+
+Installer artık strateji sormadan önce bunu yokluyor. Uyumsuz bir `users` tablosu bulduğunda sebebi ve çözümü yazar, ek yapıcı seçeneği `WILL FAIL` diye işaretler ve — yine de o seçilirse ya da oturum prompt açamıyorsa — foreign key'in raporlamasını beklemeden migration adımını gerekçesiyle durdurur. Yukarıdaki satır yoklamasının aksine bu yoklama **fail-open**'dır: okunamayan bir şema uyumsuzluk sayılmaz, yani cevaplayamadığı bir soru yüzünden bir kurulumu asla bloklamaz.
+
+Bunu yalnızca tam bir sıfırlama çözer: bağlantı üzerinde `php artisan migrate:fresh`, sunulduğunda `fresh` seçeneği ya da boş bir veritabanı. Ardından `php artisan sk:install --resume` ile devam edin.
+
 ### Varsayılan domain eject'i (User + Role)
 
 Sıfır bir kurulumda installer, `User` ve `Role` domain runtime sınıflarını otomatik olarak `app/Domain/User/` ve `app/Domain/Role/` altına eject eder. Bu iki domain gerçek projelerde en çok özelleştirilen alanlardır; bu nedenle kurulumdan itibaren doğrudan uygulamanıza aittir.
@@ -209,7 +217,7 @@ php artisan sk:install --modules=telescope,pulse
 - `--without-ai-skill` Lvntr Starter Kit AI skill'lerinin yayınlanmasını tamamen atlar — hem Claude Code kopyaları (`.claude/skills/`) hem de Codex aynası (`.codex/skills/`). Kit'in skill bundle'ını ne Claude Code ne Codex ile kullanan consumer'lar için
 - `--without-eject` varsayılan `User` ve `Role` domain eject'ini atlar; runtime vendor'da kalır ve `class_alias` ile çözülür
 - `--resume` yarıda kalmış bir kurulumu kaldığı yerden devam ettirir: `storage/starter-kit/install-progress.json`'a checkpoint'lenmiş adımlar atlanır, çalışma başarısız olan adımdan devam eder. Önceden bir checkpoint yoksa uyarıyla birlikte tam bir kurulum çalıştırır.
-- `--modules=` kit ile birlikte kurulacak opsiyonel gözlemlenebilirlik paketlerini seçer (`telescope`, `pulse`, `sentry`; virgülle ayrılmış ya da tekrarlanan flag ile, örn. `--modules=telescope --modules=pulse`). Boş bırakılırsa, TTY'de interaktif olarak sorulur; interaktif olmayan bir çalışmada (`--no-interaction` ya da TTY yok) bu adım atlanır ve hiçbir opsiyonel modül kurulmaz. Aşağıdaki [Opsiyonel Gözlemlenebilirlik Recipe'leri](#opsiyonel-gözlemlenebilirlik-recipeleri) bölümüne bakın.
+- `--modules=` kit ile birlikte kurulacak opsiyonel gözlemlenebilirlik paketlerini seçer (`telescope`, `pulse`, `horizon`, `sentry`; virgülle ayrılmış ya da tekrarlanan flag ile, örn. `--modules=telescope --modules=pulse`). Boş bırakılırsa, TTY'de interaktif olarak sorulur; interaktif olmayan bir çalışmada (`--no-interaction` ya da TTY yok) bu adım atlanır ve hiçbir opsiyonel modül kurulmaz. Aşağıdaki [Opsiyonel Gözlemlenebilirlik Recipe'leri](#opsiyonel-gözlemlenebilirlik-recipeleri) bölümüne bakın.
 
 ### Opsiyonel Gözlemlenebilirlik Recipe'leri
 
@@ -219,16 +227,17 @@ Kurulum sırasında `sk:install`, sizin için bir veya daha fazla opsiyonel izle
 |-----|---------|--------------|
 | `telescope` | `laravel/telescope` (dev bağımlılığı) | `telescope:install` çalıştırır |
 | `pulse` | `laravel/pulse` | yok |
+| `horizon` | `laravel/horizon` | `horizon:install` çalıştırır |
 | `sentry` | `sentry/sentry-laravel` | `vendor:publish --tag=sentry-config` çalıştırır |
 
 Seçim iki şekilde yapılır:
 
-- **İnteraktif** — `--modules=` verilmediğinde ve terminal interaktifse, installer "Install optional monitoring/debugging modules?" sorusunu üç recipe'i çoklu-seçim olarak sunarak sorar; hiçbirini seçmemek de geçerli bir cevaptır.
-- **Flag** — recipe'leri interaktif olmadan seçmek için (örn. `--no-interaction` altında da dahil) `--modules=telescope,pulse,sentry` verin (ya da flag'i tekrarlayın). Tanınmayan bir anahtar, hiçbir şey yazılmadan önce hızlıca hata ile durur.
+- **İnteraktif** — `--modules=` verilmediğinde ve terminal interaktifse, installer "Install optional monitoring/debugging modules?" sorusunu tüm recipe'leri çoklu-seçim olarak sunarak sorar; hiçbirini seçmemek de geçerli bir cevaptır.
+- **Flag** — recipe'leri interaktif olmadan seçmek için (örn. `--no-interaction` altında da dahil) `--modules=telescope,pulse,horizon,sentry` verin (ya da flag'i tekrarlayın). Tanınmayan bir anahtar, hiçbir şey yazılmadan önce hızlıca hata ile durur.
 
 Her recipe birbirinden bağımsız ve best-effort olarak denenir: bir recipe için `composer require` başarısızlığı ya da post-install komutunun başarısız olması kurulumu durdurmaz ya da diğerlerini engellemez. Kurulan ve post-install adımını sorunsuz tamamlayan bir recipe, kurulum özetinde "Optional modules" altında listelenir; kısmen başarısız olan bir recipe ise kalan adımı elle çalıştırmanız gerektiği notuyla başarısızlık listesinde raporlanır.
 
-Bu adım yalnızca paketi ekler ve kendi kurulum komutunu çalıştırır — paketi yapılandırmaz (örn. bir Sentry DSN'i, Telescope'un kendi gate/auth'u). `sk:install` bittikten sonraki yapılandırma adımı için o paketin kendi dokümantasyonunu izleyin.
+Bu adım yalnızca paketi ekler ve kendi kurulum komutunu çalıştırır — paketi yapılandırmaz (örn. bir Sentry DSN'i, Telescope'un kendi gate/auth'u, Horizon'un Redis queue bağlantısı ve supervisor süreci). `sk:install` bittikten sonraki yapılandırma adımı için o paketin kendi dokümantasyonunu izleyin.
 
 ## 4. Frontend Asset'lerini Derleyin
 

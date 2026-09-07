@@ -167,6 +167,14 @@ The destructive option is **withheld outright** when any of these hold, and the 
 
 When it *is* offered, choosing it prints the connection and database name and asks you to **type** the database name (or the word `fresh`). Surrounding whitespace is forgiven; nothing else is. An empty line, `y`, `yes` or any other answer falls back to the additive `migrate` path with nothing dropped — deliberately not to `Skip`, which would walk on into seeders against a schema that was never built.
 
+#### When the existing `users` table is incompatible
+
+The kit keys `users` on a uuid (`char(36)`), and every kit table that points at a user declares a matching uuid column. Running `php artisan migrate` on a **stock Laravel app before installing the kit** creates `users` with a `bigIncrements` id — and records stock Laravel's users migration in the ledger under the *same filename the kit publishes* (`0001_01_01_000000_create_users_table.php`). The kit's own uuid version of that file therefore never runs, and the first foreign key into `users` dies with a bare `SQLSTATE[HY000] ... 3780`.
+
+The installer now probes for this before offering a strategy. When it finds an incompatible `users` table it prints the cause and the remedy, labels the additive option `WILL FAIL`, and — if you pick it anyway, or the session cannot prompt — stops the migration step with the reason instead of letting the foreign key report it. Unlike the row probe above, this one **fails open**: an unreadable schema is not treated as a conflict, so it can never block an install on a question it could not answer.
+
+Only a full reset clears it: `php artisan migrate:fresh` on the connection, the `fresh` option when it is offered, or an empty database. Then continue with `php artisan sk:install --resume`.
+
 ### Default domain eject (User + Role)
 
 On a fresh install the installer automatically ejects the `User` and `Role` domain runtime classes into `app/Domain/User/` and `app/Domain/Role/`. These are the two domains most often customised in real projects, so they land in your app from day one.
@@ -209,7 +217,7 @@ php artisan sk:install --modules=telescope,pulse
 - `--without-ai-skill` skips publishing the Lvntr Starter Kit AI skills entirely — both the Claude Code copies (`.claude/skills/`) and their Codex mirror (`.codex/skills/`). Useful when the consumer uses neither Claude Code nor Codex with the kit's skill bundle
 - `--without-eject` skips the default `User` and `Role` domain eject; runtime stays in vendor and resolves via `class_alias`
 - `--resume` picks up an install that failed partway through: steps already checkpointed in `storage/starter-kit/install-progress.json` are skipped and the run continues from the failed step. Passed without a prior checkpoint, it just runs a full install with a warning.
-- `--modules=` selects optional observability packages to install alongside the kit (`telescope`, `pulse`, `sentry`; comma-separated or repeated, e.g. `--modules=telescope --modules=pulse`). Left empty, you are prompted interactively in a TTY; in a non-interactive run (`--no-interaction` or no TTY) it is skipped and no optional module is installed. See [Optional Observability Recipes](#optional-observability-recipes) below.
+- `--modules=` selects optional observability packages to install alongside the kit (`telescope`, `pulse`, `horizon`, `sentry`; comma-separated or repeated, e.g. `--modules=telescope --modules=pulse`). Left empty, you are prompted interactively in a TTY; in a non-interactive run (`--no-interaction` or no TTY) it is skipped and no optional module is installed. See [Optional Observability Recipes](#optional-observability-recipes) below.
 
 ### Optional Observability Recipes
 
@@ -219,16 +227,17 @@ During installation `sk:install` can `composer require` and wire up one or more 
 |-----|---------|--------------|
 | `telescope` | `laravel/telescope` (dev dependency) | runs `telescope:install` |
 | `pulse` | `laravel/pulse` | none |
+| `horizon` | `laravel/horizon` | runs `horizon:install` |
 | `sentry` | `sentry/sentry-laravel` | runs `vendor:publish --tag=sentry-config` |
 
 Selection works two ways:
 
-- **Interactive** — when `--modules=` is not passed and the terminal is interactive, the installer prompts "Install optional monitoring/debugging modules?" with the three recipes as a multi-select; picking none is a valid answer.
-- **Flag** — pass `--modules=telescope,pulse,sentry` (or repeat the flag) to select recipes non-interactively, including under `--no-interaction`. An unrecognized key fails fast with an error before anything is written.
+- **Interactive** — when `--modules=` is not passed and the terminal is interactive, the installer prompts "Install optional monitoring/debugging modules?" with every recipe as a multi-select; picking none is a valid answer.
+- **Flag** — pass `--modules=telescope,pulse,horizon,sentry` (or repeat the flag) to select recipes non-interactively, including under `--no-interaction`. An unrecognized key fails fast with an error before anything is written.
 
 Each recipe is attempted independently and best-effort: a `composer require` failure or a failing post-install command for one recipe does not abort the install or block the others. A recipe that installs and completes its post-install step cleanly is listed under "Optional modules" in the install summary; one that partially fails is reported in the failure list with a note to run the remaining step by hand.
 
-This step only requires the package and runs its own installer command — it does **not** configure the package (e.g. a Sentry DSN, Telescope's own gate/auth). Follow that package's own documentation for its configuration step after `sk:install` finishes.
+This step only requires the package and runs its own installer command — it does **not** configure the package (e.g. a Sentry DSN, Telescope's own gate/auth, Horizon's Redis queue connection and supervisor process). Follow that package's own documentation for its configuration step after `sk:install` finishes.
 
 ## 4. Build Frontend Assets
 

@@ -46,6 +46,7 @@
   "suggest": {
     "laravel/telescope": "Enables the optional sk:install --modules=telescope recipe (debug assistant).",
     "laravel/pulse": "Enables the optional sk:install --modules=pulse recipe (application performance monitoring).",
+    "laravel/horizon": "Enables the optional sk:install --modules=horizon recipe (Redis queue dashboard/supervisor).",
     "sentry/sentry-laravel": "Enables the optional sk:install --modules=sentry recipe (error tracking)."
   },
   "autoload": {

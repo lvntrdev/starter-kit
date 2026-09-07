@@ -49,7 +49,7 @@ class InstallCommand extends Command
         {--dry-run : Print what would be written and exit without writing anything}
         {--without-ai-skill : Skip .claude/skills/ and .codex/skills/ AI skill files}
         {--without-eject : Keep User/Role runtime in vendor (skip default domain eject)}
-        {--modules=* : Optional packages (telescope, pulse, sentry) — left empty, prompted interactively in a TTY, skipped when non-interactive}
+        {--modules=* : Optional packages (telescope, pulse, horizon, sentry) — left empty, prompted interactively in a TTY, skipped when non-interactive}
         {--resume : Resume a previously interrupted install, skipping already-completed steps}';
 
     protected $description = 'Install the Lvntr Starter Kit application skeleton (v13.5.0+: package runtime runs from vendor; User + Role are ejected into app/Domain on first install)';
@@ -635,7 +635,7 @@ class InstallCommand extends Command
                 $this->files->makeDirectory($dir, 0755, true);
             }
 
-            // 5b. Optional observability modules (Telescope / Pulse / Sentry).
+            // 5b. Optional observability modules (Telescope / Pulse / Horizon / Sentry).
             //
             // Ordering is load-bearing: the `composer require` has to happen
             // BEFORE the autoload dump (step 6) and the migration step (step 7),
@@ -687,22 +687,24 @@ class InstallCommand extends Command
             // the operator can create/fix the connection and `sk:install --resume`
             // to pick these up without redoing the earlier filesystem steps.
             if ($this->databaseReachable()) {
-                // 7. Run migrations
-                if ($this->confirmStep('Run database migrations?')) {
-                    $this->runMigrations();
-                }
+                // 7. Run migrations — no gate: an installed app with no schema
+                // is not a valid outcome, so this always runs. The destructive
+                // fresh/skip choice inside runMigrations() is untouched — that
+                // one is a genuine safety decision, not installer noise.
+                $this->runMigrations();
 
                 // 8. Run seeders
-                if ($this->confirmStep('Run database seeders?')) {
-                    $this->runSeeders();
-                }
+                $this->runSeeders();
 
                 // 9. Seed permissions (config-driven, vendor runtime reads from permission-resources.php)
-                if ($this->confirmStep('Seed permissions from config/permission-resources.php?')) {
-                    $this->step('Seeding permissions', function () {
-                        return $this->runArtisan('sk:seed-permissions', ['--fresh' => true]);
-                    });
-                }
+                // Deliberately WITHOUT --fresh: the seeder syncs a brand-new role to
+                // config either way, while --fresh would also `syncPermissions()` an
+                // EXISTING role — wiping permissions an admin customised in the UI on
+                // every re-run of the installer. A deliberate reset stays available as
+                // `php artisan sk:seed-permissions --fresh`.
+                $this->step('Seeding permissions', function () {
+                    return $this->runArtisan('sk:seed-permissions');
+                });
             } else {
                 // Skipping these leaves an application with no schema. The run
                 // continues (the remaining filesystem work is still worth
@@ -3106,10 +3108,16 @@ class InstallCommand extends Command
         $appTables = $this->existingApplicationTables();
 
         if ($appTables !== []) {
+            $schemaConflict = $this->usersTableSchemaConflict();
+
             $this->newLine();
             $this->components->warn('The database already contains tables.');
 
-            $action = $this->chooseMigrationStrategy($appTables);
+            if ($schemaConflict !== null) {
+                $this->renderSchemaConflictNotice($schemaConflict);
+            }
+
+            $action = $this->chooseMigrationStrategy($appTables, $schemaConflict);
 
             if ($action === 'skip') {
                 $this->components->info('Migrations skipped.');
@@ -3120,6 +3128,21 @@ class InstallCommand extends Command
             if ($action === 'fresh') {
                 $this->step('Running migrate:fresh', function () {
                     return $this->runArtisan('migrate:fresh', ['--force' => true]);
+                });
+
+                return;
+            }
+
+            // The additive path against an incompatible `users` table is a
+            // guaranteed foreign-key failure several migrations later, reported
+            // by the driver as a bare SQLSTATE[HY000] 3780 that names two
+            // columns and no cause. Fail HERE instead, while the reason and the
+            // remedy can still be stated.
+            if ($schemaConflict !== null) {
+                $this->step('Running migrations', function () use ($schemaConflict): bool {
+                    $this->stepFailureDetail = $this->schemaConflictFailureDetail($schemaConflict);
+
+                    return false;
                 });
 
                 return;
@@ -3139,9 +3162,10 @@ class InstallCommand extends Command
      * 'migrate' or to 'skip'.
      *
      * @param  list<string>  $appTables
+     * @param  string|null  $schemaConflict  Why the existing schema cannot host the kit, from {@see usersTableSchemaConflict()}
      * @return 'migrate'|'fresh'|'skip'
      */
-    private function chooseMigrationStrategy(array $appTables): string
+    private function chooseMigrationStrategy(array $appTables, ?string $schemaConflict = null): string
     {
         // A session with no human on the other end is never offered a
         // destructive branch and never has one selected for it. Deciding that
@@ -3163,7 +3187,7 @@ class InstallCommand extends Command
 
         $action = select(
             label: 'How would you like to proceed?',
-            options: $this->migrationStrategyOptions($blockReason === null),
+            options: $this->migrationStrategyOptions($blockReason === null, $schemaConflict !== null),
             default: 'migrate',
         );
 
@@ -3204,13 +3228,19 @@ class InstallCommand extends Command
      *
      * `migrate` is always first AND always the default: the highlighted row of a
      * select is one Enter away, so the entry that destroys data must never
-     * occupy it — whatever else is on the list.
+     * occupy it — whatever else is on the list. That holds even when the schema
+     * probe knows `migrate` cannot succeed: the entry is LABELLED as doomed
+     * rather than removed or demoted, because promoting the destructive row to
+     * the default is a worse failure than an operator pressing Enter on a run
+     * that stops with a named cause.
      *
      * @return array<string, string>
      */
-    private function migrationStrategyOptions(bool $allowFresh): array
+    private function migrationStrategyOptions(bool $allowFresh, bool $schemaConflict = false): array
     {
-        $options = ['migrate' => 'Run pending migrations only (keep existing data)'];
+        $options = ['migrate' => $schemaConflict
+            ? 'Run pending migrations only — WILL FAIL: the existing schema is incompatible (see above)'
+            : 'Run pending migrations only (keep existing data)'];
 
         if ($allowFresh) {
             $options['fresh'] = 'Drop all tables and run fresh migrations (ALL DATA WILL BE LOST)';
@@ -3271,6 +3301,79 @@ class InstallCommand extends Command
         }
 
         return $names;
+    }
+
+    /**
+     * Why the `users` table already on this connection cannot host the kit's
+     * schema, or null when it can — and null, too, whenever the question cannot
+     * be answered.
+     *
+     * The kit keys `users` on a uuid (`char(36)`), and every kit table that
+     * points at a user declares a matching uuid column. A stock Laravel app that
+     * ran `php artisan migrate` BEFORE installing the kit has `users` with a
+     * `bigIncrements` id — and, worse, has that migration recorded in the ledger
+     * under the SAME filename the kit publishes
+     * (`0001_01_01_000000_create_users_table.php`). The kit's own uuid version of
+     * the file therefore never runs, `users.id` stays `bigint`, and the first
+     * foreign key into it dies with SQLSTATE[HY000] 3780 — a message that names
+     * two columns and nothing an operator can act on.
+     *
+     * Fails OPEN, unlike the row probe next door. That probe answers "may I
+     * destroy this?", where an unknown must mean no; this one answers "will the
+     * additive path work?", where an unknown must not block an install on a
+     * question that was never answered. An unreadable schema returns null and
+     * `migrate` reports whatever it reports, exactly as it did before this
+     * probe existed.
+     */
+    private function usersTableSchemaConflict(): ?string
+    {
+        try {
+            if (! Schema::hasTable('users')) {
+                return null;
+            }
+
+            $type = strtolower(Schema::getColumnType('users', 'id'));
+        } catch (\Throwable) {
+            return null;
+        }
+
+        // The string family is what a uuid primary key reports across drivers:
+        // MySQL answers `char`, Postgres `uuid`, and SQLite — where the package's
+        // own suite runs — collapses char(36) to `varchar`/`string`.
+        if (in_array($type, ['uuid', 'char', 'varchar', 'string', 'guid'], true)) {
+            return null;
+        }
+
+        return sprintf(
+            'the existing "users" table has an "id" column of type %s, but the kit\'s schema requires a uuid (char(36)) primary key',
+            $type,
+        );
+    }
+
+    /**
+     * Explain a schema conflict at the point the operator still has every option.
+     */
+    private function renderSchemaConflictNotice(string $conflict): void
+    {
+        $this->line('  <fg=red;options=bold>Schema conflict: '.$conflict.'.</>');
+        $this->line('  <fg=gray>This happens when `php artisan migrate` was run on this app BEFORE installing</>');
+        $this->line('  <fg=gray>the kit: stock Laravel\'s users migration is already recorded in the ledger under</>');
+        $this->line('  <fg=gray>the same filename the kit publishes, so the kit\'s uuid version never runs.</>');
+        $this->line('  <fg=gray>Only a full reset fixes it — drop every table on this connection ("fresh" below</>');
+        $this->line('  <fg=gray>when offered, or `php artisan migrate:fresh`), or point the app at an empty database.</>');
+    }
+
+    /**
+     * The failure text for an additive run that cannot succeed. Surfaced through
+     * $stepFailureDetail so it lands in the step failure report next to the
+     * `sk:install --resume` line, which IS the right next command once the
+     * database has been reset.
+     */
+    private function schemaConflictFailureDetail(string $conflict): string
+    {
+        return 'Cannot run pending migrations: '.$conflict.'.'
+            .PHP_EOL.'  Reset the database first — `php artisan migrate:fresh` on this connection, or'
+            .PHP_EOL.'  point the app at an empty one. Nothing else clears the bigint `users.id`.';
     }
 
     /**

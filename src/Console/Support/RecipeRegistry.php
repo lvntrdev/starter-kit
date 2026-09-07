@@ -35,6 +35,12 @@ class RecipeRegistry
             'label' => 'Laravel Pulse (application performance monitoring)',
             'post_install' => [],
         ],
+        'horizon' => [
+            'composer' => 'laravel/horizon',
+            'dev' => false,
+            'label' => 'Laravel Horizon (Redis queue dashboard/supervisor)',
+            'post_install' => ['horizon:install'],
+        ],
         'sentry' => [
             'composer' => 'sentry/sentry-laravel',
             'dev' => false,
