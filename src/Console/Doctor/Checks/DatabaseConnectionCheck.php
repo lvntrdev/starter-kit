@@ -16,7 +16,7 @@ class DatabaseConnectionCheck implements DoctorCheck
 {
     public function name(): string
     {
-        return 'Database Connection';
+        return (string) __('sk-doctor.database_connection.name');
     }
 
     public function run(): DoctorReport
@@ -29,13 +29,13 @@ class DatabaseConnectionCheck implements DoctorCheck
 
             return DoctorReport::ok(
                 $this->name(),
-                "Connection successful ({$driver}: {$database})."
+                (string) __('sk-doctor.database_connection.connected', ['driver' => $driver, 'database' => $database])
             );
         } catch (Throwable $e) {
             return DoctorReport::fail(
                 $this->name(),
-                'Could not connect to the database: '.$e->getMessage(),
-                'Check DB_HOST, DB_DATABASE, DB_USERNAME, and DB_PASSWORD in your .env file.'
+                (string) __('sk-doctor.database_connection.connection_failed', ['error' => $e->getMessage()]),
+                (string) __('sk-doctor.database_connection.connection_failed_hint')
             );
         }
     }

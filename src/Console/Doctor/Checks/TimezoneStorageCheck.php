@@ -13,7 +13,7 @@ class TimezoneStorageCheck implements DoctorCheck
 {
     public function name(): string
     {
-        return 'Timezone Storage';
+        return (string) __('sk-doctor.timezone_storage.name');
     }
 
     public function run(): DoctorReport
@@ -25,8 +25,8 @@ class TimezoneStorageCheck implements DoctorCheck
 
             return DoctorReport::fail(
                 $this->name(),
-                "Application timezone is {$configured}; timestamps are being stored outside UTC and existing rows are already ambiguous.",
-                'Set APP_TIMEZONE=UTC. Use APP_DISPLAY_TIMEZONE or the General/user settings for display timezones.'
+                (string) __('sk-doctor.timezone_storage.non_utc', ['timezone' => $configured]),
+                (string) __('sk-doctor.timezone_storage.non_utc_hint')
             );
         }
 
@@ -37,7 +37,7 @@ class TimezoneStorageCheck implements DoctorCheck
             if (! in_array($driver, ['mysql', 'mariadb'], true)) {
                 return DoctorReport::ok(
                     $this->name(),
-                    "Application timezone is UTC; the database session timezone check does not apply to the {$driver} driver."
+                    (string) __('sk-doctor.timezone_storage.driver_not_applicable', ['driver' => $driver])
                 );
             }
 
@@ -49,29 +49,32 @@ class TimezoneStorageCheck implements DoctorCheck
             if ($sessionTimezone === '') {
                 return DoctorReport::warn(
                     $this->name(),
-                    'Could not verify the database session timezone even though the application timezone is UTC: the query returned no value.',
-                    'Check the database connection and the timezone key for the default connection in config/database.php.'
+                    (string) __('sk-doctor.timezone_storage.session_unverifiable'),
+                    (string) __('sk-doctor.timezone_storage.session_unverifiable_hint')
                 );
             }
         } catch (Throwable $e) {
             return DoctorReport::warn(
                 $this->name(),
-                'Could not verify the database session timezone even though the application timezone is UTC: '.$e->getMessage(),
-                'Check the database connection and the timezone key for the default connection in config/database.php.'
+                (string) __('sk-doctor.timezone_storage.session_error', ['error' => $e->getMessage()]),
+                (string) __('sk-doctor.timezone_storage.session_error_hint')
             );
         }
 
         if (! in_array($sessionTimezone, ['+00:00', 'UTC'], true)) {
             return DoctorReport::fail(
                 $this->name(),
-                "Application timezone is UTC, but the {$driver} session timezone is {$sessionTimezone}. TIMESTAMP columns are being written through a non-UTC session conversion, so rows on disk are offset even though the application reads them back consistently.",
-                "Set 'timezone' => '+00:00' on the default {$driver} connection in config/database.php."
+                (string) __('sk-doctor.timezone_storage.session_mismatch', [
+                    'driver' => $driver,
+                    'session_timezone' => $sessionTimezone,
+                ]),
+                (string) __('sk-doctor.timezone_storage.session_mismatch_hint', ['driver' => $driver])
             );
         }
 
         return DoctorReport::ok(
             $this->name(),
-            "Application timezone is UTC and the {$driver} session timezone is {$sessionTimezone}; TIMESTAMP storage uses UTC without session conversion offsets."
+            (string) __('sk-doctor.timezone_storage.healthy', ['driver' => $driver, 'session_timezone' => $sessionTimezone])
         );
     }
 }

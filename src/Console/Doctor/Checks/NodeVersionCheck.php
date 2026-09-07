@@ -34,7 +34,7 @@ class NodeVersionCheck implements DoctorCheck
 
     public function name(): string
     {
-        return 'Node Version';
+        return (string) __('sk-doctor.node_version.name');
     }
 
     public function run(): DoctorReport
@@ -45,16 +45,16 @@ class NodeVersionCheck implements DoctorCheck
         } catch (Throwable $e) {
             return DoctorReport::warn(
                 $this->name(),
-                'Could not execute "node -v": '.$e->getMessage(),
-                'Install Node.js '.self::MIN_LABEL.' to build frontend assets.'
+                (string) __('sk-doctor.node_version.exec_failed', ['error' => $e->getMessage()]),
+                (string) __('sk-doctor.node_version.exec_failed_hint', ['min_label' => self::MIN_LABEL])
             );
         }
 
         if (! $process->isSuccessful()) {
             return DoctorReport::warn(
                 $this->name(),
-                'Node.js is not installed or not available in PATH.',
-                'Install Node.js '.self::MIN_LABEL.' — the frontend build (vite/npm) requires it.'
+                (string) __('sk-doctor.node_version.not_installed'),
+                (string) __('sk-doctor.node_version.not_installed_hint', ['min_label' => self::MIN_LABEL])
             );
         }
 
@@ -64,8 +64,8 @@ class NodeVersionCheck implements DoctorCheck
         if (! preg_match('/v?(\d+)\.(\d+)\.(\d+)/', $raw, $m)) {
             return DoctorReport::warn(
                 $this->name(),
-                "Could not parse Node.js version from output: \"{$raw}\".",
-                'Verify your Node.js installation with node -v.'
+                (string) __('sk-doctor.node_version.parse_failed', ['raw' => $raw]),
+                (string) __('sk-doctor.node_version.parse_failed_hint')
             );
         }
 
@@ -76,14 +76,14 @@ class NodeVersionCheck implements DoctorCheck
         if (! self::meetsFloor($major, $minor)) {
             return DoctorReport::warn(
                 $this->name(),
-                "Node.js {$version} is below the frontend toolchain floor (Vite 7 needs Node ".self::MIN_LABEL.').',
-                'Upgrade Node.js to '.self::MIN_LABEL.' (e.g. via nvm) before building assets.'
+                (string) __('sk-doctor.node_version.below_floor', ['version' => $version, 'min_label' => self::MIN_LABEL]),
+                (string) __('sk-doctor.node_version.below_floor_hint', ['min_label' => self::MIN_LABEL])
             );
         }
 
         return DoctorReport::ok(
             $this->name(),
-            "Node.js {$version} meets the frontend toolchain minimum requirement (Node ".self::MIN_LABEL.').'
+            (string) __('sk-doctor.node_version.meets_floor', ['version' => $version, 'min_label' => self::MIN_LABEL])
         );
     }
 }

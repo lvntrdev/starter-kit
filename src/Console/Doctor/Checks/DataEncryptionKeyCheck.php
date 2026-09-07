@@ -40,7 +40,7 @@ class DataEncryptionKeyCheck implements DoctorCheck
 {
     public function name(): string
     {
-        return 'Data Encryption Key';
+        return (string) __('sk-doctor.data_encryption_key.name');
     }
 
     public function run(): DoctorReport
@@ -60,32 +60,37 @@ class DataEncryptionKeyCheck implements DoctorCheck
             // offending env var and never its value.
             return DoctorReport::fail(
                 $this->name(),
-                'The data encryption key chain could not be resolved: '.$e->getMessage(),
-                'Fix the key configuration in .env. Do NOT clear '.DataEncrypterFactory::PREVIOUS_ENV_KEY
-                .' while fixing it — a key removed from the chain cannot be recovered.'
+                (string) __('sk-doctor.data_encryption_key.chain_unresolved', ['error' => $e->getMessage()]),
+                (string) __('sk-doctor.data_encryption_key.chain_unresolved_hint', [
+                    'previous_key' => DataEncrypterFactory::PREVIOUS_ENV_KEY,
+                ])
             );
         }
 
         if (! $usingDedicatedKey) {
             return DoctorReport::warn(
                 $this->name(),
-                'No '.DataEncrypterFactory::PRIMARY_ENV_KEY.' is set, so sensitive settings and 2FA secrets are '
-                .'encrypted with '.DataEncrypterFactory::APP_ENV_KEY.'; `php artisan key:generate` on a server '
-                .'migration will make them unreadable, and the failure is silent.',
-                'Adopt a dedicated key with `php artisan encryption:key` (it keeps '
-                .DataEncrypterFactory::APP_ENV_KEY.' in the read chain, so nothing breaks), then follow '
-                .DocsLink::to('server-migration-runbook.md').'.'
+                (string) __('sk-doctor.data_encryption_key.no_dedicated_key', [
+                    'primary_key' => DataEncrypterFactory::PRIMARY_ENV_KEY,
+                    'app_key' => DataEncrypterFactory::APP_ENV_KEY,
+                ]),
+                (string) __('sk-doctor.data_encryption_key.no_dedicated_key_hint', [
+                    'app_key' => DataEncrypterFactory::APP_ENV_KEY,
+                    'docs_link' => DocsLink::to('server-migration-runbook.md'),
+                ])
             );
         }
 
         if ($this->previousKeysConfigured()) {
             return DoctorReport::warn(
                 $this->name(),
-                'A dedicated '.DataEncrypterFactory::PRIMARY_ENV_KEY.' is in use, but '
-                .DataEncrypterFactory::PREVIOUS_ENV_KEY.' still holds at least one key, so a rotation is unfinished '
-                .'and the old key still has to travel with this app.',
-                'Run `php artisan encryption:rekey`, then `php artisan encryption:health`; clear '
-                .DataEncrypterFactory::PREVIOUS_ENV_KEY.' only after health reports it is safe.'
+                (string) __('sk-doctor.data_encryption_key.rotation_unfinished', [
+                    'primary_key' => DataEncrypterFactory::PRIMARY_ENV_KEY,
+                    'previous_key' => DataEncrypterFactory::PREVIOUS_ENV_KEY,
+                ]),
+                (string) __('sk-doctor.data_encryption_key.rotation_unfinished_hint', [
+                    'previous_key' => DataEncrypterFactory::PREVIOUS_ENV_KEY,
+                ])
             );
         }
 
@@ -99,9 +104,10 @@ class DataEncryptionKeyCheck implements DoctorCheck
         // verdict.
         return DoctorReport::ok(
             $this->name(),
-            'A dedicated '.DataEncrypterFactory::PRIMARY_ENV_KEY.' is in use with no previous keys pending, so '
-            .'every NEW encrypted value is written with it. Run `php artisan encryption:health` to confirm no '
-            .'existing row is still on '.DataEncrypterFactory::APP_ENV_KEY.' before rotating it.'
+            (string) __('sk-doctor.data_encryption_key.dedicated_key_active', [
+                'primary_key' => DataEncrypterFactory::PRIMARY_ENV_KEY,
+                'app_key' => DataEncrypterFactory::APP_ENV_KEY,
+            ])
         );
     }
 

@@ -24,7 +24,7 @@ class PhpExtensionsCheck implements DoctorCheck
 
     public function name(): string
     {
-        return 'PHP Extensions';
+        return (string) __('sk-doctor.php_extensions.name');
     }
 
     public function run(): DoctorReport
@@ -34,14 +34,14 @@ class PhpExtensionsCheck implements DoctorCheck
         if ($missing === []) {
             return DoctorReport::ok(
                 $this->name(),
-                'All required PHP extensions are loaded ('.implode(', ', $this->required).').'
+                (string) __('sk-doctor.php_extensions.all_loaded', ['extensions' => implode(', ', $this->required)])
             );
         }
 
         return DoctorReport::fail(
             $this->name(),
-            'Missing extensions: '.implode(', ', $missing).'.',
-            'Enable the extensions in your php.ini or install them via your package manager.'
+            (string) __('sk-doctor.php_extensions.missing', ['extensions' => implode(', ', $missing)]),
+            (string) __('sk-doctor.php_extensions.missing_hint')
         );
     }
 }

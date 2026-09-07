@@ -29,7 +29,7 @@ class ThemeManifestCheck implements DoctorCheck
 {
     public function name(): string
     {
-        return 'Theme Manifest';
+        return (string) __('sk-doctor.theme_manifest.name');
     }
 
     public function run(): DoctorReport
@@ -41,7 +41,7 @@ class ThemeManifestCheck implements DoctorCheck
         if (! file_exists($themeEntryPath) || ! $this->importsActiveManifest($themeEntryPath)) {
             return DoctorReport::ok(
                 $this->name(),
-                'Theme resolver not in use (no _active.css import) — check skipped.'
+                (string) __('sk-doctor.theme_manifest.not_in_use')
             );
         }
 
@@ -50,8 +50,8 @@ class ThemeManifestCheck implements DoctorCheck
         if (! file_exists($activeManifestPath)) {
             return DoctorReport::fail(
                 $this->name(),
-                'resources/css/theme/_active.css is missing (theme resolver output).',
-                'Run npm run theme:build or npm run build.'
+                (string) __('sk-doctor.theme_manifest.manifest_missing'),
+                (string) __('sk-doctor.theme_manifest.manifest_missing_hint')
             );
         }
 
@@ -74,14 +74,14 @@ class ThemeManifestCheck implements DoctorCheck
         if (preg_match('#@import\s+[\'"][^\'"]*\.\./#', $contents) === 1) {
             return DoctorReport::warn(
                 $this->name(),
-                '_active.css contains an @import that escapes the theme directory (../).',
-                'Regenerate with npm run build.'
+                (string) __('sk-doctor.theme_manifest.traversal'),
+                (string) __('sk-doctor.theme_manifest.traversal_hint')
             );
         }
 
         return DoctorReport::ok(
             $this->name(),
-            'Theme manifest present (resources/css/theme/_active.css).'
+            (string) __('sk-doctor.theme_manifest.present')
         );
     }
 

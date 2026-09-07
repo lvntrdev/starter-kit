@@ -15,7 +15,7 @@ class NpmBuildArtifactsCheck implements DoctorCheck
 {
     public function name(): string
     {
-        return 'NPM Build Artifacts';
+        return (string) __('sk-doctor.npm_build_artifacts.name');
     }
 
     public function run(): DoctorReport
@@ -30,15 +30,15 @@ class NpmBuildArtifactsCheck implements DoctorCheck
             if ($env === 'production') {
                 return DoctorReport::fail(
                     $this->name(),
-                    'public/build/manifest.json not found — frontend build is missing.',
-                    'Run npm run build.'
+                    (string) __('sk-doctor.npm_build_artifacts.manifest_missing_production'),
+                    (string) __('sk-doctor.npm_build_artifacts.manifest_missing_production_hint')
                 );
             }
 
             return DoctorReport::warn(
                 $this->name(),
-                'public/build/manifest.json not found.',
-                'Run npm run build or npm run dev.'
+                (string) __('sk-doctor.npm_build_artifacts.manifest_missing'),
+                (string) __('sk-doctor.npm_build_artifacts.manifest_missing_hint')
             );
         }
 
@@ -49,8 +49,8 @@ class NpmBuildArtifactsCheck implements DoctorCheck
         if (! is_array($decoded) || $decoded === []) {
             return DoctorReport::fail(
                 $this->name(),
-                'public/build/manifest.json is invalid or empty.',
-                'Run npm run build again.'
+                (string) __('sk-doctor.npm_build_artifacts.manifest_invalid'),
+                (string) __('sk-doctor.npm_build_artifacts.manifest_invalid_hint')
             );
         }
 
@@ -58,7 +58,7 @@ class NpmBuildArtifactsCheck implements DoctorCheck
 
         return DoctorReport::ok(
             $this->name(),
-            "NPM build artifacts present ({$assetCount} assets)."
+            (string) __('sk-doctor.npm_build_artifacts.present', ['count' => $assetCount])
         );
     }
 }

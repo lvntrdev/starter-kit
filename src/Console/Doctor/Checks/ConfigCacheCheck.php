@@ -15,7 +15,7 @@ class ConfigCacheCheck implements DoctorCheck
 {
     public function name(): string
     {
-        return 'Config Cache';
+        return (string) __('sk-doctor.config_cache.name');
     }
 
     public function run(): DoctorReport
@@ -31,14 +31,14 @@ class ConfigCacheCheck implements DoctorCheck
             if (! $cacheExists) {
                 return DoctorReport::warn(
                     $this->name(),
-                    'Config cache not found in production environment.',
-                    'Run php artisan config:cache (recommended for performance).'
+                    (string) __('sk-doctor.config_cache.production_missing'),
+                    (string) __('sk-doctor.config_cache.production_missing_hint')
                 );
             }
 
             return DoctorReport::ok(
                 $this->name(),
-                'Config cache exists and is ready for production.'
+                (string) __('sk-doctor.config_cache.production_ready')
             );
         }
 
@@ -46,14 +46,14 @@ class ConfigCacheCheck implements DoctorCheck
         if ($cacheExists) {
             return DoctorReport::warn(
                 $this->name(),
-                "Config cache exists but environment is \"{$env}\" — config changes may not be reflected.",
-                'Clear the cache with php artisan config:clear.'
+                (string) __('sk-doctor.config_cache.stale_local', ['env' => $env]),
+                (string) __('sk-doctor.config_cache.stale_local_hint')
             );
         }
 
         return DoctorReport::ok(
             $this->name(),
-            "Environment \"{$env}\" — config cache is not required."
+            (string) __('sk-doctor.config_cache.not_required', ['env' => $env])
         );
     }
 }

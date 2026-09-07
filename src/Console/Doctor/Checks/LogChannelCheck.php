@@ -16,7 +16,7 @@ class LogChannelCheck implements DoctorCheck
 {
     public function name(): string
     {
-        return 'Log Channel';
+        return (string) __('sk-doctor.log_channel.name');
     }
 
     public function run(): DoctorReport
@@ -29,14 +29,14 @@ class LogChannelCheck implements DoctorCheck
         if ($channel === 'single') {
             return DoctorReport::fail(
                 $this->name(),
-                'LOG_CHANNEL=single — all logs go to one file and it will grow unbounded.',
-                'Set LOG_CHANNEL=daily or LOG_CHANNEL=stack in .env.'
+                (string) __('sk-doctor.log_channel.single_unbounded'),
+                (string) __('sk-doctor.log_channel.single_unbounded_hint')
             );
         }
 
         return DoctorReport::ok(
             $this->name(),
-            "LOG_CHANNEL=\"{$channel}\"."
+            (string) __('sk-doctor.log_channel.configured', ['channel' => $channel])
         );
     }
 }

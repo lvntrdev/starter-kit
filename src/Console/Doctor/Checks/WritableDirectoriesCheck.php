@@ -27,7 +27,7 @@ class WritableDirectoriesCheck implements DoctorCheck
 
     public function name(): string
     {
-        return 'Writable Directories';
+        return (string) __('sk-doctor.writable_directories.name');
     }
 
     public function run(): DoctorReport
@@ -47,14 +47,14 @@ class WritableDirectoriesCheck implements DoctorCheck
         if ($notWritable !== []) {
             return DoctorReport::fail(
                 $this->name(),
-                'Non-writable directories: '.implode(', ', $notWritable).'.',
-                'Run chmod -R 775 storage bootstrap/cache.'
+                (string) __('sk-doctor.writable_directories.not_writable', ['directories' => implode(', ', $notWritable)]),
+                (string) __('sk-doctor.writable_directories.not_writable_hint')
             );
         }
 
         return DoctorReport::ok(
             $this->name(),
-            'All critical directories are writable.'
+            (string) __('sk-doctor.writable_directories.all_writable')
         );
     }
 }

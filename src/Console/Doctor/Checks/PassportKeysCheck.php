@@ -15,7 +15,7 @@ class PassportKeysCheck implements DoctorCheck
 {
     public function name(): string
     {
-        return 'Passport Keys';
+        return (string) __('sk-doctor.passport_keys.name');
     }
 
     public function run(): DoctorReport
@@ -23,8 +23,8 @@ class PassportKeysCheck implements DoctorCheck
         if (! class_exists('Laravel\Passport\Passport')) {
             return DoctorReport::warn(
                 $this->name(),
-                'Laravel Passport is not installed — key check skipped.',
-                'Ignore this warning if you are not using Passport.'
+                (string) __('sk-doctor.passport_keys.not_installed'),
+                (string) __('sk-doctor.passport_keys.not_installed_hint')
             );
         }
 
@@ -53,22 +53,22 @@ class PassportKeysCheck implements DoctorCheck
         if ($missing !== []) {
             return DoctorReport::fail(
                 $this->name(),
-                'Missing Passport key file(s): '.implode(', ', $missing).'.',
-                'Run php artisan passport:keys.'
+                (string) __('sk-doctor.passport_keys.missing', ['files' => implode(', ', $missing)]),
+                (string) __('sk-doctor.passport_keys.missing_hint')
             );
         }
 
         if ($unreadable !== []) {
             return DoctorReport::fail(
                 $this->name(),
-                'Unreadable Passport key file(s): '.implode(', ', $unreadable).'.',
-                'Fix permissions with chmod 600 storage/oauth-*.key.'
+                (string) __('sk-doctor.passport_keys.unreadable', ['files' => implode(', ', $unreadable)]),
+                (string) __('sk-doctor.passport_keys.unreadable_hint')
             );
         }
 
         return DoctorReport::ok(
             $this->name(),
-            'Passport key files exist and are readable.'
+            (string) __('sk-doctor.passport_keys.readable')
         );
     }
 }

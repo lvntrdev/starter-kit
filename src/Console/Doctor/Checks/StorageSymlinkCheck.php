@@ -14,7 +14,7 @@ class StorageSymlinkCheck implements DoctorCheck
 {
     public function name(): string
     {
-        return 'Storage Symlink';
+        return (string) __('sk-doctor.storage_symlink.name');
     }
 
     public function run(): DoctorReport
@@ -24,22 +24,22 @@ class StorageSymlinkCheck implements DoctorCheck
         if (! file_exists($publicPath) && ! is_link($publicPath)) {
             return DoctorReport::fail(
                 $this->name(),
-                'public/storage symlink not found.',
-                'Run php artisan storage:link.'
+                (string) __('sk-doctor.storage_symlink.missing'),
+                (string) __('sk-doctor.storage_symlink.missing_hint')
             );
         }
 
         if (is_link($publicPath) && ! file_exists($publicPath)) {
             return DoctorReport::fail(
                 $this->name(),
-                'public/storage is a broken symlink (target not found).',
-                'Recreate it with php artisan storage:link --force.'
+                (string) __('sk-doctor.storage_symlink.broken'),
+                (string) __('sk-doctor.storage_symlink.broken_hint')
             );
         }
 
         return DoctorReport::ok(
             $this->name(),
-            'public/storage symlink is valid.'
+            (string) __('sk-doctor.storage_symlink.valid')
         );
     }
 }

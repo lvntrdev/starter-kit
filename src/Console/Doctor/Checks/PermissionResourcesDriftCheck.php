@@ -70,7 +70,7 @@ class PermissionResourcesDriftCheck implements DoctorCheck
 
     public function name(): string
     {
-        return 'Permission Matrix';
+        return (string) __('sk-doctor.permission_resources_drift.name');
     }
 
     public function run(): DoctorReport
@@ -80,8 +80,8 @@ class PermissionResourcesDriftCheck implements DoctorCheck
         if ($expected === null) {
             return DoctorReport::warn(
                 $this->name(),
-                'The package copy of config/permission-resources.php could not be read.',
-                'Re-install the package files (`composer update lvntr/laravel-starter-kit`), then run `php artisan sk:doctor --only=permission-matrix` again.'
+                (string) __('sk-doctor.permission_resources_drift.package_matrix_unreadable'),
+                (string) __('sk-doctor.permission_resources_drift.package_matrix_unreadable_hint')
             );
         }
 
@@ -90,8 +90,8 @@ class PermissionResourcesDriftCheck implements DoctorCheck
         if (! is_array($actual) || $actual === []) {
             return DoctorReport::warn(
                 $this->name(),
-                'config/permission-resources.php is missing or empty — no permissions can be generated.',
-                'Run `php artisan sk:publish --tag=config`, then `php artisan sk:seed-permissions`.'
+                (string) __('sk-doctor.permission_resources_drift.app_matrix_missing'),
+                (string) __('sk-doctor.permission_resources_drift.app_matrix_missing_hint')
             );
         }
 
@@ -104,7 +104,7 @@ class PermissionResourcesDriftCheck implements DoctorCheck
         if ($missing === []) {
             return DoctorReport::ok(
                 $this->name(),
-                'config/permission-resources.php covers every resource and ability the package ships.'
+                (string) __('sk-doctor.permission_resources_drift.covered')
             );
         }
 
@@ -115,8 +115,12 @@ class PermissionResourcesDriftCheck implements DoctorCheck
 
         return DoctorReport::warn(
             $this->name(),
-            count($missing).' permission(s) the package ships are absent from your matrix: '.implode(', ', $shown).$suffix,
-            'sk:update never touches config/permission-resources.php — it is yours. Add the entries above by hand, then run `php artisan sk:seed-permissions`.'
+            (string) __('sk-doctor.permission_resources_drift.missing', [
+                'count' => count($missing),
+                'items' => implode(', ', $shown),
+                'suffix' => $suffix,
+            ]),
+            (string) __('sk-doctor.permission_resources_drift.missing_hint')
         );
     }
 

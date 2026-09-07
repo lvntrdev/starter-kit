@@ -89,3 +89,23 @@ test('sk:doctor komutu --json ile fail check varsa exit code >= 1 döner', funct
 
     config()->set('mail.default', 'log');
 });
+
+test('sk:doctor --only seçicileri aktif dilden bağımsızdır', function () {
+    // Selectors are derived from the check CLASS, not from the translated display
+    // name: under a non-English locale a name-derived selector matched nothing and
+    // the command returned an empty report with exit code 0.
+    app()->setLocale('tr');
+
+    Artisan::call('sk:doctor', ['--json' => true, '--only' => 'database-connection,timezone-storage']);
+    $decoded = json_decode(Artisan::output(), true);
+
+    expect($decoded['checks'])->toHaveCount(2)
+        ->and($decoded['summary']['total'])->toBe(2);
+});
+
+test('sk:doctor --only eski görünen-ad seçicilerini kabul etmeyi sürdürür', function () {
+    Artisan::call('sk:doctor', ['--json' => true, '--only' => 'filemanager-disk,permission-matrix,unresolved-routes']);
+    $decoded = json_decode(Artisan::output(), true);
+
+    expect($decoded['checks'])->toHaveCount(3);
+});

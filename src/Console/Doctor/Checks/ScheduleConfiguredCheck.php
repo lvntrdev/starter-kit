@@ -21,7 +21,7 @@ class ScheduleConfiguredCheck implements DoctorCheck
 
     public function name(): string
     {
-        return 'Schedule Configured';
+        return (string) __('sk-doctor.schedule_configured.name');
     }
 
     public function run(): DoctorReport
@@ -35,8 +35,8 @@ class ScheduleConfiguredCheck implements DoctorCheck
             if ($count === 0) {
                 return DoctorReport::warn(
                     $this->name(),
-                    'No scheduled tasks are defined.',
-                    'Define tasks in routes/console.php or App\Console\Kernel.'
+                    (string) __('sk-doctor.schedule_configured.no_tasks'),
+                    (string) __('sk-doctor.schedule_configured.no_tasks_hint')
                 );
             }
 
@@ -48,8 +48,8 @@ class ScheduleConfiguredCheck implements DoctorCheck
             if (! file_exists($lastRunFile)) {
                 return DoctorReport::warn(
                     $this->name(),
-                    "{$count} scheduled task(s) defined, but schedule:run has never been recorded.",
-                    'The system cron entry may be missing. Add: * * * * * php artisan schedule:run >> /dev/null 2>&1'
+                    (string) __('sk-doctor.schedule_configured.never_run', ['count' => $count]),
+                    (string) __('sk-doctor.schedule_configured.never_run_hint')
                 );
             }
 
@@ -60,20 +60,20 @@ class ScheduleConfiguredCheck implements DoctorCheck
             if ($secondsAgo >= self::STALE_THRESHOLD) {
                 return DoctorReport::warn(
                     $this->name(),
-                    "{$count} scheduled task(s) defined, but the last schedule:run was {$diff}.",
-                    'The cron may have stopped. Verify the crontab entry runs schedule:run every minute.'
+                    (string) __('sk-doctor.schedule_configured.stale', ['count' => $count, 'diff' => $diff]),
+                    (string) __('sk-doctor.schedule_configured.stale_hint')
                 );
             }
 
             return DoctorReport::ok(
                 $this->name(),
-                "{$count} scheduled task(s) defined. Last run: {$diff}."
+                (string) __('sk-doctor.schedule_configured.healthy', ['count' => $count, 'diff' => $diff])
             );
         } catch (Throwable $e) {
             return DoctorReport::warn(
                 $this->name(),
-                'Could not check schedule status: '.$e->getMessage(),
-                'Is the Schedule container binding correct? Try php artisan schedule:list.'
+                (string) __('sk-doctor.schedule_configured.error', ['error' => $e->getMessage()]),
+                (string) __('sk-doctor.schedule_configured.error_hint')
             );
         }
     }

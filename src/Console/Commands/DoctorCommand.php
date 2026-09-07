@@ -42,6 +42,17 @@ class DoctorCommand extends Command
     protected $description = 'Check the Starter Kit installation: PHP extensions, DB, Redis, Passport, queue, and more.';
 
     /**
+     * Legacy `--only` selectors kept working after the switch to class-derived,
+     * locale-independent ids: these three display names never matched their own
+     * class name, and the published docs list them.
+     */
+    private const SELECTOR_ALIASES = [
+        'filemanager-disk' => 'file-manager-disk',
+        'permission-matrix' => 'permission-resources-drift',
+        'unresolved-routes' => 'unresolved-route',
+    ];
+
+    /**
      * sk:doctor exit code şeması (plan gereği):
      *   0  — tüm checkler ok (Command::SUCCESS)
      *   1  — en az bir warn var, fail yok
@@ -108,15 +119,30 @@ class DoctorCommand extends Command
             return $all;
         }
 
-        $selected = array_map('trim', explode(',', (string) $only));
+        $selected = array_map(
+            fn (string $selector) => self::SELECTOR_ALIASES[$selector] ?? $selector,
+            array_map(fn (string $s) => strtolower(trim($s)), explode(',', (string) $only))
+        );
 
         return array_filter(
             $all,
-            fn (DoctorCheck $check) => in_array(
-                strtolower(str_replace(' ', '-', $check->name())),
-                array_map('strtolower', $selected),
-                true
-            )
+            fn (DoctorCheck $check) => in_array($this->selectorFor($check), $selected, true)
+        );
+    }
+
+    /**
+     * The locale-independent `--only` selector of a check.
+     *
+     * Derived from the CLASS name, never from `name()`: the display name goes
+     * through the `sk-doctor.*` translations, so a `tr` locale used to make every
+     * documented selector match nothing and return an empty, exit-0 report.
+     */
+    private function selectorFor(DoctorCheck $check): string
+    {
+        $class = (new \ReflectionClass($check))->getShortName();
+
+        return strtolower(
+            preg_replace('/(?<!^)[A-Z]/', '-$0', preg_replace('/Check$/', '', $class)) ?? $class
         );
     }
 

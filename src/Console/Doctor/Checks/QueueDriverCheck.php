@@ -19,7 +19,7 @@ class QueueDriverCheck implements DoctorCheck
 {
     public function name(): string
     {
-        return 'Queue Driver';
+        return (string) __('sk-doctor.queue_driver.name');
     }
 
     public function run(): DoctorReport
@@ -32,15 +32,15 @@ class QueueDriverCheck implements DoctorCheck
             if ($env === 'production') {
                 return DoctorReport::fail(
                     $this->name(),
-                    'Queue driver is "sync" in production — jobs run inside the HTTP request.',
-                    'Set QUEUE_CONNECTION=redis or database and start queue:work.'
+                    (string) __('sk-doctor.queue_driver.sync_production'),
+                    (string) __('sk-doctor.queue_driver.sync_production_hint')
                 );
             }
 
             return DoctorReport::warn(
                 $this->name(),
-                "Queue driver \"{$driver}\" — not suitable for production.",
-                'Set QUEUE_CONNECTION=redis or database.'
+                (string) __('sk-doctor.queue_driver.sync_non_production', ['driver' => $driver]),
+                (string) __('sk-doctor.queue_driver.sync_non_production_hint')
             );
         }
 
@@ -51,13 +51,13 @@ class QueueDriverCheck implements DoctorCheck
 
                 return DoctorReport::ok(
                     $this->name(),
-                    "Queue driver \"{$driver}\" is active."
+                    (string) __('sk-doctor.queue_driver.database_active', ['driver' => $driver])
                 );
             } catch (Throwable $e) {
                 return DoctorReport::warn(
                     $this->name(),
-                    "Queue driver \"{$driver}\" but DB access failed: ".$e->getMessage(),
-                    'Run php artisan queue:table && php artisan migrate.'
+                    (string) __('sk-doctor.queue_driver.database_error', ['driver' => $driver, 'error' => $e->getMessage()]),
+                    (string) __('sk-doctor.queue_driver.database_error_hint')
                 );
             }
         }
@@ -68,20 +68,20 @@ class QueueDriverCheck implements DoctorCheck
 
                 return DoctorReport::ok(
                     $this->name(),
-                    "Queue driver \"{$driver}\" is active and connection successful."
+                    (string) __('sk-doctor.queue_driver.redis_active', ['driver' => $driver])
                 );
             } catch (Throwable $e) {
                 return DoctorReport::fail(
                     $this->name(),
-                    "Queue driver \"{$driver}\" but Redis connection failed: ".$e->getMessage(),
-                    'Make sure the Redis server is running.'
+                    (string) __('sk-doctor.queue_driver.redis_error', ['driver' => $driver, 'error' => $e->getMessage()]),
+                    (string) __('sk-doctor.queue_driver.redis_error_hint')
                 );
             }
         }
 
         return DoctorReport::ok(
             $this->name(),
-            "Queue driver \"{$driver}\" is configured."
+            (string) __('sk-doctor.queue_driver.configured', ['driver' => $driver])
         );
     }
 }

@@ -11,7 +11,7 @@ class LogStackCheck implements DoctorCheck
 {
     public function name(): string
     {
-        return 'Log Stack';
+        return (string) __('sk-doctor.log_stack.name');
     }
 
     public function run(): DoctorReport
@@ -34,22 +34,20 @@ class LogStackCheck implements DoctorCheck
         if ($unrotated !== []) {
             return DoctorReport::warn(
                 $this->name(),
-                sprintf(
-                    'Active log channel "%s" writes through an unrotated "single" driver (%s) — logs grow unbounded.',
-                    $default,
-                    implode(', ', $unrotated)
-                ),
+                (string) __('sk-doctor.log_stack.unrotated', [
+                    'channel' => $default,
+                    'channels' => implode(', ', $unrotated),
+                ]),
                 $this->remediation($default)
             );
         }
 
         return DoctorReport::ok(
             $this->name(),
-            sprintf(
-                'Active log channel "%s" (%s) — no unrotated "single" driver in use.',
-                $default,
-                implode(', ', $channels) ?: 'no channel resolved'
-            )
+            (string) __('sk-doctor.log_stack.no_unrotated', [
+                'channel' => $default,
+                'channels' => implode(', ', $channels) ?: 'no channel resolved',
+            ])
         );
     }
 
@@ -110,18 +108,14 @@ class LogStackCheck implements DoctorCheck
     private function remediation(string $channel): string
     {
         if ($channel === 'stack') {
-            return 'Set LOG_STACK=daily in .env to enable automatic log rotation.';
+            return (string) __('sk-doctor.log_stack.unrotated_hint_stack');
         }
 
         if ($this->isStack($channel)) {
-            return sprintf(
-                'Replace the "single" member of logging.channels.%s.channels with "daily" '
-                .'(LOG_STACK only configures the framework\'s own "stack" channel).',
-                $channel
-            );
+            return (string) __('sk-doctor.log_stack.unrotated_hint_named_stack', ['channel' => $channel]);
         }
 
-        return 'Set LOG_CHANNEL=daily in .env to enable automatic log rotation.';
+        return (string) __('sk-doctor.log_stack.unrotated_hint_default');
     }
 
     private function isStack(string $channel): bool

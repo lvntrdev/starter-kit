@@ -16,7 +16,7 @@ class MailDriverCheck implements DoctorCheck
 {
     public function name(): string
     {
-        return 'Mail Driver';
+        return (string) __('sk-doctor.mail_driver.name');
     }
 
     public function run(): DoctorReport
@@ -30,15 +30,15 @@ class MailDriverCheck implements DoctorCheck
             if ($env === 'production') {
                 return DoctorReport::fail(
                     $this->name(),
-                    "Mail driver is \"{$transport}\" in production — emails cannot be sent.",
-                    'Set MAIL_MAILER=smtp or use a driver such as Mailgun/SES.'
+                    (string) __('sk-doctor.mail_driver.log_array_production', ['transport' => $transport]),
+                    (string) __('sk-doctor.mail_driver.log_array_production_hint')
                 );
             }
 
             return DoctorReport::warn(
                 $this->name(),
-                "Mail driver \"{$transport}\" — not suitable for production.",
-                'Set MAIL_MAILER=smtp or use a driver such as Mailgun/SES.'
+                (string) __('sk-doctor.mail_driver.log_array_non_production', ['transport' => $transport]),
+                (string) __('sk-doctor.mail_driver.log_array_non_production_hint')
             );
         }
 
@@ -49,8 +49,8 @@ class MailDriverCheck implements DoctorCheck
             if (empty($host)) {
                 return DoctorReport::fail(
                     $this->name(),
-                    'SMTP host is not configured.',
-                    'Set MAIL_HOST in your .env file.'
+                    (string) __('sk-doctor.mail_driver.smtp_host_missing'),
+                    (string) __('sk-doctor.mail_driver.smtp_host_missing_hint')
                 );
             }
 
@@ -65,8 +65,12 @@ class MailDriverCheck implements DoctorCheck
             if ($socket === false) {
                 return DoctorReport::fail(
                     $this->name(),
-                    "Could not connect to SMTP server ({$host}:{$port}): {$errstr}.",
-                    'Check MAIL_HOST, MAIL_PORT, MAIL_USERNAME, and MAIL_PASSWORD.'
+                    (string) __('sk-doctor.mail_driver.smtp_unreachable', [
+                        'host' => $host,
+                        'port' => $port,
+                        'error' => $errstr,
+                    ]),
+                    (string) __('sk-doctor.mail_driver.smtp_unreachable_hint')
                 );
             }
 
@@ -74,13 +78,13 @@ class MailDriverCheck implements DoctorCheck
 
             return DoctorReport::ok(
                 $this->name(),
-                "SMTP connection successful ({$host}:{$port})."
+                (string) __('sk-doctor.mail_driver.smtp_connected', ['host' => $host, 'port' => $port])
             );
         }
 
         return DoctorReport::ok(
             $this->name(),
-            "Mail driver \"{$transport}\" is configured."
+            (string) __('sk-doctor.mail_driver.configured', ['transport' => $transport])
         );
     }
 }

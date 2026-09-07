@@ -19,7 +19,7 @@ class FileManagerDiskCheck implements DoctorCheck
 {
     public function name(): string
     {
-        return 'FileManager Disk';
+        return (string) __('sk-doctor.file_manager_disk.name');
     }
 
     public function run(): DoctorReport
@@ -32,8 +32,8 @@ class FileManagerDiskCheck implements DoctorCheck
         if (config("filesystems.disks.{$fileManagerDisk}") === null) {
             return DoctorReport::fail(
                 $this->name(),
-                "FileManager disk \"{$fileManagerDisk}\" is not defined in filesystems.disks.",
-                'Set FILESYSTEM_DISK in your .env file or choose a valid disk under Settings → Storage.'
+                (string) __('sk-doctor.file_manager_disk.disk_undefined', ['disk' => $fileManagerDisk]),
+                (string) __('sk-doctor.file_manager_disk.disk_undefined_hint')
             );
         }
 
@@ -50,29 +50,37 @@ class FileManagerDiskCheck implements DoctorCheck
         if ($root !== '' && is_dir($root) && ! is_writable($root)) {
             return DoctorReport::warn(
                 $this->name(),
-                "FileManager disk \"{$fileManagerDisk}\" ({$driver}) root directory is not writable: {$root}.",
-                'Fix directory permissions (chmod/chown) so the web server user can write.'
+                (string) __('sk-doctor.file_manager_disk.root_not_writable', [
+                    'disk' => $fileManagerDisk,
+                    'driver' => $driver,
+                    'root' => $root,
+                ]),
+                (string) __('sk-doctor.file_manager_disk.root_not_writable_hint')
             );
         }
 
         if ($root !== '' && is_dir($root)) {
             return DoctorReport::ok(
                 $this->name(),
-                "FileManager disk \"{$fileManagerDisk}\" ({$driver}) is accessible."
+                (string) __('sk-doctor.file_manager_disk.accessible', ['disk' => $fileManagerDisk, 'driver' => $driver])
             );
         }
 
         if ($root !== '' && ! is_dir($root)) {
             return DoctorReport::warn(
                 $this->name(),
-                "FileManager disk \"{$fileManagerDisk}\" ({$driver}) root directory not found: {$root}.",
-                'Run php artisan storage:link.'
+                (string) __('sk-doctor.file_manager_disk.root_missing', [
+                    'disk' => $fileManagerDisk,
+                    'driver' => $driver,
+                    'root' => $root,
+                ]),
+                (string) __('sk-doctor.file_manager_disk.root_missing_hint')
             );
         }
 
         return DoctorReport::ok(
             $this->name(),
-            "FileManager disk \"{$fileManagerDisk}\" ({$driver}) is configured."
+            (string) __('sk-doctor.file_manager_disk.configured', ['disk' => $fileManagerDisk, 'driver' => $driver])
         );
     }
 
@@ -83,8 +91,8 @@ class FileManagerDiskCheck implements DoctorCheck
         if (empty($bucket)) {
             return DoctorReport::fail(
                 $this->name(),
-                "No bucket configured for S3 disk \"{$diskName}\".",
-                'Set AWS_BUCKET in your .env file.'
+                (string) __('sk-doctor.file_manager_disk.s3_no_bucket', ['disk' => $diskName]),
+                (string) __('sk-doctor.file_manager_disk.s3_no_bucket_hint')
             );
         }
 
@@ -105,13 +113,17 @@ class FileManagerDiskCheck implements DoctorCheck
 
             return DoctorReport::ok(
                 $this->name(),
-                "S3 disk \"{$diskName}\" (bucket: {$bucket}) is accessible."
+                (string) __('sk-doctor.file_manager_disk.s3_accessible', ['disk' => $diskName, 'bucket' => $bucket])
             );
         } catch (Throwable $e) {
             return DoctorReport::fail(
                 $this->name(),
-                "S3 disk \"{$diskName}\" (bucket: {$bucket}) is not accessible: ".$e->getMessage(),
-                'Check AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_BUCKET, and AWS_DEFAULT_REGION. IAM policy must include s3:GetBucketLocation and s3:HeadBucket permissions.'
+                (string) __('sk-doctor.file_manager_disk.s3_inaccessible', [
+                    'disk' => $diskName,
+                    'bucket' => $bucket,
+                    'error' => $e->getMessage(),
+                ]),
+                (string) __('sk-doctor.file_manager_disk.s3_inaccessible_hint')
             );
         }
     }

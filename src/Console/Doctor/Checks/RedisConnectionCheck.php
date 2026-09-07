@@ -18,7 +18,7 @@ class RedisConnectionCheck implements DoctorCheck
 {
     public function name(): string
     {
-        return 'Redis Connection';
+        return (string) __('sk-doctor.redis_connection.name');
     }
 
     public function run(): DoctorReport
@@ -30,8 +30,8 @@ class RedisConnectionCheck implements DoctorCheck
         if ($cacheDriver !== 'redis' && $sessionDriver !== 'redis') {
             return DoctorReport::warn(
                 $this->name(),
-                'Cache or session is not using Redis (cache='.$cacheDriver.', session='.$sessionDriver.').',
-                'Redis is recommended in production: CACHE_STORE=redis, SESSION_DRIVER=redis.'
+                (string) __('sk-doctor.redis_connection.not_used', ['cache' => $cacheDriver, 'session' => $sessionDriver]),
+                (string) __('sk-doctor.redis_connection.not_used_hint')
             );
         }
 
@@ -58,13 +58,13 @@ class RedisConnectionCheck implements DoctorCheck
 
             return DoctorReport::ok(
                 $this->name(),
-                "Redis connection successful ({$redisHost}:{$redisPort})."
+                (string) __('sk-doctor.redis_connection.connected', ['host' => $redisHost, 'port' => $redisPort])
             );
         } catch (Throwable $e) {
             return DoctorReport::fail(
                 $this->name(),
-                'Could not connect to Redis: '.$e->getMessage(),
-                'Check REDIS_HOST, REDIS_PORT, and REDIS_PASSWORD in your .env file.'
+                (string) __('sk-doctor.redis_connection.connection_failed', ['error' => $e->getMessage()]),
+                (string) __('sk-doctor.redis_connection.connection_failed_hint')
             );
         }
     }

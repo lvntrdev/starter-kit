@@ -15,7 +15,9 @@ use Throwable;
  * job'ın yaşına bakar (backlog-age sezgisi): uzun süredir bekleyen job'lar
  * worker'ın düştüğüne işarettir. `redis`/`sqs` gibi async driver'larda yaş
  * bilgisi ucuz alınamaz — canlılık doğrudan doğrulanamadığı için warn'la
- * worker çalıştırmayı hatırlatır. `sync` driver worker gerektirmez.
+ * worker çalıştırmayı hatırlatır. Tek istisna: `redis` + Horizon kurulu ise
+ * master supervisor kaydı okunur ve canlılık gerçekten doğrulanır.
+ * `sync` driver worker gerektirmez.
  */
 class QueueWorkerCheck implements DoctorCheck
 {
@@ -24,7 +26,7 @@ class QueueWorkerCheck implements DoctorCheck
 
     public function name(): string
     {
-        return 'Queue Worker';
+        return (string) __('sk-doctor.queue_worker.name');
     }
 
     public function run(): DoctorReport
@@ -34,7 +36,7 @@ class QueueWorkerCheck implements DoctorCheck
         if ($driver === 'sync') {
             return DoctorReport::ok(
                 $this->name(),
-                'Queue driver is "sync" — jobs run inline; no worker process is required.'
+                (string) __('sk-doctor.queue_worker.sync')
             );
         }
 
@@ -42,11 +44,65 @@ class QueueWorkerCheck implements DoctorCheck
             return $this->checkDatabaseBacklog();
         }
 
+        if ($driver === 'redis' && ($horizon = $this->checkHorizon()) !== null) {
+            return $horizon;
+        }
+
         // redis / sqs / beanstalkd: bekleyen job yaşı ucuz sorgulanamıyor.
         return DoctorReport::warn(
             $this->name(),
-            "Queue driver \"{$driver}\" is async — worker liveness cannot be verified automatically.",
-            'Ensure a worker is running: php artisan queue:work (Supervisor or Horizon in production).'
+            (string) __('sk-doctor.queue_worker.async_unverifiable', ['driver' => $driver]),
+            (string) __('sk-doctor.queue_worker.async_unverifiable_hint')
+        );
+    }
+
+    /**
+     * Horizon kuruluysa canlılık doğrudan okunabilir: master supervisor kaydı
+     * Redis'te tutulur. Horizon yoksa / okunamıyorsa null döner ve genel
+     * async uyarısına düşülür.
+     */
+    private function checkHorizon(): ?DoctorReport
+    {
+        // Horizon paket bağımlılığı değil; FQCN string olarak tutulur ki
+        // kurulu olmadığı projelerde statik analiz de derleme de patlamasın.
+        $repository = 'Laravel\Horizon\Contracts\MasterSupervisorRepository';
+
+        if (! interface_exists($repository)) {
+            return null;
+        }
+
+        try {
+            /** @var array<int, object> $masters */
+            $masters = app($repository)->all();
+        } catch (Throwable $e) {
+            return DoctorReport::warn(
+                $this->name(),
+                (string) __('sk-doctor.queue_worker.horizon_unreadable', ['error' => $e->getMessage()]),
+                (string) __('sk-doctor.queue_worker.horizon_unreadable_hint')
+            );
+        }
+
+        if ($masters === []) {
+            return DoctorReport::warn(
+                $this->name(),
+                (string) __('sk-doctor.queue_worker.horizon_no_master'),
+                (string) __('sk-doctor.queue_worker.horizon_no_master_hint')
+            );
+        }
+
+        $paused = array_filter($masters, fn ($master) => ($master->status ?? null) === 'paused');
+
+        if (count($paused) === count($masters)) {
+            return DoctorReport::warn(
+                $this->name(),
+                (string) __('sk-doctor.queue_worker.horizon_paused'),
+                (string) __('sk-doctor.queue_worker.horizon_paused_hint')
+            );
+        }
+
+        return DoctorReport::ok(
+            $this->name(),
+            (string) __('sk-doctor.queue_worker.horizon_running', ['count' => count($masters)])
         );
     }
 
@@ -62,8 +118,8 @@ class QueueWorkerCheck implements DoctorCheck
             if (! $schema->hasTable($table)) {
                 return DoctorReport::warn(
                     $this->name(),
-                    "Queue table \"{$table}\" does not exist — jobs cannot be persisted.",
-                    'Run php artisan queue:table && php artisan migrate.'
+                    (string) __('sk-doctor.queue_worker.database_table_missing', ['table' => $table]),
+                    (string) __('sk-doctor.queue_worker.database_table_missing_hint')
                 );
             }
 
@@ -78,7 +134,7 @@ class QueueWorkerCheck implements DoctorCheck
             if ($oldest === null) {
                 return DoctorReport::ok(
                     $this->name(),
-                    'No pending jobs are waiting — the worker appears healthy (or the queue is empty).'
+                    (string) __('sk-doctor.queue_worker.database_empty')
                 );
             }
 
@@ -92,20 +148,23 @@ class QueueWorkerCheck implements DoctorCheck
 
                 return DoctorReport::warn(
                     $this->name(),
-                    "{$pending} job(s) pending; the oldest has waited ".$this->humanize($waitedFor).' — the worker may be down.',
-                    'Start or restart the queue worker: php artisan queue:work (or Supervisor/Horizon).'
+                    (string) __('sk-doctor.queue_worker.database_stale', [
+                        'count' => $pending,
+                        'waited' => $this->humanize($waitedFor),
+                    ]),
+                    (string) __('sk-doctor.queue_worker.database_stale_hint')
                 );
             }
 
             return DoctorReport::ok(
                 $this->name(),
-                'Pending jobs are within the expected processing window (oldest waited '.$this->humanize($waitedFor).').'
+                (string) __('sk-doctor.queue_worker.database_healthy', ['waited' => $this->humanize($waitedFor)])
             );
         } catch (Throwable $e) {
             return DoctorReport::warn(
                 $this->name(),
-                'Could not inspect the queue backlog: '.$e->getMessage(),
-                'Verify the queue database connection and jobs table.'
+                (string) __('sk-doctor.queue_worker.database_error', ['error' => $e->getMessage()]),
+                (string) __('sk-doctor.queue_worker.database_error_hint')
             );
         }
     }

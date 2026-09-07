@@ -38,7 +38,7 @@ php artisan sk:doctor --only=timezone-storage
 ```
 
 - `--json` outputs machine-readable JSON instead of a table
-- `--only=<selectors>` runs a comma-separated subset of checks. Each selector is the check's name lowercased with spaces turned into hyphens (e.g. "Database Connection" → `database-connection`) — derive any selector this way
+- `--only=<selectors>` runs a comma-separated subset of checks. A selector is the check's stable id — its class name without the `Check` suffix, hyphenated and lowercased (`DatabaseConnectionCheck` → `database-connection`) — so it does NOT change with the active locale even though the displayed check name is now translated. The three selectors in the table that differ from their class name (`filemanager-disk`, `permission-matrix`, `unresolved-routes`) keep working as aliases
 
 Checks (name → `--only` selector):
 

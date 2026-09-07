@@ -38,7 +38,7 @@ php artisan sk:doctor --only=timezone-storage
 ```
 
 - `--json` tablo yerine makine okunabilir JSON çıktı üretir
-- `--only=<seçiciler>` virgülle ayrılmış seçili kontrolleri çalıştırır. Her seçici, kontrolün adının küçük harfe çevrilip boşlukların tire ile değiştirilmiş halidir (örn. "Database Connection" → `database-connection`) — herhangi bir seçiciyi bu kuralla türetebilirsiniz
+- `--only=<seçiciler>` virgülle ayrılmış seçili kontrolleri çalıştırır. Seçici, kontrolün sabit kimliğidir — sınıf adının `Check` eki atılmış, tireli ve küçük harfli hâli (`DatabaseConnectionCheck` → `database-connection`) — bu yüzden görünen kontrol adı artık çevrilse de seçici aktif dile göre DEĞİŞMEZ. Tablodaki, sınıf adından farklı üç seçici (`filemanager-disk`, `permission-matrix`, `unresolved-routes`) takma ad olarak çalışmayı sürdürür
 
 Kontroller (ad → `--only` seçicisi):
 

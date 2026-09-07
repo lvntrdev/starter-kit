@@ -42,7 +42,7 @@ class ActivityLogSecretsCheck implements DoctorCheck
 {
     public function name(): string
     {
-        return 'Activity Log Secrets';
+        return (string) __('sk-doctor.activity_log_secrets.name');
     }
 
     public function run(): DoctorReport
@@ -52,22 +52,22 @@ class ActivityLogSecretsCheck implements DoctorCheck
         } catch (Throwable $e) {
             return DoctorReport::warn(
                 $this->name(),
-                'Could not inspect the activity log for stored credentials: '.$e->getMessage(),
-                'Check the database connection, then run `php artisan sk:redact-activity-secrets --dry-run --all` by hand.'
+                (string) __('sk-doctor.activity_log_secrets.probe_failed', ['error' => $e->getMessage()]),
+                (string) __('sk-doctor.activity_log_secrets.probe_failed_hint')
             );
         }
 
         if ($stats['table'] === null) {
             return DoctorReport::ok(
                 $this->name(),
-                'No activity log table on this connection — there is nothing that could hold a credential.'
+                (string) __('sk-doctor.activity_log_secrets.no_table')
             );
         }
 
         if ($stats['columns'] === []) {
             return DoctorReport::ok(
                 $this->name(),
-                "Table [{$stats['table']}] has no JSON payload column — there is nowhere for a credential to be stored."
+                (string) __('sk-doctor.activity_log_secrets.no_json_column', ['table' => $stats['table']])
             );
         }
 
@@ -75,30 +75,29 @@ class ActivityLogSecretsCheck implements DoctorCheck
             return DoctorReport::fail(
                 $this->name(),
                 $stats['exhaustive']
-                    ? sprintf(
-                        '%d row(s) in [%s] still contain credentials (password hashes, tokens or secrets) readable from the activity-log screen.',
-                        $stats['dirty'],
-                        $stats['table'],
-                    )
-                    : sprintf(
-                        'At least %d row(s) in [%s] still contain credentials (password hashes, tokens or secrets) readable from the activity-log screen. The probe stopped after %d row(s), so that is a floor, not the total.',
-                        $stats['dirty'],
-                        $stats['table'],
-                        $stats['scanned'],
-                    ),
-                'Back up the database, then run `php artisan migrate` (or `php artisan sk:redact-activity-secrets`). Removal is irreversible.'
+                    ? (string) __('sk-doctor.activity_log_secrets.dirty_exhaustive', [
+                        'count' => $stats['dirty'],
+                        'table' => $stats['table'],
+                    ])
+                    : (string) __('sk-doctor.activity_log_secrets.dirty_bounded', [
+                        'count' => $stats['dirty'],
+                        'table' => $stats['table'],
+                        'scanned' => $stats['scanned'],
+                    ]),
+                $stats['exhaustive']
+                    ? (string) __('sk-doctor.activity_log_secrets.dirty_exhaustive_hint')
+                    : (string) __('sk-doctor.activity_log_secrets.dirty_bounded_hint')
             );
         }
 
         if ($stats['invalid'] > 0) {
             return DoctorReport::warn(
                 $this->name(),
-                sprintf(
-                    '%d JSON payload(s) in [%s] could not be decoded, so they could not be checked for credentials.',
-                    $stats['invalid'],
-                    $stats['table'],
-                ),
-                'Inspect those rows by hand — `php artisan sk:redact-activity-secrets --dry-run --all` reports the count over the whole table.'
+                (string) __('sk-doctor.activity_log_secrets.invalid_json', [
+                    'count' => $stats['invalid'],
+                    'table' => $stats['table'],
+                ]),
+                (string) __('sk-doctor.activity_log_secrets.invalid_json_hint')
             );
         }
 
@@ -108,12 +107,14 @@ class ActivityLogSecretsCheck implements DoctorCheck
         return DoctorReport::ok(
             $this->name(),
             $stats['exhaustive']
-                ? "No credential-bearing rows found in [{$stats['table']}] (all {$stats['scanned']} row(s) inspected)."
-                : sprintf(
-                    'No credential-bearing rows in the first %d row(s) of [%s] — a bounded probe, not a full audit. Run `php artisan sk:redact-activity-secrets --dry-run --all` for the exhaustive count.',
-                    $stats['scanned'],
-                    $stats['table'],
-                )
+                ? (string) __('sk-doctor.activity_log_secrets.clean_exhaustive', [
+                    'table' => $stats['table'],
+                    'scanned' => $stats['scanned'],
+                ])
+                : (string) __('sk-doctor.activity_log_secrets.clean_bounded', [
+                    'scanned' => $stats['scanned'],
+                    'table' => $stats['table'],
+                ])
         );
     }
 }

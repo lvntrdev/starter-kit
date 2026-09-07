@@ -54,7 +54,7 @@ class UnresolvedRouteCheck implements DoctorCheck
 
     public function name(): string
     {
-        return 'Unresolved Routes';
+        return (string) __('sk-doctor.unresolved_route.name');
     }
 
     public function run(): DoctorReport
@@ -90,7 +90,7 @@ class UnresolvedRouteCheck implements DoctorCheck
         if ($unresolved === []) {
             return DoctorReport::ok(
                 $this->name(),
-                'Every route gated by check.permission / check.resource.permission resolves to a permission.'
+                (string) __('sk-doctor.unresolved_route.all_resolved')
             );
         }
 
@@ -101,8 +101,12 @@ class UnresolvedRouteCheck implements DoctorCheck
 
         return DoctorReport::fail(
             $this->name(),
-            count($unresolved).' route(s) currently pass with a warning because no permission can be derived from their name: '.implode(', ', $shown).$suffix,
-            'They will be DENIED once starter-kit.permissions.allow_unresolved defaults to false. Give each route a "<resource>.<action>" name with a mapped action, gate it with an explicit permission argument, or declare it under starter-kit.permissions.unrestricted_routes.'
+            (string) __('sk-doctor.unresolved_route.found', [
+                'count' => count($unresolved),
+                'routes' => implode(', ', $shown),
+                'suffix' => $suffix,
+            ]),
+            (string) __('sk-doctor.unresolved_route.found_hint')
         );
     }
 
