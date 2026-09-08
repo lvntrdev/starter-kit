@@ -1,0 +1,19 @@
+secret:
+  ignored_matches:
+  - match: 15e61414cf45a541c4a490ee01a90425f8ff8eb774831ebd199a96b3ffe9df0b
+    name: Generic Password - commit://797503928b3b14f1389ac35ccd23f4bcca2c12d5/stubs/app/Http/Controllers/Api/Auth/AuthController.php
+  - match: e8ae8d9c730320a7c4e203822997fc8ea371e1f781d45d7fdba23b27aceccc3b
+    name: Generic Password - commit://2cb8ea215226ab10a4865e21101bbc6bc6b77962/tests/Feature/Api/AuthFlowTest.php
+  - match: 598ba77c600c10a7ed66493758b0d26f015c7f18dde18c65eb4fd8b7b6ee54f6
+    name: Generic Password - commit://19e45806b934ad7b08de8996c606feb7c84873fe/tests/Feature/Install/InstallerSafetyTest.php
+  ignored_paths:
+  - __tests__/**
+  - tests/**
+  - '**/*_test.*'
+  - spec/**
+  - '**/*.spec.*'
+  # Generated i18n bundles: Turkish 'parola' UI labels trip generic_password.
+  - resources/js/lang/php_*.json
+  - test/**
+  - '**/*.test.*'
+version: 2
