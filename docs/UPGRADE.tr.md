@@ -258,9 +258,18 @@ FileManager ve avatar yüklemeleri artık yalnızca sniff edilen content-type e�
 
 Segment bazlı engelleme (yukarıdaki `name.html.pdf` durumu) `spatie/laravel-medialibrary` **11.23.0** (2026-05-28) ile geldi; kitin `composer.json`'ı artık `^11.23` istiyor, dolayısıyla bu sürümü getiren `composer update` listeyi uygulayan bir build'i de çeker. Eski bir build'in hâlâ kurulu olduğu aralığı kitin kendi request seviyesindeki segment kontrolü kapatır. Şüphede kalırsanız `composer show spatie/laravel-medialibrary` ile kontrol edin.
 
-### Ayarlar cache anahtarı değişti — işlem gerekmiyor
+### Ayarlar cache anahtarı değişti — `SettingService`'i extend etmediyseniz işlem gerekmiyor
 
 `SettingService` artık `settings` altında çözülmüş değerleri cache'lemek yerine `settings:v2` altında ham (ciphertext) satırları cache'liyor; nedeni için `CHANGELOG.tr.md`'ye bakın. Herhangi bir deploy adımı gerekmiyor: eski `settings` anahtarı, yeni snapshot ilk kurulduğunda otomatik olarak düşürülüyor. Beklemek yerine kalıcı bir düz-metin snapshot'ı hemen düşürmek isterseniz `php artisan cache:forget settings`'i elle çalıştırmak zararsızdır.
+
+**Eski cache davranışını aşmak için `SettingService`'i extend ettiyseniz, o subclass'ı kaldırın.** Bu sürümden önce write path'ler cache snapshot'ını düşürmüyordu ve bazı kurulumlar bunu, cache anahtarını yeniden tanımlayan kendi alt sınıflarıyla yamamıştı — tipik olarak `private const CACHE_KEY = 'settings';`. `SettingService::CACHE_KEY` artık **public** bir sabit ve PHP bir alt sınıfın sabit görünürlüğünü daraltmasına izin vermiyor; dolayısıyla böyle bir sınıf `composer update` sırasında autoload aşamasında fatal veriyor:
+
+```
+Access level to App\...\YourSettingService::CACHE_KEY must be public
+(as in class Lvntr\StarterKit\Domain\Setting\SettingService)
+```
+
+Subclass zaten gereksiz: artık her write path `DB::afterCommit()` üzerinden `Cache::forget()` çağırıyor, yani snapshot en dıştaki commit'te düşüyor. Alt sınıfı silin, container binding'inizi (ve varsa `class_alias`'ı) `Lvntr\StarterKit\Domain\Setting\SettingService`'e geri döndürün, ardından `composer dump-autoload && php artisan optimize:clear` çalıştırın. Görünürlüğü düzeltip subclass'ı korumak da seçenek değil — `'settings'` anahtarı düz-metin cache'leyen v1 davranışını geri getirir. `SettingService`'i hiç extend etmemiş bir tüketici etkilenmez; kit `stubs/` altında böyle bir alt sınıf göndermiyor.
 
 ### `POST /api/v1/auth/login` artık kendi hesap-başına rate limitine sahip
 

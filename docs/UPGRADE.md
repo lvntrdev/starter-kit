@@ -258,9 +258,18 @@ FileManager and avatar uploads no longer pass purely on a sniffed content-type m
 
 Per-segment blocking (the `name.html.pdf` case above) ships in `spatie/laravel-medialibrary` **11.23.0** (2026-05-28), and the kit's `composer.json` now requires `^11.23`, so the `composer update` that brings in this release pulls a build that enforces the list; the kit's own request-level segment check covers any interval in which an older build is still installed. Check with `composer show spatie/laravel-medialibrary` if in doubt.
 
-### The settings cache key changed — no action required
+### The settings cache key changed — no action required unless you subclassed `SettingService`
 
 `SettingService` now caches raw (ciphertext) rows under `settings:v2` instead of caching decrypted values under `settings`; see `CHANGELOG.md` for why. No deploy step is required: the old `settings` key is dropped automatically the first time the new snapshot is built. Running `php artisan cache:forget settings` by hand is harmless if you'd rather drop a lingering plaintext snapshot immediately instead of waiting for it to be replaced.
+
+**If you extended `SettingService` to work around the old cache behaviour, remove that subclass.** Before this release the write paths did not drop the cached snapshot, and some installations patched around it with a child class of their own that re-declared the cache key — typically `private const CACHE_KEY = 'settings';`. `SettingService::CACHE_KEY` is now a **public** constant, and PHP does not allow a subclass to reduce a constant's visibility, so such a class fatals at autoload time on `composer update`:
+
+```
+Access level to App\...\YourSettingService::CACHE_KEY must be public
+(as in class Lvntr\StarterKit\Domain\Setting\SettingService)
+```
+
+The subclass is also obsolete: every write path now calls `Cache::forget()` through `DB::afterCommit()`, so the snapshot is dropped on the outermost commit. Delete the child class, point your container binding (and any `class_alias`) back at `Lvntr\StarterKit\Domain\Setting\SettingService`, then run `composer dump-autoload && php artisan optimize:clear`. Keeping the subclass is not an option even with the visibility corrected — its `'settings'` key would put the plaintext-caching v1 behaviour back. A consumer that never subclassed `SettingService` is unaffected; the kit ships no such subclass in `stubs/`.
 
 ### `POST /api/v1/auth/login` now has its own per-account rate limiter
 
