@@ -161,8 +161,14 @@ jobs:
           MARIADB_DATABASE: starter_kit_ci
         ports:
           - 3306:3306
+        # healthcheck.sh, NOT `mysqladmin ping`: the mariadb:11 tag now resolves
+        # to 11.8, which dropped the mysql* symlinks, so the probe never ran and
+        # the container was reported unhealthy while the server was up. It is
+        # also the honest readiness signal — the entrypoint boots once on port 0
+        # for its own init before the real 3306 listener exists, and a bare ping
+        # answers during that window.
         options: >-
-          --health-cmd="mysqladmin ping -proot"
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -282,7 +288,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          # Node 24, NOT 22: the fixture app installs from a bare package.json,
+          # and npm 10 (bundled with Node 22) crashes resolving vitest 4's peer
+          # set with "Cannot read properties of null (reading 'edgesOut')".
+          # npm 11 resolves the same tree.
+          node-version: '24'
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4

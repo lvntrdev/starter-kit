@@ -4,10 +4,10 @@ namespace Lvntr\StarterKit\Domain\User\Queries;
 
 use App\Enums\RoleEnum;
 use App\Http\Resources\Admin\User\UserResource;
-use App\Http\Responses\ApiResponse;
 use App\Http\Responses\DatatableQueryBuilder;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Lvntr\StarterKit\Http\Responses\ApiResponse;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 

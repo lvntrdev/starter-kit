@@ -1,56 +1,3 @@
-# PHPStan baseline — Larastan level 5, package runtime only (see phpstan.neon).
-#
-# A DELIBERATE record, not a dumping ground. Triaged in 13.7.0 (MRG-14): every
-# typing gap that could be closed with a docblock, without touching runtime
-# behaviour, was fixed instead of suppressed (238 -> 201 errors, 193 -> 157
-# rules — the 259 -> 238 / 212 -> 193 first pass narrowed identifier() noise;
-# this pass closed stubs/app/Models/* @property gaps: ContentLanguage,
-# Definition, User, Role::$sort_order, plus the ContentLanguageResource
-# @mixin errors that resolved once the model docblock did). What is left
-# falls into two categories, and both stay on purpose.
-#
-# 1. DELIBERATE DEFENSIVE CODE — the analyser is right about the declared types
-#    and wrong about the world.
-#      function.alreadyNarrowedType · instanceof.alwaysTrue · identical.always*
-#      booleanAnd.* · booleanOr.* · booleanNot.* · match.alwaysTrue
-#      greaterOrEqual.alwaysTrue · deadCode.unreachable · nullCoalesce.offset
-#      nullsafe.neverNull · arrayValues.list
-#    The kit is fail-closed: an is_string() on a value the signature already
-#    calls a string, or a `?? 0` on a key a docblock promises, guards a trust
-#    boundary the type system cannot see — HTTP input, a consumer-implemented
-#    handler, a config() value, a third-party model. DO NOT delete one of these
-#    because PHPStan calls it unreachable. If one looks genuinely dead, remove
-#    it in its own commit with a test, never by shrinking this file.
-#    Same bucket, other reason: trait.unused / method.unused /
-#    classConstant.unused are seams kept for consumers and tests, and
-#    larastan.noEnvCallsOutsideOfConfig is the installer / encryption surface,
-#    which MUST read raw .env state rather than cached config.
-#
-# 2. SCANNING-SCOPE LIMITS — not code debt.
-#      property.notFound · staticMethod.notFound · method.notFound
-#      class.notFound · foreach.nonIterable · argument.type · return.type
-#      argument.unresolvableType · property.protected · new.static
-#      larastan.console.undefinedOption
-#    The runtime is analysed alone yet addresses symbols it does not own:
-#    third-party model properties/columns the kit's own migrations bolt on
-#    (Laravel\Passport\Client::$name, ::$user_id on Token, Media::$folder_id
-#    added to Spatie's own MediaLibrary Media class), traits the CONSUMER
-#    applies (SoftDeletes -> onlyTrashed()/withTrashed(), InteractsWithMedia
-#    -> addMedia()), generic Illuminate\Database\Eloquent\Model typed morph
-#    targets/pivots, and class-string<Model> values resolved from config at
-#    runtime. new.static is the BaseDTO factory idiom. larastan.console.
-#    undefinedOption is one trait method analysed in the context of every
-#    command using the trait, although only sk:publish and sk:eject — which
-#    both declare --destination — call it.
-#    Closing the remaining property.notFound/staticMethod.notFound entries
-#    needs PHPStan stub files for Passport / MediaLibrary (they are
-#    third-party classes we do not own the source of): a separate task,
-#    outside the package runtime.
-#
-# Regenerate from a CLEAN tree (a dirty one absorbs in-flight errors):
-#   vendor/bin/phpstan analyse --generate-baseline
-# then restore this header — PHPStan drops it.
-
 parameters:
 	ignoreErrors:
 		-
@@ -66,39 +13,15 @@ parameters:
 			path: src/Console/Commands/EncryptionHealthCommand.php
 
 		-
-			message: '#^Command "encryption\:key" does not have option "destination"\.$#'
-			identifier: larastan.console.undefinedOption
-			count: 1
-			path: src/Console/Commands/EncryptionKeyCommand.php
-
-		-
-			message: '#^Call to function is_string\(\) with non\-empty\-string will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: src/Console/Commands/EncryptionRekeyCommand.php
-
-		-
 			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
-			count: 2
-			path: src/Console/Commands/EncryptionRekeyCommand.php
-
-		-
-			message: '#^Command "env\:sync" does not have option "destination"\.$#'
-			identifier: larastan.console.undefinedOption
 			count: 1
-			path: src/Console/Commands/EnvSyncCommand.php
+			path: src/Console/Commands/EncryptionRekeyCommand.php
 
 		-
 			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
 			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 11
-			path: src/Console/Commands/InstallCommand.php
-
-		-
-			message: '#^Command "sk\:install" does not have option "destination"\.$#'
-			identifier: larastan.console.undefinedOption
-			count: 1
 			path: src/Console/Commands/InstallCommand.php
 
 		-
@@ -126,24 +49,6 @@ parameters:
 			path: src/Console/Commands/InstallCommand.php
 
 		-
-			message: '#^Command "make\:domain" does not have option "destination"\.$#'
-			identifier: larastan.console.undefinedOption
-			count: 1
-			path: src/Console/Commands/MakeDomainCommand.php
-
-		-
-			message: '#^Command "make\:sk\-domain" does not have option "destination"\.$#'
-			identifier: larastan.console.undefinedOption
-			count: 1
-			path: src/Console/Commands/MakeDomainCommand.php
-
-		-
-			message: '#^Command "sk\-make\:domain" does not have option "destination"\.$#'
-			identifier: larastan.console.undefinedOption
-			count: 1
-			path: src/Console/Commands/MakeDomainCommand.php
-
-		-
 			message: '#^Match arm comparison between ''morphto'' and ''morphto'' is always true\.$#'
 			identifier: match.alwaysTrue
 			count: 1
@@ -168,30 +73,6 @@ parameters:
 			path: src/Console/Commands/RedactActivityLogSecretsCommand.php
 
 		-
-			message: '#^Command "remove\:domain" does not have option "destination"\.$#'
-			identifier: larastan.console.undefinedOption
-			count: 1
-			path: src/Console/Commands/RemoveDomainCommand.php
-
-		-
-			message: '#^Command "remove\:sk\-domain" does not have option "destination"\.$#'
-			identifier: larastan.console.undefinedOption
-			count: 1
-			path: src/Console/Commands/RemoveDomainCommand.php
-
-		-
-			message: '#^Command "sk\-remove\:domain" does not have option "destination"\.$#'
-			identifier: larastan.console.undefinedOption
-			count: 1
-			path: src/Console/Commands/RemoveDomainCommand.php
-
-		-
-			message: '#^Command "sk\:update" does not have option "destination"\.$#'
-			identifier: larastan.console.undefinedOption
-			count: 1
-			path: src/Console/Commands/UpdateCommand.php
-
-		-
 			message: '#^Constant Lvntr\\StarterKit\\Console\\Commands\\UpdateCommand\:\:VENDOR_MIGRATED_PATHS is unused\.$#'
 			identifier: classConstant.unused
 			count: 1
@@ -208,12 +89,6 @@ parameters:
 			identifier: nullCoalesce.offset
 			count: 1
 			path: src/Console/Commands/UpdateCommand.php
-
-		-
-			message: '#^Command "sk\:upgrade" does not have option "destination"\.$#'
-			identifier: larastan.console.undefinedOption
-			count: 1
-			path: src/Console/Commands/UpgradeCommand.php
 
 		-
 			message: '#^Comparison operation "\>\=" between int\<80400, 80599\> and 80400 is always true\.$#'

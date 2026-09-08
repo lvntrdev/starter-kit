@@ -2,9 +2,9 @@
 
 namespace Lvntr\StarterKit\Domain\Role\Queries;
 
-use App\Http\Responses\ApiResponse;
 use App\Http\Responses\DatatableQueryBuilder;
 use App\Models\Role;
+use Lvntr\StarterKit\Http\Responses\ApiResponse;
 
 /**
  * Query: Build the role datatable response with permission and user counts.
