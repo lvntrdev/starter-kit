@@ -13,14 +13,18 @@
  * ancestor outspecifies the always-loaded `main` counterpart.
  */
 
-html[data-sk-theme='aura'] .sk-card__head--page .admin-page-header {
-    @apply mb-0 w-full gap-3.5;
+/* Every host marks its container with `data-sk-page-header`, so the page strip's
+   own bottom margin is stripped once, here — a host that only ever needed that
+   (a card's or a datatable toolbar's action row, where the header sits next to
+   the surface's own title) needs no rule of its own, and the next host added
+   inherits the reset instead of shipping the 24px gap that pushed the back
+   button off the action row's centre line. */
+html[data-sk-theme='aura'] [data-sk-page-header] .admin-page-header {
+    @apply mb-0;
 }
 
-/* Card with a title of its own: the header keeps only its back button and page
-   actions and sits in the card's own head row, next to that title. */
-html[data-sk-theme='aura'] .sk-card__actions .admin-page-header {
-    @apply mb-0;
+html[data-sk-theme='aura'] .sk-card__head--page .admin-page-header {
+    @apply w-full gap-3.5;
 }
 
 /* File manager: the header is drawn at the top of the 232px sidebar rail, above

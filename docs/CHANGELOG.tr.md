@@ -2,6 +2,12 @@
 
 Starter kit'e yeni eklenen özellikler ve iyileştirmeler burada listelenir.
 
+## 2026-09-08 — v13.7.2
+
+### Düzeltildi
+
+- **Geri butonu artık yanındaki oluştur butonundan bir satır yukarıda durmuyor.** `.admin-page-header` sayfa şeridinin kendi `mb-6`'sını taşıyor ve aura bunu host başına sıfırlıyordu — `.sk-card__head--page`, `.sk-card__actions` ve `.fm-sidebar__page-header` için birer kural. Tablonun kendi başlığı olduğunda header'ı host eden datatable toolbar aksiyon satırı bu listede hiç yoktu, dolayısıyla 24px'lik alt boşluğu header'ı satırın merkez çizgisinden yukarı itiyordu. Sıfırlama artık her host'un verdiği `data-sk-page-header` işaretine bağlı; hepsine birden uygulanıyor ve eklenecek yeni host aynı boşlukla gelmek yerine sıfırlamayı devralıyor. `FileManagerSidebar`'a da eksik olan işaret eklendi.
+
 ## 2026-09-08 — v13.7.1
 
 ### Düzeltildi

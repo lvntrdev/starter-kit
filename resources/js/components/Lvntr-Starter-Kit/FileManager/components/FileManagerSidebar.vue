@@ -78,6 +78,7 @@
         <div
             v-if="$slots.header"
             class="fm-sidebar__page-header mb-3 shrink-0 border-b border-surface-200 pb-2 dark:border-surface-700"
+            data-sk-page-header
         >
             <slot name="header" />
         </div>

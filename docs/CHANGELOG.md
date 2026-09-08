@@ -2,6 +2,12 @@
 
 Newly added features and improvements to the starter kit are listed here.
 
+## 2026-09-08 — v13.7.2
+
+### Fixed
+
+- **The back button no longer sits a line above the create button it stands next to.** `.admin-page-header` carries the page strip's own `mb-6`, and aura stripped it per host — one rule each for `.sk-card__head--page`, `.sk-card__actions` and `.fm-sidebar__page-header`. The datatable toolbar's action row, which hosts the header whenever the table has a title of its own, was never on that list, so its 24px bottom margin pushed the header off the row's centre line. The reset now hangs off the `data-sk-page-header` marker every host sets, so it applies to all of them at once and the next host added inherits it instead of shipping the same gap; `FileManagerSidebar` gained the marker it was missing.
+
 ## 2026-09-08 — v13.7.1
 
 ### Fixed
