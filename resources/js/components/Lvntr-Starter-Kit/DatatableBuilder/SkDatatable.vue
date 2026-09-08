@@ -1270,7 +1270,7 @@
                      Branching on the title rather than on the whole heading block is
                      deliberate — a table with only a subtitle still hosts the header,
                      and the earlier `title || subtitle` branch swallowed it. -->
-                <div v-else-if="hostsPageHeader" class="sk-dt-toolbar__page-header">
+                <div v-else-if="hostsPageHeader" class="sk-dt-toolbar__page-header" data-sk-page-header>
                     <component :is="hostedPageHeader" />
                     <div v-if="config.subtitle" class="sk-dt-toolbar__subtitle">{{ $t(config.subtitle) }}</div>
                 </div>
@@ -1284,7 +1284,16 @@
                 <div
                     v-if="config.createButton || $slots.toolbar || $slots['toolbar-start'] || (hostsPageHeader && !!config.title)"
                     class="sk-dt-toolbar__actions"
+                    :data-sk-page-header="hostsPageHeader && config.title ? '' : undefined"
                 >
+                    <!-- Layout page header (back button + page actions) when this
+                         toolbar's own title stands in for the page heading. First,
+                         same as SkCard — back is navigation, not a page action. -->
+                    <component
+                        :is="hostedPageHeader"
+                        v-if="hostsPageHeader && config.title"
+                    />
+
                     <!-- Custom slot — rendered before (to the left of) the create button -->
                     <slot name="toolbar-start" />
 
@@ -1320,13 +1329,6 @@
 
                     <!-- Custom toolbar slot -->
                     <slot name="toolbar" />
-
-                    <!-- Layout page header (back button + page actions) when this
-                         toolbar's own title stands in for the page heading -->
-                    <component
-                        :is="hostedPageHeader"
-                        v-if="hostsPageHeader && config.title"
-                    />
                 </div>
 
                 <!-- Titled toolbar: the head row ends here so search + filters wrap
