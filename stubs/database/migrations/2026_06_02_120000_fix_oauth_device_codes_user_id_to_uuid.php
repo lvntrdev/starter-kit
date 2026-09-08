@@ -46,20 +46,28 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Deliberately a no-op — the forward step is conditional, and there is no
+     * honest way to tell the two starting points apart afterwards.
+     *
+     * up() only acts on a legacy bigint column; on a fresh install (where the
+     * create migration already declares foreignUuid) it does nothing at all.
+     * The column reads as uuid either way once the batch has run, so a down()
+     * that converts uuid back to bigint would rewrite the schema of an install
+     * this migration never touched. MySQL takes that conversion silently;
+     * MariaDB >= 10.7, where uuid() is the native 16-byte type rather than
+     * char(36), refuses it outright ("Cannot cast 'uuid' as 'bigint unsigned'
+     * in assignment") and fails the rollback.
+     *
+     * Nothing is lost by standing still. The values up() nulled were invalid
+     * identifiers by definition and no type change brings them back, and a
+     * full-batch rollback drops the table through the create migration anyway.
+     * A single-step rollback leaves the column as uuid, which up() then reads
+     * as already-repaired and skips.
+     */
     public function down(): void
     {
-        $schema = Schema::connection($this->getConnection());
-
-        if (! $schema->hasTable('oauth_device_codes')) {
-            return;
-        }
-
-        // Restore the legacy integer column (rollback to the pre-fix schema).
-        if ($this->isUuidColumn('oauth_device_codes', 'user_id')) {
-            $schema->table('oauth_device_codes', function (Blueprint $table) {
-                $table->unsignedBigInteger('user_id')->nullable()->change();
-            });
-        }
+        // Intentionally empty. See the docblock above.
     }
 
     /**
