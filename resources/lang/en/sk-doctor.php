@@ -107,6 +107,14 @@ return [
         'configured' => 'Mail driver ":transport" is configured.',
     ],
 
+    // MissingKitDependenciesCheck
+    'missing_kit_dependencies' => [
+        'name' => 'Kit Dependencies',
+        'all_installed' => 'All packages required by the kit are installed.',
+        'missing' => 'Missing kit dependencies: :packages.',
+        'missing_hint' => 'Run composer update lvntr/laravel-starter-kit -W to install them.',
+    ],
+
     // NodeVersionCheck
     'node_version' => [
         'name' => 'Node Version',

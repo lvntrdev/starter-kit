@@ -13,6 +13,7 @@ use Lvntr\StarterKit\Console\Doctor\Checks\FileManagerDiskCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\LogChannelCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\LogStackCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\MailDriverCheck;
+use Lvntr\StarterKit\Console\Doctor\Checks\MissingKitDependenciesCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\NodeVersionCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\NpmBuildArtifactsCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\PassportKeysCheck;
@@ -111,6 +112,7 @@ class DoctorCommand extends Command
             new ConfigCacheCheck,
             new FileManagerDiskCheck,
             new ThemeManifestCheck,
+            new MissingKitDependenciesCheck,
         ];
 
         $only = $this->option('only');

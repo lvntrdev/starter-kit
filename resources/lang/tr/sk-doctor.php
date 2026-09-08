@@ -105,6 +105,14 @@ return [
         'configured' => 'Mail sürücüsü ":transport" yapılandırılmış.',
     ],
 
+    // MissingKitDependenciesCheck
+    'missing_kit_dependencies' => [
+        'name' => 'Kit Bağımlılıkları',
+        'all_installed' => 'Kit tarafından gereken tüm paketler kurulu.',
+        'missing' => 'Eksik kit bağımlılıkları: :packages.',
+        'missing_hint' => '`composer update lvntr/laravel-starter-kit -W` komutunu çalıştırın.',
+    ],
+
     // NodeVersionCheck
     'node_version' => [
         'name' => 'Node Sürümü',

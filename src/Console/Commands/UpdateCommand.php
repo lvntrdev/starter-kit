@@ -11,6 +11,7 @@ use Lvntr\StarterKit\Console\Commands\Concerns\RefusesPackageSourceTree;
 use Lvntr\StarterKit\Console\Commands\Concerns\WritesFilesAtomically;
 use Lvntr\StarterKit\StarterKitServiceProvider;
 use Lvntr\StarterKit\Support\DocsLink;
+use Lvntr\StarterKit\Support\KitDependencies;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\multiselect;
@@ -697,6 +698,11 @@ class UpdateCommand extends Command
         // Summary
         $this->newLine();
         $this->printSummary($dryRun);
+
+        // Reported after the summary rather than inside it: a missing kit
+        // dependency is true regardless of whether this run touched any file,
+        // and printSummary() returns early on "Everything is up to date!".
+        $this->reportMissingDependencies($dryRun);
 
         // A failed database step does not roll back the file work above, and the
         // hash registry deliberately still records it: the stub copies really are
@@ -2153,5 +2159,84 @@ PHP;
             $this->components->warn('Run the following commands to apply frontend changes:');
             $this->line('  <fg=cyan>npm install && npm run build</>');
         }
+    }
+
+    /**
+     * Report kit-required Composer packages the consumer app does not have, and
+     * offer to pull them in.
+     *
+     * A newer kit release can add a `require` entry that the consumer's
+     * `composer.lock` predates (the app was updated with `--no-update`, a
+     * package was removed by hand, or the lock drifted). The kit code that
+     * depends on it then dies at runtime with an opaque "class not found", far
+     * from the update that introduced it.
+     *
+     * Composer is only ever run after an explicit yes: `--dry-run`,
+     * `--no-interaction` and any TTY-less session (CI, piped stdin) print the
+     * command and start no process. The prompt's default is `false` for the
+     * same reason — every fallback path a prompt can take here resolves to "do
+     * not run". The exit code is untouched on both outcomes: this is advisory,
+     * and a failed `composer update` is not a failed `sk:update`.
+     */
+    private function reportMissingDependencies(bool $dryRun): void
+    {
+        $missing = KitDependencies::missing();
+
+        if ($missing === []) {
+            return;
+        }
+
+        $command = [...$this->findComposerBinary(), 'update', 'lvntr/laravel-starter-kit', '-W'];
+        $printable = implode(' ', $command);
+
+        $this->newLine();
+        $this->components->warn('Packages the kit requires are NOT installed: '.implode(', ', $missing));
+        $this->line('  <fg=gray>Every kit feature that depends on them stays broken until they are installed.</>');
+
+        // Same "is there anybody to ask?" test the install command uses before a
+        // prompt (see InstallCommand::promptForRecipes()).
+        $canPrompt = ! $dryRun
+            && ! $this->option('no-interaction')
+            && $this->input->isInteractive()
+            && defined('STDIN')
+            && stream_isatty(STDIN);
+
+        if (! $canPrompt || ! confirm('Run `'.$printable.'` now?', default: false)) {
+            $this->line('  <fg=cyan>'.$printable.'</>');
+
+            return;
+        }
+
+        $installed = spin(
+            fn (): bool => $this->runProcessStep($command, timeout: 300),
+            'Installing missing packages...',
+        );
+
+        if ($installed) {
+            $this->components->info('Missing packages are now installed.');
+
+            return;
+        }
+
+        $this->components->warn($this->stepFailureDetail ?? '`composer update` failed.');
+        $this->line('  <fg=gray>Run it by hand:</>');
+        $this->line('  <fg=cyan>'.$printable.'</>');
+        $this->stepFailureDetail = null;
+    }
+
+    /**
+     * Locate the composer executable, same resolution InstallCommand uses: a
+     * project-local `composer.phar` when there is one, else whatever `composer`
+     * PATH resolves to.
+     *
+     * @return list<string>
+     */
+    private function findComposerBinary(): array
+    {
+        if ($this->files->exists(base_path('composer.phar'))) {
+            return [PHP_BINARY, base_path('composer.phar')];
+        }
+
+        return ['composer'];
     }
 }

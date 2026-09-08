@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Lvntr\StarterKit\Console\Commands\DoctorCommand;
 use Lvntr\StarterKit\Console\Doctor\Checks\DataEncryptionKeyCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\LogStackCheck;
+use Lvntr\StarterKit\Console\Doctor\Checks\MissingKitDependenciesCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\NodeVersionCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\QueueWorkerCheck;
 use Lvntr\StarterKit\Console\Doctor\Checks\ScheduleConfiguredCheck;
@@ -559,5 +560,27 @@ test('DataEncryptionKeyCheck sk:doctor --only seçicisiyle tek başına çalış
 
     expect($decoded['checks'])->toHaveCount(1)
         ->and($decoded['checks'][0]['name'])->toBe('Data Encryption Key')
+        ->and($decoded['checks'][0]['status'])->toBe('ok');
+});
+
+/*
+| MissingKitDependenciesCheck — registration + OK against this repo's own,
+| fully installed composer state (KitDependencies::missing() detection logic
+| itself is covered by KitDependenciesTest.php; this only checks the report
+| shape and doctor registry wiring).
+*/
+
+test('MissingKitDependenciesCheck bu repo kurulu haliyle OK döner', function () {
+    $report = (new MissingKitDependenciesCheck)->run();
+
+    expect($report)->toBeInstanceOf(DoctorReport::class)
+        ->and($report->isOk())->toBeTrue();
+});
+
+test('MissingKitDependenciesCheck sk:doctor kayıtlı check kümesinde yer alır', function () {
+    Artisan::call('sk:doctor', ['--json' => true, '--only' => 'missing-kit-dependencies']);
+    $decoded = json_decode(Artisan::output(), true);
+
+    expect($decoded['checks'])->toHaveCount(1)
         ->and($decoded['checks'][0]['status'])->toBe('ok');
 });
