@@ -289,6 +289,19 @@ A new config key, `starter-kit.security.csp_nonce` (env `STARTER_KIT_CSP_NONCE`)
 
 With the flag off, the `nonce="..."` attribute on that script tag renders empty and is inert — a CSP with no nonce-source still honours `'unsafe-inline'` — so adding the attribute ahead of time is always safe. `style-src 'unsafe-inline'` is unaffected either way; PrimeVue writes inline styles at runtime and cannot be nonce'd.
 
+### The API documentation surface moved to api-dock — the old `/docs/api` URL is gone
+
+**Affects:** every install; the kit's own API documentation reading surface changed. **Not affected:** the JSON API itself (`/api/v1/...`) — only where you go to read its OpenAPI document.
+
+The kit now depends on a new package, `lvntr/api-dock`, and it — not Scramble's own bundled UI — is the documentation surface from 13.7.0 on. api-dock documents the exact same `default` Scramble API the kit already generates from route attributes; nothing about how you annotate a controller or route changes. What changed is where you go to read it and who is allowed to: Scramble's default routes are now explicitly disabled (`Scramble::ignoreDefaultRoutes()`), so **`/docs/api` and `/docs/api.json` return 404** on any app that updates — there is no redirect and no grace period. The panel now lives at `/api-dock` (the raw OpenAPI document at `/api-dock/spec`), and unlike the old Scramble route, it is gated behind the seeded `api-docs.read` permission — the same one the API Routes screen already used. If you had bookmarked the old URL, linked it from internal documentation, or pointed a CI/tooling step at it, update it to `/api-dock`.
+
+**What to check:**
+
+- `sk:update` publishes `config/api-dock.php` and the panel's compiled assets (`--tag=api-dock-assets`) the same way it publishes any other config/asset tag — nothing extra to run by hand on a normal `sk:update`.
+- Authorization does not wait for that publish step. api-dock's own packaged defaults serve the panel, the `/api-dock/spec` document and the try-it proxy behind `['web']` alone, so if you run `composer update` and stop there, the kit disables api-dock outright rather than leave it anonymous. Once `App\Http\Middleware\CheckApiDocsAccess` exists in your app, the kit stacks `['web', 'auth', CheckApiDocsAccess::class]` on it automatically. Both behaviours only apply while `api-dock.middleware` is still the untouched `['web']` default — publish the config and set your own middleware stack and the kit steps aside completely.
+- If you previously ran `php artisan vendor:publish --tag=scramble-config` and have your own `config/scramble.php` committed, open it and confirm it does not itself re-register Scramble's default docs route (e.g. by calling `Scramble::routes()` or clearing `ignoreDefaultRoutes()`) — a published config predating this change cannot do that on its own, but a hand-edited one might, and it would compete with api-dock for the same document.
+- The four new `api-dock:*` Artisan commands (`export`, `diff`, `sync`, `agent-guide`) and the AI-oriented `llms.txt`/MCP exports are opt-in tooling, not part of the upgrade path — see [docs/api.md](api.md) and `config/api-dock.php` for what each does.
+
 ### Standing ops notes with no prior home
 
 A few behaviors already shipped in earlier releases had no documented home; noting them here so they're discoverable going forward:

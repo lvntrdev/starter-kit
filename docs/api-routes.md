@@ -7,8 +7,8 @@ The ApiRoutes module exposes the application's API and service route surface ins
 - lists API endpoints from inside the panel
 - shows service routes in a separate section
 - displays HTTP method, URI, route name, action, and middleware
-- lets admins regenerate the Scramble-based API docs
-- provides a shortcut to the `/docs/api` documentation page
+- lets admins regenerate the api-dock OpenAPI document
+- provides a shortcut to the `/api-dock` documentation panel
 - pushes the spec to Postman as a fresh collection
 - pushes the spec to Apidog and overwrites the target project
 
@@ -42,8 +42,8 @@ Each entry shows:
 
 Page actions:
 
-- **Regenerate Docs**: rebuilds the Scramble export
-- **Open API Docs**: opens `/docs/api` in a new tab
+- **Regenerate Docs**: rebuilds the api-dock OpenAPI document and writes it to an `admin/` subdirectory of `config('api-dock.ai.export_path')` — `storage/api-dock/admin/openapi.json` by default. It deliberately does not write to the export root, because that path is also the default `api-dock.snapshot.path` that `api-dock:diff` / `api-dock:sync --check` compare against; overwriting it from the panel would silently rewrite the CI baseline.
+- **Open API Docs**: opens the api-dock panel in a new tab. The URL is resolved server-side from the `api-dock.docs` named route, so a custom `api-dock.route_prefix` is honoured; when api-dock is absent or disabled the button is not rendered.
 
 ## Backend Structure
 
@@ -65,12 +65,12 @@ The project also defines related permission entries such as `api-docs.read`. For
 
 The admin page ships two extra toolbar buttons next to **Regenerate Docs**:
 
-- **Sync to Postman**: runs `SyncPostmanAction`, which exports the current Scramble spec and uploads it to Postman's `POST /import/openapi` endpoint with `folderStrategy=Tags`. Each sync imports a fresh collection, persists the new UID to settings, then best-effort deletes the previous collection — an `import-first, delete-after` sequence so a transient Postman outage cannot leave the workspace without a working collection.
-- **Sync to Apidog**: runs `SyncApidogAction`, which uploads the same spec to Apidog's `POST /v1/projects/{id}/import-openapi` endpoint as inline JSON with `OVERWRITE_EXISTING` mode.
+- **Sync to Postman**: runs `SyncPostmanAction`, which builds the current OpenAPI document through api-dock's `DocumentGenerator` and uploads it to Postman's `POST /import/openapi` endpoint with `folderStrategy=Tags`. Each sync imports a fresh collection, persists the new UID to settings, then best-effort deletes the previous collection — an `import-first, delete-after` sequence so a transient Postman outage cannot leave the workspace without a working collection.
+- **Sync to Apidog**: runs `SyncApidogAction`, which uploads the same document to Apidog's `POST /v1/projects/{id}/import-openapi` endpoint as inline JSON with `OVERWRITE_EXISTING` mode.
 
 Both buttons share a loading spinner and a result toast. If the matching credentials are missing, the button is disabled and a hint redirects to **Settings → API Clients**, where the `postman` and `apidog` settings groups live. The secret fields (`postman.api_key`, `apidog.access_token`) are encrypted at rest via the `sensitive_keys` list in [config/settings.php](../stubs/config/settings.php).
 
-The Actions share a helper, `App\Domain\ApiRoute\Support\OpenApiExporter`, which runs `scramble:export` into a per-request temp file under `storage/app/postman/` and cleans up in a `finally` block — the CLI command and the admin UI button can run concurrently without racing on a shared file. The spec is handed to the target client **unchanged**; content-type rewriting is deliberately avoided so the pushed collection mirrors the real server contract.
+The Actions share a helper, `Lvntr\StarterKit\Domain\ApiRoute\Support\OpenApiExporter` (vendor-resident, `src/Domain/ApiRoute/`), which resolves api-dock's `DocumentGenerator` from the container — the same entry point the `/api-dock` panel and every `api-dock:*` console command use, so what gets pushed to Postman/Apidog is byte-for-byte what the panel renders. The document is handed to the target client **unchanged**; content-type rewriting is deliberately avoided so the pushed collection mirrors the real server contract.
 
 The same flows are exposed on the CLI for CI use:
 

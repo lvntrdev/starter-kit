@@ -637,6 +637,33 @@ class UpdateCommand extends Command
             }
         }
 
+        // 5c. Republish api-dock's compiled panel.
+        //
+        // The bundle in public/vendor/api-dock is vendor output that Composer
+        // never places, and nothing else in the update path publishes it: a
+        // consumer who deploys with `composer install` (the usual production
+        // path) does not run Laravel's `post-update-cmd`, which is where the
+        // stock skeleton republishes the `laravel-assets` tag. Without this the
+        // panel keeps serving the PREVIOUS release's JS/CSS against a newer
+        // package — or has no assets at all on the release that introduced it.
+        //
+        // Unconditional and unprompted: an asset directory carries no user
+        // edits to protect, and a half-updated bundle is a broken panel.
+        if (! $dryRun) {
+            $published = spin(function () {
+                return $this->runArtisan('vendor:publish', [
+                    '--tag' => 'api-dock-assets',
+                    '--force' => true,
+                ]);
+            }, 'Publishing API Dock panel assets...');
+
+            if (! $published) {
+                $failedSteps[] = 'Publishing API Dock panel assets';
+                $this->components->error($this->stepFailureDetail ?? 'API Dock assets could not be published.');
+                $this->stepFailureDetail = null;
+            }
+        }
+
         // 6. Update hash registry
         if (! $dryRun) {
             $this->updateHashRegistry();

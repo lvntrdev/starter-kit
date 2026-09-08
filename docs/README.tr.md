@@ -20,6 +20,7 @@ Tüm dökümanlar bu `docs/` klasöründe yer alır. Her konunun İngilizce ve T
 | [api.tr.md](./api.tr.md) | `/api/v1` altında versiyonlanmış JSON API; `ApiResponse` / `ApiException` zarfı |
 | [api-clients.tr.md](./api-clients.tr.md) | Passport OAuth2 client ve Personal Access Token yönetimi için admin arayüzü |
 | [api-routes.tr.md](./api-routes.tr.md) | API Routes admin modülü — uygulamanın route yüzeyini incele |
+| [api-ai-metadata.tr.md](./api-ai-metadata.tr.md) | AI odaklı API metadata attribute'ları (`AiHint`, `AiPitfall`, `AiChangelog`, `AiExample`, `AiTool`, `ApiFeature`) ve `llms.txt` / MCP dışa aktarım yüzeyi |
 | [module-routes.tr.md](./module-routes.tr.md) | Modül route kaydı — vendor route gruplarının consumer uygulamaya nasıl bağlandığı |
 | [definitions.tr.md](./definitions.tr.md) | DB tabanlı enum arama sistemi (`DefinitionService`, `definition()` helper) |
 | [wayfinder.tr.md](./wayfinder.tr.md) | Laravel Wayfinder ile üretilen tip güvenli TypeScript route fonksiyonları |

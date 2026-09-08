@@ -9,8 +9,9 @@ This project is built on top of **Lvntr Starter Kit** (`lvntr/laravel-starter-ki
 The kit ships an admin-first scaffolding for Laravel 13 / Inertia v3 / Vue 3 /
 PrimeVue 4 / Tailwind 4: authentication (Fortify + Passport), users / roles /
 permissions, activity & audit logs, settings panel, file manager, definitions,
-a slot-based theme system, a fluent Vue component library (FormBuilder,
-DatatableBuilder, TabBuilder), and a DDD-flavored domain layer.
+API documentation (the `/api-dock` panel via `lvntr/api-dock`), a slot-based
+theme system, a fluent Vue component library (FormBuilder, DatatableBuilder,
+TabBuilder), and a DDD-flavored domain layer.
 
 The kit is **vendor-first** (v13.6.0+). Three things matter:
 
@@ -249,8 +250,8 @@ vendor-precompiled JSON. Only the active locale is lazy-loaded at runtime.
 
 This skill is a lean gate; heavy reference is read on demand:
 - Project file shape after `sk:install` (vendor-first layout, what is app-owned) → `references/project-shape.md`
-- Command reference (install incl. `--adopt`/first-install-only rules, update/publish/upgrade/doctor/eject, make:sk-domain incl. `--with=`, seed-permissions, purge-trash, encryption key/rekey/health, site:install, env:sync, wayfinder:generate) → `references/commands.md`
-- Built-in modules (file manager, activity & audit log, settings panel, definitions, OAuth/Passport, theme system) → `references/modules.md`
+- Command reference (install incl. `--adopt`/first-install-only rules, update/publish/upgrade/doctor/eject, make:sk-domain incl. `--with=`, seed-permissions, purge-trash, encryption key/rekey/health, api-dock sync/diff/export/agent-guide, site:install, env:sync, wayfinder:generate) → `references/commands.md`
+- Built-in modules (file manager, activity & audit log, settings panel, definitions, OAuth/Passport, API documentation (`/api-dock`), theme system) → `references/modules.md`
 - Safe update flow (`sk:update`, hash registry, SAFE_UPDATE vs NEVER_UPDATE vs vendor-resident) → `references/update-flow.md`
 - "Where to look" lookup table (which pattern lives in which file) → `references/lookup.md`
 

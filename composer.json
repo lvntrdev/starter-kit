@@ -29,6 +29,7 @@
     "laravel/fortify": "^1.35",
     "laravel/passport": "^13.5",
     "laravel/wayfinder": "^0.1",
+    "lvntr/api-dock": "~0.0.1",
     "nikic/php-parser": "^5.0",
     "spatie/laravel-activitylog": "^5.0",
     "spatie/laravel-medialibrary": "^11.23",

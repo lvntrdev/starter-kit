@@ -28,7 +28,7 @@ File Manager; medya yükleme, klasörleme, çöp kutusu, geri yükleme ve imzal�
 
 ## API ve Token Yönetimi
 
-Laravel Passport ile OAuth2 API erişimi, API client yönetimi ve personal access token akışları desteklenir. Admin paneli üzerinden API istemcileri ve token'lar kontrol edilebilir.
+Laravel Passport ile OAuth2 API erişimi, API client yönetimi ve personal access token akışları desteklenir. Admin paneli üzerinden API istemcileri ve token'lar kontrol edilebilir. Uç noktalar ayrıca [AI odaklı metadata](./api-ai-metadata.tr.md) taşıyabilir — ipucu, tuzak, örnek ve changelog — bunlar `llms.txt` ve MCP tool tanımları olarak dışa aktarılır.
 
 ## Sistem Sağlığı
 

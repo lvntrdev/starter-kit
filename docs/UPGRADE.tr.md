@@ -289,6 +289,19 @@ Yeni bir config anahtarı, `starter-kit.security.csp_nonce` (env `STARTER_KIT_CS
 
 Bayrak kapalıyken o script etiketindeki `nonce="..."` özniteliği boş render edilir ve etkisizdir — nonce kaynağı olmayan bir CSP hâlâ `'unsafe-inline'`'ı onaylıyor — dolayısıyla özniteliği önceden eklemek her zaman güvenlidir. `style-src 'unsafe-inline'` her iki durumda da etkilenmiyor; PrimeVue çalışma zamanında inline stiller yazıyor ve nonce'lanamıyor.
 
+### API dökümantasyon yüzeyi api-dock'a taşındı — eski `/docs/api` URL'i gitti
+
+**Etkilenen:** her kurulum; kitin kendi API dökümantasyon okuma yüzeyi değişti. **Etkilenmeyen:** JSON API'nin kendisi (`/api/v1/...`) — yalnızca OpenAPI belgesini okumaya gittiğiniz yer değişti.
+
+Kit artık yeni bir pakete bağımlı: `lvntr/api-dock` — ve 13.7.0'dan itibaren dökümantasyon yüzeyi Scramble'ın kendi paketlenmiş arayüzü değil, bu. api-dock, kitin route attribute'larından zaten ürettiği aynı `default` Scramble API'sini belgeliyor; bir controller veya route'u nasıl annotate ettiğiniz konusunda hiçbir şey değişmiyor. Değişen şey, onu okumaya nereye gittiğiniz ve kimin erişebileceği: Scramble'ın varsayılan rotaları artık bilerek devre dışı bırakıldı (`Scramble::ignoreDefaultRoutes()`), yani **`/docs/api` ve `/docs/api.json` güncelleyen her uygulamada 404 dönüyor** — yönlendirme yok, geçiş süresi yok. Panel artık `/api-dock` adresinde yaşıyor (ham OpenAPI belgesi `/api-dock/spec`'te), ve eski Scramble rotasının aksine, seed edilen `api-docs.read` izninin arkasında korunuyor — API Routes ekranının zaten kullandığı aynı izin. Eski URL'i yer imlerine eklediyseniz, dahili dökümantasyondan link verdiyseniz veya bir CI/tooling adımını ona işaret ettiyseniz, `/api-dock`'a güncelleyin.
+
+**Kontrol edilecekler:**
+
+- `sk:update`, `config/api-dock.php`'yi ve panelin derlenmiş asset'lerini (`--tag=api-dock-assets`) başka bir config/asset tag'i yayınladığı gibi yayınlıyor — normal bir `sk:update`'te elle çalıştırılacak ekstra bir şey yok.
+- Yetkilendirme bu publish adımını beklemiyor. api-dock'un kendi paket varsayılanları paneli, `/api-dock/spec` belgesini ve try-it proxy'sini yalnız `['web']` arkasında sunuyor; bu yüzden `composer update` çalıştırıp orada durursanız kit api-dock'u anonim bırakmak yerine tamamen kapatıyor. Uygulamanızda `App\Http\Middleware\CheckApiDocsAccess` var olduğu anda kit `['web', 'auth', CheckApiDocsAccess::class]` yığınını kendisi kuruyor. Her iki davranış da yalnızca `api-dock.middleware` hâlâ dokunulmamış `['web']` varsayılanındayken geçerli — config'i publish edip kendi middleware yığınınızı yazarsanız kit tamamen devreden çıkıyor.
+- Daha önce `php artisan vendor:publish --tag=scramble-config` çalıştırdıysanız ve kendi `config/scramble.php`'niz commit'liyse, bunu açıp Scramble'ın varsayılan docs rotasını kendi başına yeniden kaydetmediğinden emin olun (örn. `Scramble::routes()` çağırarak veya `ignoreDefaultRoutes()`'u temizleyerek) — bu değişiklikten önce publish edilmiş bir config bunu kendi başına yapamaz, ama elle düzenlenmiş biri yapabilir ve api-dock ile aynı belge için rekabet eder.
+- Dört yeni `api-dock:*` Artisan komutu (`export`, `diff`, `sync`, `agent-guide`) ve AI odaklı `llms.txt`/MCP export'ları opt-in araçlardır, yükseltme yolunun parçası değildir — her birinin ne yaptığı için bkz. [docs/api.tr.md](api.tr.md) ve `config/api-dock.php`.
+
 ### Daha önce evi olmayan sabit ops notları
 
 Daha önceki sürümlerde zaten gönderilmiş ama belgelenmiş bir yeri olmayan birkaç davranış var; bundan sonra bulunabilir olması için burada not ediyoruz:

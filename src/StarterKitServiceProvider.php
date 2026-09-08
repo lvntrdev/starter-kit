@@ -10,6 +10,7 @@ use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Container\Container;
+use Illuminate\Contracts\Auth\Access\Authorizable;
 use Illuminate\Contracts\Encryption\Encrypter as EncrypterContract;
 use Illuminate\Contracts\Encryption\StringEncrypter;
 use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
@@ -28,6 +29,7 @@ use Illuminate\Translation\FileLoader;
 use Inertia\Inertia;
 use Laravel\Fortify\Fortify;
 use Laravel\Passport\Passport;
+use LvntR\ApiDock\ApiDockServiceProvider;
 use Lvntr\StarterKit\Domain\ActivityLog\Queries\ActivityLogDatatableQuery;
 use Lvntr\StarterKit\Domain\ApiClient\Actions\CreateApiClientAction;
 use Lvntr\StarterKit\Domain\ApiClient\Actions\CreatePersonalAccessTokenAction;
@@ -203,6 +205,68 @@ class StarterKitServiceProvider extends ServiceProvider
         $this->registerDataEncryption();
 
         $this->registerMediaFilesystem();
+
+        // The kit's documentation UI is api-dock (`api-dock`, `api-dock/spec`),
+        // which documents the SAME `default` Scramble API. Scramble's own
+        // `docs/api` + `docs/api.json` routes would serve a second, unstyled
+        // copy of that document, so they are switched off.
+        //
+        // MUST run in register(): `Scramble::ignoreDefaultRoutes()` only flips
+        // the `Scramble::$defaultRoutesIgnored` static, which ScrambleServiceProvider
+        // reads in its own `bootingPackage()` (it calls `expose(false)` there).
+        // Every provider's register() precedes every provider's boot(), so this
+        // is the only phase that is order-independent — from boot() it would be a
+        // coin flip on provider order and the routes would often still register.
+        // class_exists() keeps an install that removed Scramble from fataling.
+        if (class_exists(Scramble::class)) {
+            Scramble::ignoreDefaultRoutes();
+        }
+
+        $this->secureApiDockDefaults();
+    }
+
+    /**
+     * Close the api-dock surface when the consumer has not published
+     * `config/api-dock.php` yet.
+     *
+     * api-dock ships `enabled => true`, `middleware => ['web']` and
+     * `gate.enabled => false`, so its panel, `/spec` and the try-it proxy are
+     * ANONYMOUS on the package defaults. The kit's gated stack lives in
+     * `stubs/config/api-dock.php`, which only reaches the app through
+     * `sk:install` / `sk:update` — an existing consumer that runs `composer
+     * update` alone (or upgrades and postpones `sk:update`) would serve the
+     * whole internal API surface, and an outbound request proxy, to the public
+     * in that window. Authorization must not depend on a scaffold step.
+     *
+     * Only the untouched package default (`['web']`) is replaced, so a consumer
+     * who published the config and edited the stack keeps their own decision —
+     * this is a safe default, not a lock. Runs in register(): api-dock builds
+     * its route middleware from this config when it loads its route file during
+     * boot.
+     *
+     * If `App\Http\Middleware\CheckApiDocsAccess` is absent (the kit was never
+     * installed into this app), there is no gate to install, so the surface is
+     * switched off entirely rather than left open — fail closed either way.
+     */
+    private function secureApiDockDefaults(): void
+    {
+        if (! class_exists(ApiDockServiceProvider::class)) {
+            return;
+        }
+
+        if (config('api-dock.middleware') !== ['web']) {
+            return;
+        }
+
+        $gate = 'App\Http\Middleware\CheckApiDocsAccess';
+
+        if (! class_exists($gate)) {
+            config(['api-dock.enabled' => false]);
+
+            return;
+        }
+
+        config(['api-dock.middleware' => ['web', 'auth', $gate]]);
     }
 
     /**
@@ -1336,11 +1400,11 @@ class StarterKitServiceProvider extends ServiceProvider
      *
      * Scramble's document wiring (transformers + envelope extension) and the
      * docs-access gate are only ever needed when the OpenAPI spec is actually
-     * built: during console doc export, or on a request targeting Scramble's
-     * own docs/spec routes (`docs/api`, `docs/api.json`). Booting the document
-     * generator on every ordinary web/API request is pure overhead, so this is
-     * skipped outside that context. class_exists() also keeps installs that
-     * removed Scramble from fataling here.
+     * built: during console doc export, or on a request targeting api-dock's
+     * panel/spec routes. Booting the document generator on every ordinary
+     * web/API request is pure overhead, so this is skipped outside that
+     * context. class_exists() also keeps installs that removed Scramble from
+     * fataling here.
      */
     private function configureScramble(): void
     {
@@ -1354,7 +1418,13 @@ class StarterKitServiceProvider extends ServiceProvider
         // hasPermissionTo() throws PermissionDoesNotExist — a fresh install
         // without the seeded api-docs permission should simply deny (403), not
         // 500. The docs middleware relies on this gate for its authorization.
-        Gate::define('viewApiDocs', function (User $user) {
+        //
+        // The parameter is typed to Authorizable, not App\Models\User: Gate
+        // hands the closure whatever the configured auth provider resolved, so
+        // an app whose user model is not App\Models\User would otherwise get a
+        // TypeError (500) here instead of the intended 403. `can()` is declared
+        // on Authorizable, which every Laravel user model implements.
+        Gate::define('viewApiDocs', function (Authorizable $user) {
             return $user->can('api-docs.read');
         });
     }
@@ -1369,6 +1439,22 @@ class StarterKitServiceProvider extends ServiceProvider
      * `postman-sync`, `apidog-sync`) run `Artisan::call('scramble:export')`
      * inside an ordinary web request, where runningInScrambleContext() was
      * false at boot. Those call sites invoke this right before exporting.
+     *
+     * Both halves reach api-dock's document unchanged, and no api-specific
+     * re-registration is needed — verified against the installed sources:
+     * api-dock does NOT register a private Scramble API. It documents
+     * `config('api-dock.scramble_api')`, which defaults to
+     * `Scramble::DEFAULT_API`, and `DocumentGenerator` generates from
+     * `Scramble::getGeneratorConfig()` of exactly that name — the same
+     * GeneratorConfig instance `Scramble::configure()` returns here, so the
+     * bearer transformer below is appended to the collection it actually uses.
+     * The envelope extension travels by config because
+     * `ApiResponseExtension` is a TypeToSchemaExtension, and Scramble reads
+     * `config('scramble.extensions')` for those inside its lazy
+     * `TypeTransformer` binding (ScrambleServiceProvider), i.e. at generation
+     * time rather than at its own boot — so provider boot order cannot lose it.
+     * (Only OperationExtensions are collected eagerly in `bootingPackage()`;
+     * this one is not an OperationExtension.)
      */
     public static function applyScrambleDocumentWiring(): void
     {
@@ -1401,12 +1487,22 @@ class StarterKitServiceProvider extends ServiceProvider
 
     /**
      * True when Scramble's document wiring is actually needed: console doc
-     * export/generation, or a request to Scramble's fixed docs/spec routes.
+     * export/generation, or a request to api-dock's routes.
      *
-     * Scramble registers its UI at `docs/api` and the JSON spec at
-     * `docs/api.json` (see GeneratorConfigCollection); both are covered by the
-     * `docs/api*` match. Under Pest/Testbench runningInConsole() is true, so
-     * doc-oriented tests still exercise the wiring.
+     * api-dock mounts everything it serves under one configurable prefix
+     * (`config/api-dock.php` → `route_prefix`, default `api-dock`): the panel
+     * at the prefix root and the generated document at `<prefix>/spec` (see
+     * vendor/lvntr/api-dock/routes/api-dock.php). Matching the prefix and its
+     * subpaths therefore covers every request that can reach
+     * `LvntR\ApiDock\Support\DocumentGenerator`. Scramble's own `docs/api*`
+     * routes are no longer registered — see register().
+     *
+     * A blank prefix would mount api-dock at the application root, which this
+     * gate deliberately does not follow (it would turn every request into a
+     * documentation context); it falls back to the documented default instead.
+     *
+     * Under Pest/Testbench runningInConsole() is true, so doc-oriented tests
+     * still exercise the wiring.
      */
     private function runningInScrambleContext(): bool
     {
@@ -1420,7 +1516,17 @@ class StarterKitServiceProvider extends ServiceProvider
 
         $request = $this->app['request'];
 
-        return $request instanceof Request && $request->is('docs/api', 'docs/api*');
+        if (! $request instanceof Request) {
+            return false;
+        }
+
+        $prefix = trim((string) config('api-dock.route_prefix', 'api-dock'), '/');
+
+        if ($prefix === '') {
+            $prefix = 'api-dock';
+        }
+
+        return $request->is($prefix, $prefix.'/*');
     }
 
     /**

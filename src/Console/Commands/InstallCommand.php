@@ -568,9 +568,30 @@ class InstallCommand extends Command
                 // FileManager config — vendor runtime reads its defaults from here.
                 // Published separately so users can override file-manager.php settings
                 // (allowed mime types, max size, model bindings) without touching vendor code.
-                return $this->runArtisan('vendor:publish', [
+                if (! $this->runArtisan('vendor:publish', [
                     '--tag' => 'starter-kit-file-manager-config',
                     '--force' => $this->option('force'),
+                ])) {
+                    return false;
+                }
+
+                // api-dock's compiled SPA → public/vendor/api-dock. NOT config:
+                // config/api-dock.php arrives with the stub tree in step 1 (the
+                // gated `middleware` stack lives there), but the bundle it serves
+                // is a vendor asset Composer never places.
+                //
+                // Only the FIRST install needs this call. api-dock also registers
+                // the same directory under Laravel's `laravel-assets` tag, which a
+                // stock consumer composer.json republishes with --force on every
+                // `post-autoload-dump` — so an upgrade refreshes the bundle by
+                // itself and cannot go stale against a newer package.
+                //
+                // Always --force: an asset directory is vendor output with no user
+                // edits to protect, and a half-updated bundle is a broken panel.
+                // Unforced, a re-install would keep the previous build's files.
+                return $this->runArtisan('vendor:publish', [
+                    '--tag' => 'api-dock-assets',
+                    '--force' => true,
                 ]);
             });
 

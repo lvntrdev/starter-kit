@@ -254,6 +254,32 @@ The handler auto-maps Laravel's built-ins: `ModelNotFoundException → 404`, `Va
 
 ---
 
+## API Docs — AI Metadata Attributes (`lvntr/api-dock`)
+
+Optional. On `App\Http\Controllers\Api\*` classes/methods, six attributes
+add AI-facing detail to the generated OpenAPI document beyond what the
+schema already says — full merge rules in `docs/api-ai-metadata.md`.
+
+```php
+use LvntR\ApiDock\Attributes\AiHint;
+use LvntR\ApiDock\Attributes\AiPitfall;
+use LvntR\ApiDock\Attributes\ApiFeature;
+
+#[AiHint('Creates an admin-managed user; the caller must already hold users.create.')]
+#[ApiFeature(scopes: ['users.create'])]
+class UserController extends Controller
+{
+    #[AiPitfall('email must be unique across active AND soft-deleted users.')]
+    public function store(StoreUserRequest $request, CreateUserAction $action): ApiResponse { /* ... */ }
+}
+```
+
+`AiHint`, `AiTool`, `ApiFeature` are single-value (method overrides class);
+`AiPitfall`, `AiChangelog`, `AiExample` are repeatable and stack. View the
+generated docs at `/api-dock`.
+
+---
+
 ## Backend Pitfalls
 
 1. **Forgetting to register a Listener** in `DomainServiceProvider::boot()` — it won't fire, no error. Always wire `Event::listen($event, $listener)`.

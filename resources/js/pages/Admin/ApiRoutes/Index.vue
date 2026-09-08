@@ -35,6 +35,8 @@
             project_id: string | null;
             access_token_is_set: boolean;
         };
+        /** Resolved from the `api-dock.docs` route; null when api-dock is absent or disabled. */
+        api_docs_url?: string | null;
     }
 
     const props = defineProps<Props>();
@@ -229,6 +231,7 @@
     <AdminLayout :title="$t('sk-api-route.title')" :subtitle="$t('sk-api-route.subtitle')">
         <template #page-actions>
             <ApiRoutesActions
+                :api-docs-url="props.api_docs_url"
                 :regenerating="regenerating"
                 :syncing-postman="syncingPostman"
                 :syncing-apidog="syncingApidog"

@@ -134,6 +134,30 @@ php artisan sk:seed-permissions --fresh   # re-seed roles + permissions after ed
                                           # config/permission-resources.php
 ```
 
+### API documentation (`lvntr/api-dock`)
+
+The `/api-dock` panel serves an OpenAPI document generated from your routes —
+this is the spec source for a Postman/Apidog import, not a hand-maintained
+file.
+
+```bash
+php artisan api-dock:sync              # regenerate the OpenAPI doc, diff vs the stored
+                                        # snapshot, report breaking/additive/cosmetic changes
+php artisan api-dock:diff              # compare current doc vs snapshot, write nothing
+php artisan api-dock:diff --json       # machine-readable diff
+php artisan api-dock:export --openapi  # write the plain openapi.json (import this into
+                                        # Postman/Apidog) to config('api-dock.ai.export_path')
+php artisan api-dock:export --llms     # write llms.txt (AI-context digest)
+php artisan api-dock:export --mcp      # write mcp-tools.json (MCP tool definitions)
+php artisan api-dock:agent-guide       # install the API Dock authoring rules into this
+                                        # project's agent instruction files
+```
+
+Annotate `App\Http\Controllers\Api\*` classes/methods with the six
+`LvntR\ApiDock\Attributes\*` attributes (`AiHint`, `AiPitfall`, `AiChangelog`,
+`AiExample`, `AiTool`, `ApiFeature`) to add AI-facing metadata beyond what the
+generated schema already says — see `docs/api-ai-metadata.md`.
+
 ### Customization
 
 ```bash

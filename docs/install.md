@@ -131,7 +131,7 @@ The installer then walks through each step interactively:
 | 4    | Configure database connection (driver, host, port, database, credentials) — skipped in `--no-interaction` |
 | 5    | Remove conflicting default Laravel files (`vite.config.js`, `welcome.blade.php`, etc.) — **on a first install only**; on any later run they are kept and listed in the closing report |
 | 6    | Merge kit `.gitignore` entries into the project's existing file                                  |
-| 7    | Publish and inject config files (`app.php`, including `display_timezone` backed by `APP_DISPLAY_TIMEZONE`; `database.php`, pinning existing MySQL/MariaDB connection arrays to `+00:00`; `filesystems.php`; `services.php` for Turnstile; `media-library.php`), wire `bootstrap/app.php`, register service providers, and register the custom-helpers autoload entry |
+| 7    | Publish and inject config files (`app.php`, including `display_timezone` backed by `APP_DISPLAY_TIMEZONE`; `database.php`, pinning existing MySQL/MariaDB connection arrays to `+00:00`; `filesystems.php`; `services.php` for Turnstile; `media-library.php`), publish the api-dock panel's compiled SPA assets (`public/vendor/api-dock`), wire `bootstrap/app.php`, register service providers, and register the custom-helpers autoload entry |
 | 8    | Eject `User` + `Role` domain runtime into `app/Domain/` (skipped when `--without-eject` is passed or when `storage/starter-kit/hashes.json` already exists) |
 | 9    | Regenerate Composer autoload                                                                     |
 | 10   | Run database migrations — see [Choosing a migration strategy](#choosing-a-migration-strategy) below. If the database is unreachable the database steps are skipped and the run closes as `INCOMPLETE` with a **non-zero exit code** (no hash registry is written); fix the connection and re-run with `--resume` |
@@ -141,6 +141,8 @@ The installer then walks through each step interactively:
 | 14   | Create default admin user (`admin@lvntr.dev` / random password printed at the end)                |
 | 15   | Install npm dependencies and build frontend assets                                               |
 | 16   | Finalize the application key and save stub hashes for `sk:update` tracking                       |
+
+`config/api-dock.php` arrives with the scaffolding in step 1, not the config-publishing step — it carries the kit's gated `middleware` stack for the `/api-dock` documentation panel. The panel and the underlying `/api/v1` contract it documents both sit behind the seeded `api-docs.read` permission (granted to the `developer` role by default); see [API Routes Admin Module](api-routes.md#access--permissions).
 
 During the config step, `sk:install` adds the literal `'timezone' => '+00:00'` contract to the existing `mysql` and `mariadb` arrays in `config/database.php`. It does not replace a consumer-defined `timezone`, create a missing connection, or touch `sqlite`, `pgsql`, or `sqlsrv`.
 

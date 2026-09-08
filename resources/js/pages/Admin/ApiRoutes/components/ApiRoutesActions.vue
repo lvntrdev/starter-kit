@@ -2,12 +2,20 @@
     import { useCan } from '@/composables/useCan';
 
     interface Props {
+        /**
+         * Panel URL resolved server-side from the `api-dock.docs` route, since
+         * `api-dock.route_prefix` is configurable. Null/undefined when api-dock
+         * is absent or disabled — the button is then hidden rather than linking
+         * somewhere that 404s.
+         */
+        apiDocsUrl?: string | null;
         regenerating?: boolean;
         syncingPostman?: boolean;
         syncingApidog?: boolean;
     }
 
     withDefaults(defineProps<Props>(), {
+        apiDocsUrl: null,
         regenerating: false,
         syncingPostman: false,
         syncingApidog: false,
@@ -61,7 +69,7 @@
             :loading="syncingApidog"
             @click="$emit('sync-apidog')"
         />
-        <a href="/docs/api" target="_blank" rel="noopener noreferrer">
+        <a v-if="apiDocsUrl" :href="apiDocsUrl" target="_blank" rel="noopener noreferrer">
             <Button
                 :label="$t('sk-api-route.open_api_docs')"
                 icon="pi pi-book"

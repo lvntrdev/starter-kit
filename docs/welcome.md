@@ -28,7 +28,7 @@ The File Manager supports core file operations such as media upload, foldering, 
 
 ## API and Token Management
 
-OAuth2 API access, API client management, and personal access token flows are supported through Laravel Passport. API clients and tokens can be controlled from the admin panel.
+OAuth2 API access, API client management, and personal access token flows are supported through Laravel Passport. API clients and tokens can be controlled from the admin panel. Endpoints can also carry [AI-oriented metadata](./api-ai-metadata.md) — hints, pitfalls, examples, and a changelog — exported as `llms.txt` and MCP tool definitions.
 
 ## System Health
 

@@ -3,6 +3,7 @@
 namespace Lvntr\StarterKit\Http\Controllers\Admin;
 
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
 use Lvntr\StarterKit\Domain\ApiRoute\Actions\RegenerateApiDocsAction;
@@ -33,6 +34,12 @@ class ApiRouteController extends Controller
                 'project_id' => $apidogProject,
                 'access_token_is_set' => $this->filled($apidogToken),
             ],
+            // Resolved from the named route rather than hardcoded in the Vue
+            // component: `api-dock.route_prefix` is configurable, so a consumer
+            // serving the panel at e.g. `internal/docs` would otherwise get a
+            // 404 from this screen's documentation button. Null when api-dock
+            // is absent or disabled — the button is then not rendered at all.
+            'api_docs_url' => Route::has('api-dock.docs') ? route('api-dock.docs') : null,
         ]);
     }
 

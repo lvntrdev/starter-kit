@@ -121,7 +121,7 @@ there is nothing to keep in sync. Releases are cut with `release.sh` (from
 
 ## Documentation
 
-Everything — installation, update flow, domain scaffolding, FormBuilder / DatatableBuilder / TabBuilder APIs, composables, file manager, roles & permissions, OAuth2 API, activity logs, settings — lives on the official site:
+Everything — installation, update flow, domain scaffolding, FormBuilder / DatatableBuilder / TabBuilder APIs, composables, file manager, roles & permissions, OAuth2 API, [AI-oriented API metadata](./docs/api-ai-metadata.md), activity logs, settings — lives on the official site:
 
 **[starter-kit.lvntr.dev](https://starter-kit.lvntr.dev/)**
 

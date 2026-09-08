@@ -18,8 +18,12 @@ This document is the command reference for the starter kit. Architectural notes 
 | `php artisan env:sync --reverse`          | Check whether `.env` is missing keys from `.env.example`     |
 | `php artisan site:install`                | Reset and reinstall site data for local/dev usage            |
 | `php artisan sk:seed-permissions --fresh` | Rebuild role and permission data from config                 |
-| `php artisan postman:sync`                | Push the Scramble OpenAPI spec to Postman                    |
-| `php artisan apidog:sync`                 | Push the Scramble OpenAPI spec to Apidog                     |
+| `php artisan postman:sync`                | Push the api-dock OpenAPI document to Postman                |
+| `php artisan apidog:sync`                 | Push the api-dock OpenAPI document to Apidog                 |
+| `php artisan api-dock:agent-guide`        | Install the API Dock authoring rules into agent instruction files |
+| `php artisan api-dock:sync`               | Regenerate, compare, and store the API Dock OpenAPI snapshot |
+| `php artisan api-dock:diff`               | Compare the generated OpenAPI document with the stored snapshot |
+| `php artisan api-dock:export`             | Export API Dock artifacts for AI tools and OpenAPI consumers |
 | `php artisan sk:redact-activity-secrets`  | Irreversibly remove credentials from existing activity logs  |
 | `php artisan file-manager:purge-trash`    | Permanently delete old File Manager trash                    |
 | `php artisan encryption:key`              | Generate a dedicated `DATA_ENCRYPTION_KEY`, preserving the old key |
@@ -342,23 +346,75 @@ Since v13.4.1 the pipeline runs `passport:client --personal --provider=users` be
 
 ## `postman:sync`
 
-Pushes the Scramble-generated OpenAPI spec to Postman so the workspace collection stays in sync with the current API surface.
+Pushes the api-dock-generated OpenAPI document to Postman so the workspace collection stays in sync with the current API surface.
 
 ```bash
 php artisan postman:sync
 ```
 
-Reads the `postman` settings group: `postman.api_key` and `postman.workspace_id` are required, and `postman.collection_id` is rewritten with the upstream id after a successful push. The command fails early with a clear error when the key or workspace id is missing — set them under **Settings → API Clients → Postman** in the admin panel (or insert the rows directly) and re-run. Internally it delegates to `App\Domain\ApiRoute\Actions\SyncPostmanAction`, which uses the shared `OpenApiExporter` helper to run `scramble:export` into a per-request temp file under `storage/app/postman/` and hands the spec to Postman unchanged. The Action imports the fresh collection first, persists the new UID, then best-effort deletes the old one — a failed push never leaves the workspace without a working collection.
+Reads the `postman` settings group: `postman.api_key` and `postman.workspace_id` are required, and `postman.collection_id` is rewritten with the upstream id after a successful push. The command fails early with a clear error when the key or workspace id is missing — set them under **Settings → API Clients → Postman** in the admin panel (or insert the rows directly) and re-run. Internally it delegates to `Lvntr\StarterKit\Domain\ApiRoute\Actions\SyncPostmanAction`, which uses the shared `OpenApiExporter` helper to resolve api-dock's `DocumentGenerator` and hands the document to Postman unchanged. The Action imports the fresh collection first, persists the new UID, then best-effort deletes the old one — a failed push never leaves the workspace without a working collection.
 
 ## `apidog:sync`
 
-Pushes the same Scramble OpenAPI spec to Apidog for teams that mirror the collection there.
+Pushes the same api-dock OpenAPI document to Apidog for teams that mirror the collection there.
 
 ```bash
 php artisan apidog:sync
 ```
 
-Reads the `apidog` settings group: `apidog.access_token` and `apidog.project_id` are required. If either value is missing the command aborts with a "not configured" error — populate them under **Settings → API Clients → Apidog** (or insert the rows directly) and re-run. The heavy lifting is done by `App\Domain\ApiRoute\Actions\SyncApidogAction`, which shares the `OpenApiExporter` helper with `postman:sync` — the spec is uploaded to Apidog unchanged so the pushed project mirrors the real server contract.
+Reads the `apidog` settings group: `apidog.access_token` and `apidog.project_id` are required. If either value is missing the command aborts with a "not configured" error — populate them under **Settings → API Clients → Apidog** (or insert the rows directly) and re-run. The heavy lifting is done by `Lvntr\StarterKit\Domain\ApiRoute\Actions\SyncApidogAction`, which shares the `OpenApiExporter` helper with `postman:sync` — the document is uploaded to Apidog unchanged so the pushed project mirrors the real server contract.
+
+## `api-dock:agent-guide`
+
+Installs api-dock's authoring rules into this project's agent instruction files, so a coding agent working on API endpoints follows the same documentation conventions the panel expects.
+
+```bash
+php artisan api-dock:agent-guide
+php artisan api-dock:agent-guide --file=AGENTS.md
+php artisan api-dock:agent-guide --print
+```
+
+- `--file=` (repeatable) targets a specific instruction file relative to the project root. Without it, the command writes to whichever of `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` already exist in the project — `AGENTS.md` is the cross-vendor convention, the other two are vendor-specific and are only written when the project already keeps one.
+- `--print` writes the instruction block to output instead of to a file.
+
+## `api-dock:sync`
+
+Regenerates the OpenAPI document, compares it against the stored snapshot, and writes the new snapshot to `config('api-dock.snapshot.path')` (default `storage/api-dock/openapi.json`).
+
+```bash
+php artisan api-dock:sync
+php artisan api-dock:sync --check
+```
+
+- `--check` exits with code `1` on breaking changes and does not write the snapshot — use this in CI to fail a build on an accidental breaking API change.
+
+## `api-dock:diff`
+
+Compares the currently generated OpenAPI document with the stored snapshot without writing anything.
+
+```bash
+php artisan api-dock:diff
+php artisan api-dock:diff --json
+```
+
+- `--json` emits the structured diff as JSON instead of the human-readable summary.
+
+## `api-dock:export`
+
+Exports API Dock artifacts for AI tools and OpenAPI consumers, built through the same `DocumentGenerator` the `/api-dock` panel uses.
+
+```bash
+php artisan api-dock:export --openapi
+php artisan api-dock:export --mcp --llms
+php artisan api-dock:export --openapi --output=storage/app/api-exports
+```
+
+- `--openapi` writes the generated OpenAPI document (`openapi.json`)
+- `--mcp` writes MCP tool definitions
+- `--llms` writes the `llms.txt` bundle
+- `--output=` overrides the export directory (default `config('api-dock.ai.export_path')`, i.e. `storage/api-dock`)
+
+This is the command the admin panel's **Regenerate Docs** button runs under the hood (`api-dock:export --openapi`) via `Lvntr\StarterKit\Domain\ApiRoute\Actions\RegenerateApiDocsAction`.
 
 ## `sk:redact-activity-secrets`
 

@@ -16,6 +16,7 @@ If something is unclear, read in this order:
 | Route file template | `routes/web/user-route.php` |
 | Permission resource shape | `config/permission-resources.php` |
 | Builder source (after `sk:publish`) | `resources/js/components/Lvntr-Starter-Kit/{FormBuilder,DatatableBuilder,TabBuilder}/core/` |
+| Document an API endpoint for a model / add an AI hint | `LvntR\ApiDock\Attributes\{AiHint,AiPitfall,AiChangelog,AiExample,AiTool,ApiFeature}` on the `App\Http\Controllers\Api\*` class/method — `docs/api-ai-metadata.md` |
 | Composables (published local copies) | `resources/js/composables/` — otherwise they run from vendor (`sk:publish --tag=composables`) |
 | Theme slots | `resources/css/theme/main/` (base) · `resources/css/theme/custom/` (override) |
 

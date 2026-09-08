@@ -1,6 +1,6 @@
 # API
 
-Starter kit, `/api/v1` altında versiyonlanmış bir JSON API sunar.
+Starter kit, `/api/v1` altında versiyonlanmış bir JSON API sunar. Bu sözleşmeyi rota dosyalarını elle okumak yerine, her zaman güncel ve gezilebilir bir görünüm için `/api-dock` adresindeki api-dock panelinden (seed edilen `api-docs.read` izniyle korunur) inceleyin.
 
 ## Yanıt Standardı
 

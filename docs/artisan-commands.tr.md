@@ -18,8 +18,12 @@ Bu döküman starter kit için komut referansıdır. DDD ile ilgili mimari notla
 | `php artisan env:sync --reverse`          | `.env` içinde eksik kalan anahtarları kontrol eder               |
 | `php artisan site:install`                | Lokal/dev kullanım için site verisini sıfırlayıp yeniden kurar   |
 | `php artisan sk:seed-permissions --fresh` | Rol ve yetki verilerini config'ten yeniden üretir                |
-| `php artisan postman:sync`                | Scramble OpenAPI spec'ini Postman'a gönderir                     |
-| `php artisan apidog:sync`                 | Scramble OpenAPI spec'ini Apidog'a gönderir                      |
+| `php artisan postman:sync`                | api-dock OpenAPI dokümanını Postman'a gönderir                   |
+| `php artisan apidog:sync`                 | api-dock OpenAPI dokümanını Apidog'a gönderir                    |
+| `php artisan api-dock:agent-guide`        | API Dock yazım kurallarını agent talimat dosyalarına kurar        |
+| `php artisan api-dock:sync`               | API Dock OpenAPI snapshot'ını yeniden üretir, kıyaslar ve kaydeder |
+| `php artisan api-dock:diff`               | Üretilen OpenAPI dokümanını kayıtlı snapshot ile kıyaslar          |
+| `php artisan api-dock:export`             | AI araçları ve OpenAPI tüketicileri için API Dock çıktıları üretir |
 | `php artisan sk:redact-activity-secrets`  | Mevcut aktivite kayıtlarından kimlik bilgilerini geri döndürülemez biçimde kaldırır |
 | `php artisan file-manager:purge-trash`    | Eski Dosya Yöneticisi çöpünü kalıcı olarak siler                 |
 | `php artisan encryption:key`              | Adanmış bir `DATA_ENCRYPTION_KEY` üretir, eski anahtarı korur    |
@@ -342,23 +346,75 @@ v13.4.1 itibarıyla akış `passport:keys` ile varsayılan admin seed'i arasınd
 
 ## `postman:sync`
 
-Scramble tarafından üretilen OpenAPI spec'ini Postman'a iterek workspace koleksiyonunuzun güncel API yüzeyiyle senkron kalmasını sağlar.
+api-dock tarafından üretilen OpenAPI dokümanını Postman'a iterek workspace koleksiyonunuzun güncel API yüzeyiyle senkron kalmasını sağlar.
 
 ```bash
 php artisan postman:sync
 ```
 
-`postman` ayar grubunu okur: `postman.api_key` ve `postman.workspace_id` zorunludur, başarılı gönderim sonrasında `postman.collection_id` Postman'dan dönen id ile güncellenir. Anahtar veya workspace id eksikse komut anlaşılır bir hata ile hemen durur — değerleri admin panelinde **Settings → API Clients → Postman** altından (ya da doğrudan ilgili satırları ekleyerek) doldurup komutu tekrar koşturun. Komut perde arkasında `App\Domain\ApiRoute\Actions\SyncPostmanAction` sınıfına delege edilir; ortak `OpenApiExporter` helper'ı `scramble:export` komutunu `storage/app/postman/` altında her çağrıda benzersiz bir geçici dosyaya yazar ve spec'i **değiştirmeden** Postman'e gönderir. Action önce taze koleksiyonu import eder, yeni UID'yi ayarlara yazar, sonra eski koleksiyonu best-effort siler — başarısız bir push mevcut çalışan koleksiyonu kaybetmez.
+`postman` ayar grubunu okur: `postman.api_key` ve `postman.workspace_id` zorunludur, başarılı gönderim sonrasında `postman.collection_id` Postman'dan dönen id ile güncellenir. Anahtar veya workspace id eksikse komut anlaşılır bir hata ile hemen durur — değerleri admin panelinde **Settings → API Clients → Postman** altından (ya da doğrudan ilgili satırları ekleyerek) doldurup komutu tekrar koşturun. Komut perde arkasında `Lvntr\StarterKit\Domain\ApiRoute\Actions\SyncPostmanAction` sınıfına delege edilir; ortak `OpenApiExporter` helper'ı api-dock'un `DocumentGenerator`'ını çözer ve dokümanı **değiştirmeden** Postman'e gönderir. Action önce taze koleksiyonu import eder, yeni UID'yi ayarlara yazar, sonra eski koleksiyonu best-effort siler — başarısız bir push mevcut çalışan koleksiyonu kaybetmez.
 
 ## `apidog:sync`
 
-Aynı Scramble OpenAPI spec'ini, koleksiyonu Apidog üzerinde yansılayan ekipler için Apidog'a gönderir.
+Aynı api-dock OpenAPI dokümanını, koleksiyonu Apidog üzerinde yansılayan ekipler için Apidog'a gönderir.
 
 ```bash
 php artisan apidog:sync
 ```
 
-`apidog` ayar grubunu okur: `apidog.access_token` ve `apidog.project_id` zorunludur. Değerlerden biri eksikse komut "not configured" hatası verip durur — değerleri **Settings → API Clients → Apidog** altından (ya da doğrudan ilgili satırları ekleyerek) doldurup komutu tekrar koşturun. Asıl iş `App\Domain\ApiRoute\Actions\SyncApidogAction` içinde yapılır ve `postman:sync` ile aynı `OpenApiExporter` helper'ını paylaşır — spec Apidog'a **değiştirilmeden** gönderilir, bu sayede push edilen proje gerçek sunucu kontratını aynen yansıtır.
+`apidog` ayar grubunu okur: `apidog.access_token` ve `apidog.project_id` zorunludur. Değerlerden biri eksikse komut "not configured" hatası verip durur — değerleri **Settings → API Clients → Apidog** altından (ya da doğrudan ilgili satırları ekleyerek) doldurup komutu tekrar koşturun. Asıl iş `Lvntr\StarterKit\Domain\ApiRoute\Actions\SyncApidogAction` içinde yapılır ve `postman:sync` ile aynı `OpenApiExporter` helper'ını paylaşır — doküman Apidog'a **değiştirilmeden** gönderilir, bu sayede push edilen proje gerçek sunucu kontratını aynen yansıtır.
+
+## `api-dock:agent-guide`
+
+API Dock'un yazım kurallarını bu projenin agent talimat dosyalarına kurar; böylece bir API endpoint'i üzerinde çalışan bir coding agent, panelin beklediği aynı dokümantasyon kurallarını izler.
+
+```bash
+php artisan api-dock:agent-guide
+php artisan api-dock:agent-guide --file=AGENTS.md
+php artisan api-dock:agent-guide --print
+```
+
+- `--file=` (tekrarlanabilir) proje köküne göre belirli bir talimat dosyasını hedefler. Verilmezse komut, projede zaten var olan `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` dosyalarına yazar — `AGENTS.md` vendor'lar arası ortak kural, diğer ikisi vendor'a özgüdür ve yalnızca proje zaten o dosyayı tutuyorsa yazılır.
+- `--print` talimat bloğunu bir dosyaya değil çıktıya yazar.
+
+## `api-dock:sync`
+
+OpenAPI dokümanını yeniden üretir, kayıtlı snapshot ile kıyaslar ve yeni snapshot'ı `config('api-dock.snapshot.path')` (varsayılan `storage/api-dock/openapi.json`) altına yazar.
+
+```bash
+php artisan api-dock:sync
+php artisan api-dock:sync --check
+```
+
+- `--check` breaking değişiklik varsa `1` çıkış koduyla sonlanır ve snapshot'ı yazmaz — CI'da beklenmedik bir breaking API değişikliğinde build'i kırmak için kullanılır.
+
+## `api-dock:diff`
+
+Şu anda üretilen OpenAPI dokümanını hiçbir şey yazmadan kayıtlı snapshot ile kıyaslar.
+
+```bash
+php artisan api-dock:diff
+php artisan api-dock:diff --json
+```
+
+- `--json` insan-okunur özet yerine yapılandırılmış diff'i JSON olarak verir.
+
+## `api-dock:export`
+
+`/api-dock` panelinin kullandığı aynı `DocumentGenerator` üzerinden AI araçları ve OpenAPI tüketicileri için API Dock çıktıları üretir.
+
+```bash
+php artisan api-dock:export --openapi
+php artisan api-dock:export --mcp --llms
+php artisan api-dock:export --openapi --output=storage/app/api-exports
+```
+
+- `--openapi` üretilen OpenAPI dokümanını yazar (`openapi.json`)
+- `--mcp` MCP tool tanımlarını yazar
+- `--llms` `llms.txt` paketini yazar
+- `--output=` export dizinini geçersiz kılar (varsayılan `config('api-dock.ai.export_path')`, yani `storage/api-dock`)
+
+Bu komut, admin panelindeki **Regenerate Docs** butonunun perde arkasında (`api-dock:export --openapi`) `Lvntr\StarterKit\Domain\ApiRoute\Actions\RegenerateApiDocsAction` üzerinden çalıştırdığı komuttur.
 
 ## `sk:redact-activity-secrets`
 

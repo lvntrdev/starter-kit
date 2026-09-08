@@ -1,6 +1,6 @@
 # API
 
-The starter kit exposes a versioned JSON API under `/api/v1`.
+The starter kit exposes a versioned JSON API under `/api/v1`. For a browsable, always-current view of that contract, use the api-dock panel at `/api-dock` (gated by the seeded `api-docs.read` permission) rather than reading route files by hand.
 
 ## Response Standard
 

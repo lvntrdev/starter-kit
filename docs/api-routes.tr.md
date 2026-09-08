@@ -7,8 +7,8 @@ ApiRoutes modülü, admin panel içinde uygulamanın API ve servis route yüzeyi
 - API endpoint'lerini panel içinden listeler
 - servis route'larını ayrı bölümde gösterir
 - HTTP method, URI, route adı, action ve middleware bilgisini görünür kılar
-- Scramble tabanlı API dokümantasyonunu panel içinden yeniden üretir
-- `/docs/api` dökümantasyon ekranına hızlı erişim sunar
+- api-dock OpenAPI dokümanını panel içinden yeniden üretir
+- `/api-dock` dokümantasyon paneline hızlı erişim sunar
 - mevcut OpenAPI spec'ini Postman'e taze bir koleksiyon olarak gönderir
 - aynı spec'i Apidog'daki hedef projeye yazar (üzerine yazar)
 
@@ -42,8 +42,8 @@ Her kayıt için şu bilgiler gösterilir:
 
 Sayfanın üst kısmındaki aksiyonlar:
 
-- **Regenerate Docs**: Scramble export'unu yeniden üretir
-- **Open API Docs**: `/docs/api` ekranını yeni sekmede açar
+- **Regenerate Docs**: api-dock OpenAPI dokümanını yeniden üretir ve `config('api-dock.ai.export_path')` altındaki `admin/` alt dizinine yazar — varsayılan olarak `storage/api-dock/admin/openapi.json`. Export köküne bilerek yazmaz: o yol aynı zamanda `api-dock:diff` / `api-dock:sync --check` komutlarının kıyasladığı varsayılan `api-dock.snapshot.path`'tir; panelden üzerine yazmak CI referansını sessizce güncellerdi.
+- **Open API Docs**: api-dock panelini yeni sekmede açar. URL sunucu tarafında `api-dock.docs` isimli route'undan çözülür, böylece özelleştirilmiş `api-dock.route_prefix` de çalışır; api-dock yoksa veya kapalıysa buton hiç render edilmez.
 
 ## Backend Yapısı
 
@@ -65,12 +65,12 @@ Projede ayrıca `api-docs.read` gibi ilgili permission girdileri de bulunur. Rol
 
 Admin ekranındaki araç çubuğu, **Regenerate Docs** butonunun yanına iki yeni aksiyon daha ekler:
 
-- **Sync to Postman**: `SyncPostmanAction` çalışır; güncel Scramble spec'ini export eder ve Postman'in `POST /import/openapi` uçuna `folderStrategy=Tags` parametresiyle yükler. Her sync önce taze koleksiyonu import eder, yeni UID'yi ayarlara yazar, sonra eski koleksiyonu best-effort siler — `import-first, delete-after` sırası sayesinde Postman tarafında geçici bir hata mevcut çalışan koleksiyonu kaybettirmez.
-- **Sync to Apidog**: `SyncApidogAction` çalışır; aynı spec'i Apidog'un `POST /v1/projects/{id}/import-openapi` uçuna inline JSON olarak `OVERWRITE_EXISTING` modunda gönderir.
+- **Sync to Postman**: `SyncPostmanAction` çalışır; güncel OpenAPI dokümanını api-dock'un `DocumentGenerator`'ı üzerinden üretir ve Postman'in `POST /import/openapi` uçuna `folderStrategy=Tags` parametresiyle yükler. Her sync önce taze koleksiyonu import eder, yeni UID'yi ayarlara yazar, sonra eski koleksiyonu best-effort siler — `import-first, delete-after` sırası sayesinde Postman tarafında geçici bir hata mevcut çalışan koleksiyonu kaybettirmez.
+- **Sync to Apidog**: `SyncApidogAction` çalışır; aynı dokümanı Apidog'un `POST /v1/projects/{id}/import-openapi` uçuna inline JSON olarak `OVERWRITE_EXISTING` modunda gönderir.
 
 Her iki buton da ortak bir loading spinner ve işlem sonucunu bildiren bir toast gösterir. İlgili kimlik bilgileri eksikse ilgili buton devre dışı kalır ve bir yönlendirme ipucu kullanıcıyı **Settings → API Clients** ekranına götürür — `postman` ve `apidog` settings grupları burada yönetilir. Gizli alanlar (`postman.api_key`, `apidog.access_token`) [config/settings.php](../stubs/config/settings.php) içindeki `sensitive_keys` listesi üzerinden şifrelenerek saklanır.
 
-İki Action ortak bir yardımcıyı, `App\Domain\ApiRoute\Support\OpenApiExporter` sınıfını kullanır: `scramble:export` komutunu her çağrıda `storage/app/postman/` altında benzersiz bir geçici dosyaya yazar ve `finally` bloğunda temizler — CLI komutu ve admin butonu eş zamanlı çalıştığında paylaşılan bir dosyada yarışmazlar. Spec hedef istemciye **değiştirilmeden** iletilir; content-type rewrite'ı bilinçli olarak yapılmaz, böylece gönderilen koleksiyon gerçek sunucu kontratını aynen yansıtır.
+İki Action ortak bir yardımcıyı, `Lvntr\StarterKit\Domain\ApiRoute\Support\OpenApiExporter` sınıfını (vendor-resident, `src/Domain/ApiRoute/`) kullanır: bu sınıf api-dock'un `DocumentGenerator`'ını container'dan çözer — `/api-dock` paneli ve her `api-dock:*` konsol komutu da aynı giriş noktasını kullanır, dolayısıyla Postman/Apidog'a gönderilen doküman panelin gösterdiğiyle bayt bayt aynıdır. Doküman hedef istemciye **değiştirilmeden** iletilir; content-type rewrite'ı bilinçli olarak yapılmaz, böylece gönderilen koleksiyon gerçek sunucu kontratını aynen yansıtır.
 
 Aynı akışlar CLI'dan da kullanılabilir (CI senaryoları için faydalıdır):
 

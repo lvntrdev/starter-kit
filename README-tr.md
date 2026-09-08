@@ -115,7 +115,7 @@ geçer; önceki major'un `N.x` branch'i ise backport almaya devam eder.
 
 ## Dökümantasyon
 
-Kurulum, güncelleme akışı, domain scaffolding, FormBuilder / DatatableBuilder / TabBuilder API'ları, composable'lar, dosya yöneticisi, roller ve yetkiler, OAuth2 API, aktivite kayıtları, ayarlar — her şey resmi sitede:
+Kurulum, güncelleme akışı, domain scaffolding, FormBuilder / DatatableBuilder / TabBuilder API'ları, composable'lar, dosya yöneticisi, roller ve yetkiler, OAuth2 API, [AI odaklı API metadata](./docs/api-ai-metadata.tr.md), aktivite kayıtları, ayarlar — her şey resmi sitede:
 
 **[starter-kit.lvntr.dev](https://starter-kit.lvntr.dev/)**
 
