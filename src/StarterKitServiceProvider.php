@@ -217,8 +217,18 @@ class StarterKitServiceProvider extends ServiceProvider
         // Every provider's register() precedes every provider's boot(), so this
         // is the only phase that is order-independent — from boot() it would be a
         // coin flip on provider order and the routes would often still register.
-        // class_exists() keeps an install that removed Scramble from fataling.
-        if (class_exists(Scramble::class)) {
+        //
+        // Both class_exists() checks are load-bearing. Scramble's guards an
+        // install that removed it. api-dock's guards the window where the
+        // replacement is NOT there: a consumer who pulled this version's source
+        // without letting Composer resolve its new requirement (a path/VCS
+        // repository on `dev-main`, a vendor dir restored from an older lock, an
+        // install that pinned api-dock away). Switching `docs/api` off in that
+        // window would leave the app with NO documentation surface at all —
+        // `api-dock` is not registered either — and the API Routes screen hides
+        // its panel button on the same missing route. Never retire the old
+        // surface unless the new one is actually there to take over.
+        if (class_exists(Scramble::class) && class_exists(ApiDockServiceProvider::class)) {
             Scramble::ignoreDefaultRoutes();
         }
 
