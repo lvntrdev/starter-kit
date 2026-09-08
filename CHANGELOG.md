@@ -5,6 +5,12 @@ All notable changes to `lvntr/laravel-starter-kit` will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [13.7.1] - 2026-09-08
+
+### Fixed
+
+- **The back button in a datatable toolbar now sits before the toolbar's actions, matching every other card.** `SkDatatable` drew the hosted page header (the layout's back button and page actions) at the very end of `.sk-dt-toolbar__actions`, while `SkCard` — the host `SkForm` and every plain card go through — drew it first. A screen carrying both therefore showed `[+ Create] [← Back]` on the table and `[← Back] [Save]` on the form. The header now renders first in the datatable toolbar too, so back stays a navigation control to the left of the primary action instead of reading as one. The toolbar's action container also carries the `data-sk-page-header` marker `SkCard` already set, so consumer CSS can target both hosts with a single selector.
+
 ## [13.7.0] - 2026-09-06
 
 ### Added
@@ -147,7 +153,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The Roles form no longer hides a validation error on an inactive tab.** Vertical `SkTabs` mounts only the active panel; the Basic Info tab (`name`/`display_name`/`color`) is not the default active one, so a required-field error there after a failed submit rendered nowhere and the operator saw no feedback at all. The form now switches to the tab holding the errored field.
 - **`sk:install` no longer silently republishes over an already-installed app.** A leftover `install-progress.json` checkpoint — written by any prior run that ended incomplete, e.g. an unreachable database — disabled both the existing-app-markers guard and the confirmation prompt on every later plain re-run, regardless of whether `--resume` was passed; `stepAlreadyCompleted()` already required an explicit `--resume` to actually skip a step, so nothing was really being resumed, just unguarded. A new `confirmReinstall()` gate now asks before republishing whenever the hash registry (`storage/starter-kit/hashes.json`) already exists and the run isn't an actual `--resume`; it fails closed under `--no-interaction` unless `--force` is passed, and a stale checkpoint alone can no longer suppress either guard.
 - **A fresh install no longer sends a successful login to a 404.** `FortifyServiceProvider` never overrode Fortify's own post-login redirect target, `config('fortify.home')` (`/home`) — a route this kit never registers, since the real landing page is `dashboard.index` (`/dashboard`). The published provider now sets `config(['fortify.home' => '/dashboard'])` in `boot()`; an existing install that customised its own copy is unaffected until it re-publishes.
-- **The back button in a datatable toolbar now sits before the toolbar's actions, matching every other card.** `SkDatatable` drew the hosted page header (the layout's back button and page actions) at the very end of `.sk-dt-toolbar__actions`, while `SkCard` — the host `SkForm` and every plain card go through — drew it first. A screen carrying both therefore showed `[+ Create] [← Back]` on the table and `[← Back] [Save]` on the form. The header now renders first in the datatable toolbar too, so back stays a navigation control to the left of the primary action instead of reading as one. The toolbar's action container also carries the `data-sk-page-header` marker `SkCard` already set, so consumer CSS can target both hosts with a single selector.
 
 ## [13.6.16] - 2026-08-25
 
